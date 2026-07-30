@@ -24,14 +24,15 @@ describe('SolarWindCard', () => {
     expect(await screen.findByText(/service unavailable/i)).toBeInTheDocument();
   });
 
-  it('renders a speed chart and a density chart, plus the latest readings', async () => {
+  it('renders a speed chart and a density chart, plus the latest readings and their time', async () => {
     vi.mocked(fetchSolarWind).mockResolvedValue([
-      { time: '2026-07-29 00:00:00.000', density: 4.5, speed: 400, temperature: 100000 },
-      { time: '2026-07-29 00:05:00.000', density: null, speed: 410, temperature: 101000 },
+      { time: '2026-07-29T00:00:00Z', density: 4.5, speed: 400, temperature: 100000 },
+      { time: '2026-07-29T00:05:00Z', density: null, speed: 410, temperature: 101000 },
     ]);
     render(<SolarWindCard />);
     await screen.findByText(/410/);
     expect(screen.getByTestId('solar-wind-speed-chart')).toBeInTheDocument();
     expect(screen.getByTestId('solar-wind-density-chart')).toBeInTheDocument();
+    expect(screen.getByText(/2026-07-29 00:05 UTC/)).toBeInTheDocument();
   });
 });

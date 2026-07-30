@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { SceneVector3 } from '../astro/coords';
+import earthTextureUrl from '../assets/earth-diffuse.jpg';
 
 export const EARTH_RADIUS_UNITS = 2;
 
 export interface EarthSceneHandle {
   setIssPosition(position: SceneVector3 | null): void;
   setOrbitPath(points: SceneVector3[]): void;
+  setSatellites(positions: SceneVector3[]): void;
   resize(): void;
   dispose(): void;
 }
@@ -18,6 +20,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   function applySize() {
     const width = canvas.clientWidth || 1;
@@ -35,23 +38,28 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   controls.minDistance = 3;
   controls.maxDistance = 20;
 
-  scene.add(new THREE.AmbientLight(0x6d84b8, 1.8));
-  const sunLight = new THREE.DirectionalLight(0xffffff, 1.6);
-  sunLight.position.set(5, 3, 5);
+  // Low ambient + a single strong "sun" light gives a visible day/night
+  // terminator instead of flat, uniformly lit shading.
+  scene.add(new THREE.AmbientLight(0x223355, 0.55));
+  const sunLight = new THREE.DirectionalLight(0xffffff, 2.4);
+  sunLight.position.set(5, 2, 4);
   scene.add(sunLight);
-  const fillLight = new THREE.DirectionalLight(0x5577aa, 0.6);
+  const fillLight = new THREE.DirectionalLight(0x334466, 0.18);
   fillLight.position.set(-5, -2, -4);
   scene.add(fillLight);
 
+  const earthTexture = new THREE.TextureLoader().load(earthTextureUrl);
+  earthTexture.colorSpace = THREE.SRGBColorSpace;
+
   const earth = new THREE.Mesh(
     new THREE.SphereGeometry(EARTH_RADIUS_UNITS, 48, 48),
-    new THREE.MeshPhongMaterial({ color: 0x1b3a6b, emissive: 0x0a1530, shininess: 8 }),
+    new THREE.MeshPhongMaterial({ map: earthTexture, shininess: 6 }),
   );
   scene.add(earth);
 
   const grid = new THREE.LineSegments(
     new THREE.WireframeGeometry(new THREE.SphereGeometry(EARTH_RADIUS_UNITS * 1.001, 24, 16)),
-    new THREE.LineBasicMaterial({ color: 0x2f5a99, transparent: true, opacity: 0.35 }),
+    new THREE.LineBasicMaterial({ color: 0x2f5a99, transparent: true, opacity: 0.15 }),
   );
   scene.add(grid);
 
@@ -61,6 +69,11 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   );
   issMarker.visible = false;
   scene.add(issMarker);
+
+  const satelliteGeometry = new THREE.SphereGeometry(0.035, 8, 8);
+  const satelliteMaterial = new THREE.MeshBasicMaterial({ color: 0x9fd8ff });
+  const satelliteGroup = new THREE.Group();
+  scene.add(satelliteGroup);
 
   let orbitLine: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial> | null = null;
 
@@ -98,6 +111,20 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       orbitLine = new THREE.Line(geometry, material);
       scene.add(orbitLine);
     },
+    setSatellites(positions) {
+      while (satelliteGroup.children.length > positions.length) {
+        const last = satelliteGroup.children[satelliteGroup.children.length - 1];
+        satelliteGroup.remove(last);
+      }
+      positions.forEach((position, i) => {
+        const existing = satelliteGroup.children[i];
+        const marker = existing instanceof THREE.Mesh ? existing : new THREE.Mesh(satelliteGeometry, satelliteMaterial);
+        if (!existing) {
+          satelliteGroup.add(marker);
+        }
+        marker.position.set(position.x, position.y, position.z);
+      });
+    },
     resize() {
       applySize();
     },
@@ -106,6 +133,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       resizeObserver.disconnect();
       controls.dispose();
       renderer.dispose();
+      earthTexture.dispose();
     },
   };
 }

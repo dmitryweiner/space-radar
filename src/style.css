@@ -129,24 +129,47 @@ body {
   font-weight: 600;
 }
 
-.card-shell-hide {
+.card-shell-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.card-shell-action {
   background: transparent;
   border: none;
   color: var(--text-dim);
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 3px 6px;
   border-radius: 4px;
 }
 
-.card-shell-hide:hover {
+.card-shell-hide {
+  font-size: 16px;
+}
+
+.card-shell-action:hover {
   background: #232f56;
   color: var(--text);
 }
 
+.card-shell-fullscreen {
+  height: 100%;
+}
+
+.fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  padding: 16px;
+  background: rgba(5, 7, 13, 0.96);
+}
+
 .card-shell-body {
   flex: 1;
+  min-height: 0;
   padding: 12px;
   overflow: auto;
   color: var(--text-dim);
@@ -187,20 +210,31 @@ body {
   color: var(--text-dim);
 }
 
+.chart-timestamp {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
 .solar-wind-subchart {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-height: 0;
 }
 
 .solar-wind-subchart-label {
   font-size: 12px;
   color: var(--text-dim);
+  flex-shrink: 0;
 }
 
 .solar-wind-svg {
   width: 100%;
-  height: 48px;
+  flex: 1;
+  min-height: 0;
 }
 
 .event-list {

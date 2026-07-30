@@ -1,6 +1,7 @@
 import { useApiResource } from '../../hooks/useApiResource';
 import { fetchKpIndex } from '../../api/swpc';
 import type { KpIndexPoint } from '../../api/types';
+import { formatUtcTimestamp } from '../formatTimestamp';
 
 const CACHE_KEY = 'space-radar:kp-index';
 const TTL_MS = 5 * 60 * 1000;
@@ -93,6 +94,7 @@ export function KpIndexCard() {
         Current: <strong>Kp {latest.kp.toFixed(2)}</strong> —{' '}
         <span style={{ color: status.color }}>{status.label}</span>
       </p>
+      <p className="chart-timestamp">As of {formatUtcTimestamp(latest.time)}</p>
     </div>
   );
 }

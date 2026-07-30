@@ -1,7 +1,8 @@
 import type { SpaceWeatherEvent } from './types';
+import { describeHttpError } from './httpError';
+import { NASA_API_KEY } from './nasaApiKey';
 
 const API_BASE = 'https://api.nasa.gov/DONKI';
-const API_KEY = 'DEMO_KEY';
 const LOOKBACK_DAYS = 7;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,7 +70,7 @@ function formatDate(date: Date): string {
 function dateRangeParams(now: Date): string {
   const end = formatDate(now);
   const start = formatDate(new Date(now.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000));
-  return `startDate=${start}&endDate=${end}&api_key=${API_KEY}`;
+  return `startDate=${start}&endDate=${end}&api_key=${NASA_API_KEY}`;
 }
 
 interface FetchResponse {
@@ -83,7 +84,7 @@ type FetchFn = (url: string) => Promise<FetchResponse>;
 async function fetchJson(url: string, fetchFn: FetchFn): Promise<unknown> {
   const response = await fetchFn(url);
   if (!response.ok) {
-    throw new Error(`NASA DONKI request failed with status ${response.status ?? 'unknown'}: ${url}`);
+    throw new Error(describeHttpError('NASA DONKI', response.status, url));
   }
   return response.json();
 }

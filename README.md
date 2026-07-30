@@ -67,10 +67,13 @@ rather than by `vitest`.
 |---|---|---|
 | [CelesTrak](https://celestrak.org/) | satellite TLEs | none |
 | [NOAA SWPC](https://www.swpc.noaa.gov/) | Kp-index, solar wind, aurora | none |
-| [NASA DONKI](https://ccmc.gsfc.nasa.gov/tools/DONKI/) | flares, CMEs | `DEMO_KEY` |
-| [NASA NeoWs](https://api.nasa.gov/) | near-Earth asteroids | `DEMO_KEY` |
+| [NASA DONKI](https://ccmc.gsfc.nasa.gov/tools/DONKI/) | flares, CMEs | personal key |
+| [NASA NeoWs](https://api.nasa.gov/) | near-Earth asteroids | personal key |
 
-`DEMO_KEY` is NASA's public, keyless-registration API key (30 requests/hour).
-It's hardcoded in `src/api/donki.ts` and `src/api/neows.ts` — fine for this
-client-only, low-traffic dashboard; swap in your own free key from
-[api.nasa.gov](https://api.nasa.gov/) if you hit the rate limit.
+The NASA key lives in `src/api/nasaApiKey.ts` (1000 requests/hour, no daily
+cap — a big step up from the shared `DEMO_KEY`'s 30/hour). This is a
+client-only static site with no backend, so — same as `DEMO_KEY` before it —
+the key ships in the public JS bundle; that's expected for `api.nasa.gov`
+keys, which only rate-limit by caller and aren't tied to billing or account
+access. Get your own free key at [api.nasa.gov](https://api.nasa.gov/) if you
+fork this.

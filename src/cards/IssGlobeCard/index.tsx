@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApiResource } from '../../hooks/useApiResource';
 import { fetchTleGroup } from '../../api/celestrak';
 import { computeSatellitePosition } from '../../astro/satellitePosition';
@@ -46,6 +46,17 @@ function sampleOrbit(tle: TleRecord, now: number): SceneVector3[] {
   return points;
 }
 
+function currentPositions(records: TleRecord[], now: Date): SceneVector3[] {
+  const points: SceneVector3[] = [];
+  for (const record of records) {
+    const position = computeSatellitePosition(record, now);
+    if (position) {
+      points.push(geodeticToSceneVector(position.latitudeDeg, position.longitudeDeg, position.altitudeKm, EARTH_RADIUS_UNITS));
+    }
+  }
+  return points;
+}
+
 export function IssGlobeCard() {
   const { data, loading, error } = useApiResource<TleRecord[]>({
     key: CACHE_KEY,
@@ -78,6 +89,10 @@ export function IssGlobeCard() {
   }, []);
 
   const iss = data ? findIss(data) : null;
+  const otherSatellites = useMemo(
+    () => (data && iss ? data.filter((record) => record !== iss) : (data ?? [])),
+    [data, iss],
+  );
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -87,7 +102,7 @@ export function IssGlobeCard() {
 
     scene.setOrbitPath(sampleOrbit(iss, Date.now()));
 
-    function updatePosition() {
+    function updatePositions() {
       const scene2 = sceneRef.current;
       if (!scene2 || !iss) {
         return;
@@ -96,11 +111,12 @@ export function IssGlobeCard() {
       scene2.setIssPosition(
         position ? geodeticToSceneVector(position.latitudeDeg, position.longitudeDeg, position.altitudeKm, EARTH_RADIUS_UNITS) : null,
       );
+      scene2.setSatellites(currentPositions(otherSatellites, new Date()));
     }
-    updatePosition();
-    const interval = setInterval(updatePosition, POSITION_UPDATE_MS);
+    updatePositions();
+    const interval = setInterval(updatePositions, POSITION_UPDATE_MS);
     return () => clearInterval(interval);
-  }, [iss]);
+  }, [iss, otherSatellites]);
 
   return (
     <div className="globe-wrap">

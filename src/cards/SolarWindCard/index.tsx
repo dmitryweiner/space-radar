@@ -1,6 +1,7 @@
 import { useApiResource } from '../../hooks/useApiResource';
 import { fetchSolarWind } from '../../api/swpc';
 import type { SolarWindPoint } from '../../api/types';
+import { formatUtcTimestamp } from '../formatTimestamp';
 
 const CACHE_KEY = 'space-radar:solar-wind';
 const TTL_MS = 5 * 60 * 1000;
@@ -74,7 +75,14 @@ function SubChart({ testId, label, points }: SubChartProps) {
         role="img"
         aria-label={label}
       >
-        <polyline points={points} fill="none" stroke="var(--series-1)" strokeWidth={2} />
+        <polyline
+          points={points}
+          fill="none"
+          stroke="var(--series-1)"
+          strokeWidth={2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
       </svg>
     </div>
   );
@@ -114,6 +122,7 @@ export function SolarWindCard() {
         Speed: <strong>{formatValue(latest.speed, 'km/s')}</strong> · Density:{' '}
         <strong>{formatValue(latest.density, 'p/cm³', 1)}</strong>
       </p>
+      <p className="chart-timestamp">As of {formatUtcTimestamp(latest.time)}</p>
     </div>
   );
 }

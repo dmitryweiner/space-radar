@@ -28,6 +28,8 @@ describe('GridLayout', () => {
         layout={layout}
         onLayoutChange={() => {}}
         onHide={() => {}}
+        fullscreenId={null}
+        onToggleFullscreen={() => {}}
       />,
     );
     expect(screen.getByText('Card A')).toBeInTheDocument();
@@ -43,9 +45,28 @@ describe('GridLayout', () => {
         layout={layout}
         onLayoutChange={() => {}}
         onHide={() => {}}
+        fullscreenId={null}
+        onToggleFullscreen={() => {}}
       />,
     );
     expect(screen.getByText('Card A')).toBeInTheDocument();
     expect(screen.getByText('Card B')).toBeInTheDocument();
+  });
+
+  it('replaces the fullscreen card content with a placeholder instead of double-mounting it', () => {
+    render(
+      <GridLayout
+        registry={registry}
+        visibleIds={['a', 'b']}
+        layout={layout}
+        onLayoutChange={() => {}}
+        onHide={() => {}}
+        fullscreenId="a"
+        onToggleFullscreen={() => {}}
+      />,
+    );
+    expect(screen.queryByText('content a')).not.toBeInTheDocument();
+    expect(screen.getByText('content b')).toBeInTheDocument();
+    expect(screen.getByText('Card A')).toBeInTheDocument();
   });
 });

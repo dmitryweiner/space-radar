@@ -1,7 +1,8 @@
 import type { Asteroid } from './types';
+import { describeHttpError } from './httpError';
+import { NASA_API_KEY } from './nasaApiKey';
 
 const API_BASE = 'https://api.nasa.gov/neo/rest/v1/feed';
-const API_KEY = 'DEMO_KEY';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -104,10 +105,10 @@ type FetchFn = (url: string) => Promise<FetchResponse>;
 
 export async function fetchAsteroids(fetchFn: FetchFn = fetch, now: Date = new Date()): Promise<Asteroid[]> {
   const date = formatDate(now);
-  const url = `${API_BASE}?start_date=${date}&end_date=${date}&api_key=${API_KEY}`;
+  const url = `${API_BASE}?start_date=${date}&end_date=${date}&api_key=${NASA_API_KEY}`;
   const response = await fetchFn(url);
   if (!response.ok) {
-    throw new Error(`NASA NeoWs request failed with status ${response.status ?? 'unknown'}`);
+    throw new Error(describeHttpError('NASA NeoWs', response.status, url));
   }
   return parseAsteroids(await response.json());
 }

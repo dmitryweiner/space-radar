@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { computePlanetPositions } from '../../astro/planetPositions';
+import { computePlanetOrbitPath, computePlanetPositions } from '../../astro/planetPositions';
 import { createSolarSystemScene, type SolarSystemSceneHandle } from '../../render/solarSystemScene';
 
 const POSITION_UPDATE_MS = 60_000;
@@ -23,6 +23,10 @@ export function SolarSystemCard() {
       return undefined;
     }
     sceneRef.current = scene;
+
+    const now = new Date();
+    const initialPositions = computePlanetPositions(now);
+    scene.setOrbitPaths(initialPositions.map((p) => ({ name: p.name, points: computePlanetOrbitPath(p.name, now) })));
 
     function updatePositions() {
       scene.setPlanetPositions(computePlanetPositions(new Date()));

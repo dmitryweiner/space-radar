@@ -11,6 +11,8 @@ interface GridLayoutProps {
   layout: Record<string, CardLayoutRect>;
   onLayoutChange: (rects: Record<string, CardLayoutRect>) => void;
   onHide: (id: string) => void;
+  fullscreenId: string | null;
+  onToggleFullscreen: (id: string) => void;
 }
 
 const GRID_COLS = 4;
@@ -45,7 +47,15 @@ function fromRglLayout(items: Layout): Record<string, CardLayoutRect> {
   return rects;
 }
 
-export function GridLayout({ registry, visibleIds, layout, onLayoutChange, onHide }: GridLayoutProps) {
+export function GridLayout({
+  registry,
+  visibleIds,
+  layout,
+  onLayoutChange,
+  onHide,
+  fullscreenId,
+  onToggleFullscreen,
+}: GridLayoutProps) {
   const { width, containerRef, mounted } = useContainerWidth();
   const byId = new Map(registry.map((card) => [card.id, card]));
   const rglLayout = toRglLayout(registry, visibleIds, layout);
@@ -73,10 +83,11 @@ export function GridLayout({ registry, visibleIds, layout, onLayoutChange, onHid
                 return null;
               }
               const CardComponent = card.component;
+              const isFullscreen = id === fullscreenId;
               return (
                 <div key={id} data-card-id={id}>
-                  <CardShell title={card.title} onHide={() => onHide(id)}>
-                    <CardComponent />
+                  <CardShell title={card.title} onHide={() => onHide(id)} onToggleFullscreen={() => onToggleFullscreen(id)}>
+                    {isFullscreen ? <p className="card-status">Shown full screen.</p> : <CardComponent />}
                   </CardShell>
                 </div>
               );

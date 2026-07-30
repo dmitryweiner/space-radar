@@ -1,12 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cardRegistry } from './layout/cardRegistry';
 import { useLayoutState } from './layout/useLayoutState';
 import { GridLayout } from './layout/GridLayout';
 import { CardVisibilityMenu } from './layout/CardVisibilityMenu';
+import { CardShell } from './cards/CardShell';
 
 export function App() {
   const { visibleIds, layout, toggleVisible, updateLayout, resetLayout } = useLayoutState(cardRegistry);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [fullscreenId, setFullscreenId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!fullscreenId) {
+      return;
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setFullscreenId(null);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [fullscreenId]);
+
+  function toggleFullscreen(id: string) {
+    setFullscreenId((current) => (current === id ? null : id));
+  }
+
+  const fullscreenCard = fullscreenId ? cardRegistry.find((card) => card.id === fullscreenId) : undefined;
+  const FullscreenCardComponent = fullscreenCard?.component;
 
   return (
     <div id="app">
@@ -33,9 +55,26 @@ export function App() {
             layout={layout}
             onLayoutChange={updateLayout}
             onHide={toggleVisible}
+            fullscreenId={fullscreenId}
+            onToggleFullscreen={toggleFullscreen}
           />
         </main>
       </div>
+      {fullscreenCard && FullscreenCardComponent && (
+        <div className="fullscreen-overlay" data-testid="fullscreen-overlay">
+          <CardShell
+            title={fullscreenCard.title}
+            isFullscreen
+            onToggleFullscreen={() => setFullscreenId(null)}
+            onHide={() => {
+              toggleVisible(fullscreenCard.id);
+              setFullscreenId(null);
+            }}
+          >
+            <FullscreenCardComponent />
+          </CardShell>
+        </div>
+      )}
     </div>
   );
 }

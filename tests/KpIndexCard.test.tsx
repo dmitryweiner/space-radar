@@ -24,14 +24,15 @@ describe('KpIndexCard', () => {
     expect(await screen.findByText(/network down/i)).toBeInTheDocument();
   });
 
-  it('renders one bar per point and the current status once data loads', async () => {
+  it('renders one bar per point, the current status, and the latest reading time', async () => {
     vi.mocked(fetchKpIndex).mockResolvedValue([
-      { time: '2026-07-29 00:00:00.000', kp: 2 },
-      { time: '2026-07-29 03:00:00.000', kp: 7.67 },
+      { time: '2026-07-29T00:00:00', kp: 2 },
+      { time: '2026-07-29T03:00:00', kp: 7.67 },
     ]);
     render(<KpIndexCard />);
     const bars = await screen.findAllByTestId('kp-bar');
     expect(bars).toHaveLength(2);
     expect(screen.getByText('Severe storm')).toBeInTheDocument();
+    expect(screen.getByText(/2026-07-29 03:00 UTC/)).toBeInTheDocument();
   });
 });

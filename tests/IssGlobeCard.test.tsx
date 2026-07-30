@@ -10,6 +10,7 @@ vi.mock('../src/api/celestrak', () => ({
 const sceneHandle = {
   setIssPosition: vi.fn(),
   setOrbitPath: vi.fn(),
+  setSatellites: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),
 };
@@ -25,12 +26,19 @@ const ISS_TLE = {
   line2: '2 25544  51.6319  88.7482 0007060 351.9810   8.1065 15.49254247578377',
 };
 
+const POISK_TLE = {
+  name: 'POISK',
+  line1: '1 35110U 98067AN  26210.89416807  .00008676  00000+0  16394-3 0  9990',
+  line2: '2 35110  51.6319  88.7482 0007060 351.9810   8.1065 15.49254247578377',
+};
+
 beforeEach(() => {
   window.localStorage.clear();
   vi.mocked(fetchTleGroup).mockReset();
   vi.mocked(createEarthScene).mockClear();
   sceneHandle.setIssPosition.mockClear();
   sceneHandle.setOrbitPath.mockClear();
+  sceneHandle.setSatellites.mockClear();
   sceneHandle.dispose.mockClear();
 });
 
@@ -60,6 +68,16 @@ describe('IssGlobeCard', () => {
     const calls = sceneHandle.setIssPosition.mock.calls;
     const [positionArg] = calls[calls.length - 1];
     expect(positionArg).toEqual(expect.objectContaining({ x: expect.any(Number), y: expect.any(Number), z: expect.any(Number) }));
+  });
+
+  it('feeds every other satellite in the group to the scene, excluding the ISS itself', async () => {
+    vi.mocked(fetchTleGroup).mockResolvedValue([ISS_TLE, POISK_TLE]);
+    render(<IssGlobeCard />);
+
+    await vi.waitFor(() => expect(sceneHandle.setSatellites).toHaveBeenCalled());
+    const calls = sceneHandle.setSatellites.mock.calls;
+    const [positions] = calls[calls.length - 1];
+    expect(positions).toHaveLength(1);
   });
 
   it('shows a message when the ISS cannot be found in the fetched group', async () => {

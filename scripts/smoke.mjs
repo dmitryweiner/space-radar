@@ -68,11 +68,12 @@ async function ensureServer() {
 
 const errors = [];
 let ctxLabel = 'app';
-// Live external APIs (NASA DEMO_KEY, NOAA) occasionally answer with 4xx/5xx
-// during a smoke run; Chromium logs those failed resource loads as console
-// errors even though the app handles them gracefully (renders an error
-// message, doesn't throw). That's expected network noise, not an app bug.
-const IGNORED_CONSOLE_PATTERN = /Failed to load resource/;
+// Live external APIs (NASA key, NOAA) occasionally answer with 4xx/5xx or
+// even fail outright (e.g. NeoWs' backend returning an error page with no
+// CORS headers, which Chromium reports as a blocked-by-CORS console error)
+// during a smoke run. The app handles all of this gracefully (renders an
+// error message, doesn't throw) — that's expected network noise, not a bug.
+const IGNORED_CONSOLE_PATTERN = /Failed to load resource|blocked by CORS policy/;
 
 function attach(page) {
   page.on('pageerror', (e) => errors.push(`[${ctxLabel}] ${String(e)}`));
@@ -198,6 +199,24 @@ if (transformAfterReload !== transformBeforeReload) {
 } else {
   console.log('persistence ok');
 }
+
+// full screen: opens an overlay covering the viewport, exits on click and on Escape
+ctxLabel = 'fullscreen';
+await page.getByRole('button', { name: 'Full screen Geomagnetic Activity (Kp-index)' }).click();
+await page.waitForTimeout(200);
+const overlay = page.getByTestId('fullscreen-overlay');
+if ((await overlay.count()) !== 1) errors.push('[fullscreen] overlay did not appear');
+const overlayBox = await overlay.boundingBox();
+const viewport = page.viewportSize();
+if (!overlayBox || !viewport || Math.abs(overlayBox.width - viewport.width) > 2 || Math.abs(overlayBox.height - viewport.height) > 2) {
+  errors.push(`[fullscreen] overlay does not cover the viewport: ${JSON.stringify(overlayBox)} vs ${JSON.stringify(viewport)}`);
+} else {
+  console.log('fullscreen overlay covers viewport');
+}
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+if ((await page.getByTestId('fullscreen-overlay').count()) !== 0) errors.push('[fullscreen] Escape did not close the overlay');
+else console.log('fullscreen Escape-to-close ok');
 
 // reset layout: back to defaults
 ctxLabel = 'reset';

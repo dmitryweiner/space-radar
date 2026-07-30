@@ -33,14 +33,14 @@ export const cardRegistry: CardDefinition[] = [
     id: 'solar-wind',
     title: 'Solar Wind',
     defaultVisible: true,
-    defaultLayout: { x: 1, y: 2, w: 2, h: 1 },
+    defaultLayout: { x: 1, y: 2, w: 1, h: 1 },
     component: SolarWindCard,
   },
   {
     id: 'aurora-forecast',
     title: 'Aurora Forecast',
     defaultVisible: false,
-    defaultLayout: { x: 0, y: 3, w: 2, h: 1 },
+    defaultLayout: { x: 0, y: 3, w: 2, h: 2, minW: 2, minH: 2 },
     component: AuroraForecastCard,
   },
   {
@@ -54,7 +54,7 @@ export const cardRegistry: CardDefinition[] = [
     id: 'asteroids',
     title: 'Near-Earth Asteroids',
     defaultVisible: false,
-    defaultLayout: { x: 0, y: 4, w: 2, h: 1 },
+    defaultLayout: { x: 0, y: 5, w: 2, h: 1 },
     component: AsteroidsCard,
   },
 ];

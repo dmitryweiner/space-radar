@@ -4,6 +4,7 @@ import { createSolarSystemScene } from '../src/render/solarSystemScene';
 
 const sceneHandle = {
   setPlanetPositions: vi.fn(),
+  setOrbitPaths: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),
 };
@@ -15,6 +16,7 @@ vi.mock('../src/render/solarSystemScene', () => ({
 beforeEach(() => {
   vi.mocked(createSolarSystemScene).mockClear();
   sceneHandle.setPlanetPositions.mockClear();
+  sceneHandle.setOrbitPaths.mockClear();
   sceneHandle.dispose.mockClear();
 });
 
@@ -26,6 +28,15 @@ describe('SolarSystemCard', () => {
     const [positions] = sceneHandle.setPlanetPositions.mock.calls[0];
     expect(positions).toHaveLength(8);
     expect(positions[0].name).toBe('Mercury');
+  });
+
+  it('feeds the scene an orbit path per planet', () => {
+    render(<SolarSystemCard />);
+    expect(sceneHandle.setOrbitPaths).toHaveBeenCalledOnce();
+    const [paths] = sceneHandle.setOrbitPaths.mock.calls[0];
+    expect(paths).toHaveLength(8);
+    expect(paths[0].name).toBe('Mercury');
+    expect(paths[0].points.length).toBeGreaterThan(2);
   });
 
   it('disposes the scene on unmount', () => {
