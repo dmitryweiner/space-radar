@@ -1,0 +1,320 @@
+:root {
+  color-scheme: dark;
+  --bg: #05070d;
+  --panel: #0d1220;
+  --panel-border: #1c2540;
+  --text: #e6ecff;
+  --text-dim: #8a94b8;
+  --accent: #5eb1ff;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --series-1: #3987e5;
+  --series-2: #199e70;
+  --gridline: #2c2c2a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+#brand {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+#content {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.tb-spacer {
+  flex: 1;
+}
+
+.tb-btn {
+  background: #1a2340;
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tb-btn:hover {
+  background: #232f56;
+}
+
+#cardMenu {
+  width: 260px;
+  flex-shrink: 0;
+  padding: 16px;
+  background: var(--panel);
+  border-right: 1px solid var(--panel-border);
+  overflow-y: auto;
+}
+
+.card-visibility-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-visibility-menu label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#viewWrap {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.grid-layout-container {
+  width: 100%;
+}
+
+.card-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.card-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #111830;
+  border-bottom: 1px solid var(--panel-border);
+  cursor: grab;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.card-shell-hide {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.card-shell-hide:hover {
+  background: #232f56;
+  color: var(--text);
+}
+
+.card-shell-body {
+  flex: 1;
+  padding: 12px;
+  overflow: auto;
+  color: var(--text-dim);
+}
+
+.card-placeholder {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.card-status {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.card-status-error {
+  color: var(--status-critical);
+}
+
+.kp-chart,
+.solar-wind-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.kp-chart-svg {
+  width: 100%;
+  flex: 1;
+  min-height: 60px;
+}
+
+.kp-status-line,
+.chart-status-line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.solar-wind-subchart {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.solar-wind-subchart-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.solar-wind-svg {
+  width: 100%;
+  height: 48px;
+}
+
+.event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.event-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0b0b0b;
+}
+
+.event-time {
+  color: var(--text-dim);
+}
+
+.event-location {
+  color: var(--text);
+}
+
+.asteroid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.asteroid-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-weight: 600;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.asteroid-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--panel-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.hazard-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0b0b0b;
+}
+
+.sort-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sort-btn:hover {
+  color: var(--text);
+}
+
+.globe-wrap,
+.solar-system-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+}
+
+.globe-canvas,
+.solar-system-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.aurora-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.aurora-image {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #000;
+}
+
+.globe-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  margin: 0;
+  background: rgba(13, 18, 32, 0.85);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
