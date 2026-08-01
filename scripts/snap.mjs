@@ -6,6 +6,7 @@
 //   node scripts/snap.mjs --out /tmp/x.png --show solar-system --show asteroids --hide kp-index
 //   node scripts/snap.mjs --out /tmp/x.png --width 1400 --height 900 --wait 2000
 //   node scripts/snap.mjs --out /tmp/x.png --preview   # prod build (vite preview :4173)
+//   node scripts/snap.mjs --out /tmp/x.png --click 'button[aria-label="Settings for Solar Wind"]'
 
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -13,7 +14,7 @@ import { dirname } from 'node:path';
 import { chromium } from 'playwright';
 
 const args = process.argv.slice(2);
-const MULTI_FLAGS = new Set(['show', 'hide']);
+const MULTI_FLAGS = new Set(['show', 'hide', 'click']);
 const VALUE_FLAGS = new Set(['out', 'width', 'height', 'wait', ...MULTI_FLAGS]);
 const flags = new Map();
 for (let i = 0; i < args.length; i++) {
@@ -47,6 +48,10 @@ const CARD_TITLES = {
   'aurora-forecast': 'Aurora Forecast',
   'solar-flares': 'Solar Flares & CME',
   asteroids: 'Near-Earth Asteroids',
+  'natural-events': 'Natural Events (EONET)',
+  launches: 'Upcoming Launches',
+  apod: 'Astronomy Picture of the Day',
+  'fire-map': 'Active Fires (FIRMS)',
 };
 
 const preview = flags.has('preview');
@@ -118,6 +123,11 @@ if (toShow.length || toHide.length) {
     if (await checkbox.isChecked()) await checkbox.click();
   }
   await page.locator('#cardsMenuBtn').click();
+}
+
+for (const selector of flags.get('click') ?? []) {
+  await page.locator(selector).first().click();
+  await page.waitForTimeout(200);
 }
 
 await page.waitForTimeout(wait);

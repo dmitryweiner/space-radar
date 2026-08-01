@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { STORAGE_KEY, applyLayoutChange, defaultState, sanitizeState, toggleVisibility } from './layoutState';
-import type { CardDefinition, CardLayoutRect, StoredLayoutState } from './types';
+import {
+  STORAGE_KEY,
+  applyLayoutChange,
+  applySettingsChange,
+  defaultState,
+  sanitizeState,
+  toggleVisibility,
+} from './layoutState';
+import type { CardDefinition, CardLayoutRect, CardSettingValues, StoredLayoutState } from './types';
 
 function loadInitialState(registry: CardDefinition[], storageKey: string): StoredLayoutState {
   const raw = window.localStorage.getItem(storageKey);
@@ -33,11 +40,17 @@ export function useLayoutState(registry: CardDefinition[], storageKey: string = 
     setState(defaultState(registry));
   }, [registry]);
 
+  const updateCardSettings = useCallback((id: string, values: CardSettingValues) => {
+    setState((prev) => applySettingsChange(prev, id, values));
+  }, []);
+
   return {
     visibleIds: state.visibleIds,
     layout: state.layout,
+    cardSettings: state.settings,
     toggleVisible,
     updateLayout,
     resetLayout,
+    updateCardSettings,
   };
 }

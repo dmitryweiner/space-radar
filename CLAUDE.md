@@ -19,7 +19,8 @@ Existing helpers:
 - `scripts/shot.mjs` — one screenshot per card into `./shots`.
 
 Card ids: `iss-globe`, `solar-system`, `kp-index`, `solar-wind`,
-`aurora-forecast`, `solar-flares`, `asteroids` (see `src/layout/cardRegistry.ts`).
+`aurora-forecast`, `solar-flares`, `asteroids`, `natural-events`, `launches`,
+`apod`, `fire-map` (see `src/layout/cardRegistry.ts`).
 
 ## Build / test commands
 
@@ -45,6 +46,26 @@ npm run build       # production build → ./docs (GitHub Pages)
   (canvas mounts, no console errors). Both scene modules self-manage sizing
   via an internal `ResizeObserver` on the canvas; nobody needs to call the
   exposed `resize()` method manually.
+- **Card settings** are a discriminated union in `src/layout/types.ts`:
+  `{ kind: 'number', ... }` renders a stepper, `{ kind: 'multiselect', options,
+  ... }` renders a checkbox list whose value is a `string[]`. Read them in a
+  card with the `numberSetting(values, id, fallback)` /
+  `listSetting(values, id, fallback)` helpers from `layoutState.ts` — never
+  index `settings[id]` directly, since the value type is `number | string[]`.
+- **Three of the cards (`iss-globe`, `natural-events`, `fire-map`) share
+  `createEarthScene`.** The globe exposes `setSatellites` (named markers with
+  labels), `setMarkers` (generic id/colour/label markers), and `setFirePoints`
+  (a single `THREE.Points` cloud). Label sprites (`src/render/labelSprite.ts`)
+  are depth-tested, so the opaque Earth mesh hides labels on the far side for
+  free — there is no manual occlusion math.
+- **`IssGlobeCard`'s scene effect must guard `if (!scene || !data) return`.**
+  Without the `!data` guard it pushes a null ISS frame on first mount before
+  TLEs load, which makes `waitFor(setIssPosition called)` in the test resolve
+  on that premature null call instead of the real position.
+- **FIRMS needs a separate MAP_KEY** (`src/api/firmsMapKey.ts`, empty by
+  default) and, in testing, did **not** send CORS headers — the Fire Map card
+  may need a proxy to work from the static site. The card degrades gracefully
+  (add-key prompt / network error) rather than throwing.
 - ESLint bans `as` type assertions (`@typescript-eslint/consistent-type-assertions:
   'never'`). Narrow `unknown` with a type-predicate helper
   (`function isRecord(v): v is Record<string, unknown>`) instead of casting.
@@ -70,6 +91,14 @@ npm run build       # production build → ./docs (GitHub Pages)
     tutorials reference, 404s.
   - If you add another SWPC product, `curl` the real endpoint first — don't
     assume the table shape from a similarly-named one.
+- **NASA DONKI on `api.nasa.gov` 503s frequently.** Flares therefore come from
+  `services.swpc.noaa.gov/json/goes/primary/xray-flares-7-day.json` (reliable,
+  CORS `*`); DONKI is only used for CMEs, best-effort. The CCMC-direct DONKI
+  host (`kauai.ccmc.gsfc.nasa.gov/DONKI/WS/get/...`) works from curl **but
+  sends no CORS headers**, so it's unusable from the browser — don't "switch"
+  to it.
+- **Launch Library 2 (`ll.thespacedevs.com`) free tier = 15 requests/hour.**
+  Keep the launches card's TTL/poll at an hour or more.
 - **NASA NeoWs (`api.nasa.gov/neo/rest/v1/feed`) has real, observed outages**
   (Heroku "Application Error" / 503), independent of DONKI on the same
   `api.nasa.gov` host. `AsteroidsCard`'s error state is not a bug when this

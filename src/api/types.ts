@@ -26,6 +26,43 @@ export interface SpaceWeatherEvent {
   sourceLocation: string | null;
 }
 
+export interface NaturalEvent {
+  id: string;
+  title: string;
+  category: string;
+  time: string | null;
+  magnitude: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface FirePoint {
+  latitude: number;
+  longitude: number;
+  brightnessKelvin: number;
+  /** 0..1 normalized confidence, or null when the source omits it. */
+  confidence: number | null;
+  acquiredAt: string;
+}
+
+export interface LaunchInfo {
+  id: string;
+  name: string;
+  status: string;
+  net: string;
+  provider: string | null;
+  location: string | null;
+}
+
+export interface ApodInfo {
+  date: string;
+  title: string;
+  mediaType: string;
+  imageUrl: string | null;
+  linkUrl: string | null;
+  copyright: string | null;
+}
+
 export interface Asteroid {
   id: string;
   name: string;

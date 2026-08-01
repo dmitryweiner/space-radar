@@ -3,19 +3,22 @@ import type { Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { CardShell } from '../cards/CardShell';
-import type { CardDefinition, CardLayoutRect } from './types';
+import { cardSettingsWithDefaults } from './layoutState';
+import type { CardDefinition, CardLayoutRect, CardSettingValues } from './types';
 
 interface GridLayoutProps {
   registry: CardDefinition[];
   visibleIds: string[];
   layout: Record<string, CardLayoutRect>;
+  cardSettings: Record<string, CardSettingValues>;
   onLayoutChange: (rects: Record<string, CardLayoutRect>) => void;
   onHide: (id: string) => void;
   fullscreenId: string | null;
   onToggleFullscreen: (id: string) => void;
+  onOpenSettings: (id: string) => void;
 }
 
-const GRID_COLS = 4;
+export const GRID_COLS = 4;
 const ROW_HEIGHT = 160;
 
 function toRglLayout(registry: CardDefinition[], visibleIds: string[], layout: Record<string, CardLayoutRect>): Layout {
@@ -51,10 +54,12 @@ export function GridLayout({
   registry,
   visibleIds,
   layout,
+  cardSettings,
   onLayoutChange,
   onHide,
   fullscreenId,
   onToggleFullscreen,
+  onOpenSettings,
 }: GridLayoutProps) {
   const { width, containerRef, mounted } = useContainerWidth();
   const byId = new Map(registry.map((card) => [card.id, card]));
@@ -86,8 +91,17 @@ export function GridLayout({
               const isFullscreen = id === fullscreenId;
               return (
                 <div key={id} data-card-id={id}>
-                  <CardShell title={card.title} onHide={() => onHide(id)} onToggleFullscreen={() => onToggleFullscreen(id)}>
-                    {isFullscreen ? <p className="card-status">Shown full screen.</p> : <CardComponent />}
+                  <CardShell
+                    title={card.title}
+                    onHide={() => onHide(id)}
+                    onToggleFullscreen={() => onToggleFullscreen(id)}
+                    onOpenSettings={() => onOpenSettings(id)}
+                  >
+                    {isFullscreen ? (
+                      <p className="card-status">Shown full screen.</p>
+                    ) : (
+                      <CardComponent settings={cardSettingsWithDefaults(card, cardSettings[id])} />
+                    )}
                   </CardShell>
                 </div>
               );

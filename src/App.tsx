@@ -3,12 +3,16 @@ import { cardRegistry } from './layout/cardRegistry';
 import { useLayoutState } from './layout/useLayoutState';
 import { GridLayout } from './layout/GridLayout';
 import { CardVisibilityMenu } from './layout/CardVisibilityMenu';
+import { CardSettingsPopup } from './layout/CardSettingsPopup';
+import { cardSettingsWithDefaults } from './layout/layoutState';
 import { CardShell } from './cards/CardShell';
 
 export function App() {
-  const { visibleIds, layout, toggleVisible, updateLayout, resetLayout } = useLayoutState(cardRegistry);
+  const { visibleIds, layout, cardSettings, toggleVisible, updateLayout, resetLayout, updateCardSettings } =
+    useLayoutState(cardRegistry);
   const [menuOpen, setMenuOpen] = useState(false);
   const [fullscreenId, setFullscreenId] = useState<string | null>(null);
+  const [settingsCardId, setSettingsCardId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!fullscreenId) {
@@ -29,6 +33,8 @@ export function App() {
 
   const fullscreenCard = fullscreenId ? cardRegistry.find((card) => card.id === fullscreenId) : undefined;
   const FullscreenCardComponent = fullscreenCard?.component;
+  const settingsCard = settingsCardId ? cardRegistry.find((card) => card.id === settingsCardId) : undefined;
+  const settingsRect = settingsCardId ? layout[settingsCardId] : undefined;
 
   return (
     <div id="app">
@@ -53,10 +59,12 @@ export function App() {
             registry={cardRegistry}
             visibleIds={visibleIds}
             layout={layout}
+            cardSettings={cardSettings}
             onLayoutChange={updateLayout}
             onHide={toggleVisible}
             fullscreenId={fullscreenId}
             onToggleFullscreen={toggleFullscreen}
+            onOpenSettings={setSettingsCardId}
           />
         </main>
       </div>
@@ -71,9 +79,19 @@ export function App() {
               setFullscreenId(null);
             }}
           >
-            <FullscreenCardComponent />
+            <FullscreenCardComponent settings={cardSettingsWithDefaults(fullscreenCard, cardSettings[fullscreenCard.id])} />
           </CardShell>
         </div>
+      )}
+      {settingsCard && settingsRect && (
+        <CardSettingsPopup
+          card={settingsCard}
+          rect={settingsRect}
+          values={cardSettings[settingsCard.id] ?? {}}
+          onResize={(w, h) => updateLayout({ [settingsCard.id]: { ...settingsRect, w, h } })}
+          onChangeSetting={(id, value) => updateCardSettings(settingsCard.id, { [id]: value })}
+          onClose={() => setSettingsCardId(null)}
+        />
       )}
     </div>
   );

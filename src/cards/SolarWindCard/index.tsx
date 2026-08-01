@@ -1,7 +1,10 @@
 import { useApiResource } from '../../hooks/useApiResource';
 import { fetchSolarWind } from '../../api/swpc';
 import type { SolarWindPoint } from '../../api/types';
+import type { CardComponentProps } from '../../layout/types';
+import { numberSetting } from '../../layout/layoutState';
 import { formatUtcTimestamp } from '../formatTimestamp';
+import { TimeAxis } from '../TimeAxis';
 
 const CACHE_KEY = 'space-radar:solar-wind';
 const TTL_MS = 5 * 60 * 1000;
@@ -88,7 +91,9 @@ function SubChart({ testId, label, points }: SubChartProps) {
   );
 }
 
-export function SolarWindCard() {
+const DEFAULT_POINTS = 48;
+
+export function SolarWindCard({ settings = {} }: CardComponentProps) {
   const { data, loading, error } = useApiResource<SolarWindPoint[]>({
     key: CACHE_KEY,
     ttlMs: TTL_MS,
@@ -107,7 +112,7 @@ export function SolarWindCard() {
     return <p className="card-status">No data available.</p>;
   }
 
-  const points = data.slice(-48);
+  const points = data.slice(-numberSetting(settings, 'points', DEFAULT_POINTS));
   const latest = points[points.length - 1];
 
   return (
@@ -118,6 +123,7 @@ export function SolarWindCard() {
         label="Density (p/cm³)"
         points={polylinePoints(points, (p) => p.density)}
       />
+      <TimeAxis times={points.map((point) => point.time)} />
       <p className="chart-status-line">
         Speed: <strong>{formatValue(latest.speed, 'km/s')}</strong> · Density:{' '}
         <strong>{formatValue(latest.density, 'p/cm³', 1)}</strong>

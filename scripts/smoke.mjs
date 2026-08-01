@@ -32,8 +32,19 @@ const PORT = preview ? 4173 : 5173;
 const BASE = `http://localhost:${PORT}`;
 
 const DEFAULT_VISIBLE = ['iss-globe', 'kp-index', 'solar-wind'];
-const HIDDEN_BY_DEFAULT = ['solar-system', 'aurora-forecast', 'solar-flares', 'asteroids'];
+const HIDDEN_BY_DEFAULT = [
+  'solar-system',
+  'aurora-forecast',
+  'solar-flares',
+  'asteroids',
+  'natural-events',
+  'launches',
+  'apod',
+  'fire-map',
+];
 const ALL_CARDS = [...DEFAULT_VISIBLE, ...HIDDEN_BY_DEFAULT];
+// Cards that mount a WebGL <canvas> (globe / solar-system scenes).
+const CANVAS_CARDS = ['iss-globe', 'solar-system', 'natural-events', 'fire-map'];
 const CARD_TITLES = {
   'iss-globe': 'ISS & Satellites',
   'solar-system': 'Solar System',
@@ -42,6 +53,10 @@ const CARD_TITLES = {
   'aurora-forecast': 'Aurora Forecast',
   'solar-flares': 'Solar Flares & CME',
   asteroids: 'Near-Earth Asteroids',
+  'natural-events': 'Natural Events (EONET)',
+  launches: 'Upcoming Launches',
+  apod: 'Astronomy Picture of the Day',
+  'fire-map': 'Active Fires (FIRMS)',
 };
 
 async function serverUp() {
@@ -134,7 +149,7 @@ console.log('all cards toggled visible:', visible.length === ALL_CARDS.length);
 // 3D cards mount a canvas
 ctxLabel = '3d-canvases';
 await page.waitForTimeout(500);
-for (const id of ['iss-globe', 'solar-system']) {
+for (const id of CANVAS_CARDS) {
   const canvasCount = await page.locator(`[data-card-id="${id}"] canvas`).count();
   if (canvasCount < 1) errors.push(`[3d-canvases] no canvas rendered for "${id}"`);
 }
@@ -147,6 +162,7 @@ await page.waitForTimeout(3000);
 ctxLabel = 'drag';
 const beforeTransform = await cardStyle(page, 'kp-index', 'transform');
 const handle = page.locator('[data-card-id="kp-index"] .card-drag-handle');
+await handle.scrollIntoViewIfNeeded();
 const handleBox = await handle.boundingBox();
 if (!handleBox) {
   errors.push('[drag] drag handle not found');
@@ -163,10 +179,18 @@ if (!handleBox) {
   else console.log('drag ok:', beforeTransform, '->', afterTransform);
 }
 
-// resize the Solar Wind card via its resize handle
+// resize the Solar Wind card via its resize handle. Per CLAUDE.md: the
+// horizontal delta must exceed one full column width, so measure the column
+// from the grid container instead of guessing a pixel delta.
 ctxLabel = 'resize';
 const beforeWidth = await cardStyle(page, 'solar-wind', 'width');
+const beforeTransformSw = await cardStyle(page, 'solar-wind', 'transform');
+const gridBox = await page.locator('.grid-layout-container').boundingBox();
+const columnWidth = gridBox ? gridBox.width / 4 : 340;
 const resizeHandle = page.locator('[data-card-id="solar-wind"] .react-resizable-handle');
+// The handle can sit below the fold once taller cards push the grid down —
+// mouse events at off-viewport coordinates silently hit nothing.
+await resizeHandle.scrollIntoViewIfNeeded();
 const resizeBox = await resizeHandle.boundingBox();
 if (!resizeBox) {
   errors.push('[resize] resize handle not found');
@@ -175,12 +199,15 @@ if (!resizeBox) {
   const startY = resizeBox.y + resizeBox.height / 2;
   await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(startX + 320, startY + 20, { steps: 15 });
+  await page.mouse.move(startX + columnWidth * 1.2, startY + 20, { steps: 15 });
   await page.mouse.up();
   await page.waitForTimeout(300);
   const afterWidth = await cardStyle(page, 'solar-wind', 'width');
-  if (afterWidth === beforeWidth) errors.push('[resize] card width did not change after resizing');
-  else console.log('resize ok:', beforeWidth, '->', afterWidth);
+  if (afterWidth === beforeWidth) {
+    errors.push(
+      `[resize] card width did not change after resizing (at ${beforeTransformSw}, column ${columnWidth.toFixed(0)}px)`,
+    );
+  } else console.log('resize ok:', beforeWidth, '->', afterWidth);
 }
 
 // reload: layout + visibility should persist via localStorage

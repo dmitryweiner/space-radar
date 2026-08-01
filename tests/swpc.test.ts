@@ -1,8 +1,10 @@
 import {
   parseKpIndex,
   parseSolarWind,
+  parseGoesFlares,
   fetchKpIndex,
   fetchSolarWind,
+  fetchGoesFlares,
   auroraForecastImageUrl,
 } from '../src/api/swpc';
 
@@ -48,6 +50,37 @@ describe('parseSolarWind', () => {
   });
 });
 
+const GOES_FLARES_SAMPLE = [
+  {
+    time_tag: '2026-07-31T11:43:00Z',
+    begin_time: '2026-07-31T11:43:00Z',
+    begin_class: 'C2.1',
+    max_time: '2026-07-31T11:47:00Z',
+    max_class: 'C3.9',
+    end_time: '2026-07-31T11:56:00Z',
+    satellite: 18,
+  },
+];
+
+describe('parseGoesFlares', () => {
+  it('converts GOES X-ray flare events into flare events', () => {
+    expect(parseGoesFlares(GOES_FLARES_SAMPLE)).toEqual([
+      {
+        kind: 'flare',
+        id: 'goes18-2026-07-31T11:43:00Z',
+        time: '2026-07-31T11:43:00Z',
+        classType: 'C3.9',
+        sourceLocation: null,
+      },
+    ]);
+  });
+
+  it('returns an empty array for malformed input', () => {
+    expect(parseGoesFlares(null)).toEqual([]);
+    expect(parseGoesFlares([{ begin_class: 'C1.0' }])).toEqual([]);
+  });
+});
+
 describe('fetchKpIndex / fetchSolarWind', () => {
   it('fetches the NOAA SWPC endpoints and parses the JSON body', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(KP_SAMPLE) });
@@ -61,6 +94,13 @@ describe('fetchKpIndex / fetchSolarWind', () => {
     const points = await fetchSolarWind(fetchMock);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('propagated-solar-wind'));
     expect(points).toHaveLength(2);
+  });
+
+  it('fetches the GOES flares endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(GOES_FLARES_SAMPLE) });
+    const events = await fetchGoesFlares(fetchMock);
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('xray-flares-7-day.json'));
+    expect(events).toHaveLength(1);
   });
 
   it('throws when the solar wind response is not ok', async () => {

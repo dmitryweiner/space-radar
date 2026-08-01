@@ -3,6 +3,10 @@ import {
   sanitizeState,
   toggleVisibility,
   applyLayoutChange,
+  applySettingsChange,
+  cardSettingsWithDefaults,
+  numberSetting,
+  listSetting,
 } from '../src/layout/layoutState';
 import type { CardDefinition } from '../src/layout/types';
 
@@ -84,6 +88,76 @@ describe('toggleVisibility', () => {
     const before = [...state.visibleIds];
     toggleVisibility(state, 'b');
     expect(state.visibleIds).toEqual(before);
+  });
+});
+
+const settingsRegistry: CardDefinition[] = [
+  {
+    id: 'sat',
+    title: 'Sat',
+    defaultVisible: true,
+    defaultLayout: { x: 0, y: 0, w: 2, h: 2 },
+    component: Placeholder,
+    settings: [
+      { kind: 'number', id: 'count', label: 'Count', min: 5, max: 50, defaultValue: 10 },
+      {
+        kind: 'multiselect',
+        id: 'groups',
+        label: 'Groups',
+        options: [
+          { value: 'a', label: 'A' },
+          { value: 'b', label: 'B' },
+        ],
+        defaultValue: ['a'],
+      },
+    ],
+  },
+];
+
+describe('sanitizeState settings', () => {
+  it('clamps numeric settings and filters multiselect values to known options', () => {
+    const stored = {
+      visibleIds: ['sat'],
+      layout: { sat: { x: 0, y: 0, w: 2, h: 2 } },
+      settings: { sat: { count: 999, groups: ['b', 'ghost'] } },
+    };
+    const result = sanitizeState(stored, settingsRegistry);
+    expect(result.settings.sat).toEqual({ count: 50, groups: ['b'] });
+  });
+
+  it('drops an empty multiselect so the schema default takes over', () => {
+    const stored = {
+      visibleIds: ['sat'],
+      layout: { sat: { x: 0, y: 0, w: 2, h: 2 } },
+      settings: { sat: { groups: ['ghost'] } },
+    };
+    const result = sanitizeState(stored, settingsRegistry);
+    expect(result.settings.sat.groups).toBeUndefined();
+    expect(cardSettingsWithDefaults(settingsRegistry[0], result.settings.sat).groups).toEqual(['a']);
+  });
+});
+
+describe('applySettingsChange', () => {
+  it('merges per-card setting values without touching other cards', () => {
+    const state = defaultState(settingsRegistry);
+    const next = applySettingsChange(state, 'sat', { groups: ['a', 'b'] });
+    expect(next.settings.sat).toEqual({ groups: ['a', 'b'] });
+    const merged = applySettingsChange(next, 'sat', { count: 20 });
+    expect(merged.settings.sat).toEqual({ groups: ['a', 'b'], count: 20 });
+  });
+});
+
+describe('setting accessors', () => {
+  it('numberSetting falls back when the value is missing or a list', () => {
+    expect(numberSetting({ count: 12 }, 'count', 5)).toBe(12);
+    expect(numberSetting({ groups: ['a'] }, 'groups', 5)).toBe(5);
+    expect(numberSetting({}, 'count', 5)).toBe(5);
+  });
+
+  it('listSetting falls back when the value is missing or a number', () => {
+    expect(listSetting({ groups: ['a', 'b'] }, 'groups', ['x'])).toEqual(['a', 'b']);
+    expect(listSetting({ groups: 3 }, 'groups', ['x'])).toEqual(['x']);
+    expect(listSetting({}, 'groups', ['x'])).toEqual(['x']);
   });
 });
 

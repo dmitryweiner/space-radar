@@ -1,10 +1,14 @@
-import { IssGlobeCard } from '../cards/IssGlobeCard';
+import { IssGlobeCard, SATELLITE_CATEGORIES } from '../cards/IssGlobeCard';
 import { SolarSystemCard } from '../cards/SolarSystemCard';
 import { KpIndexCard } from '../cards/KpIndexCard';
 import { SolarWindCard } from '../cards/SolarWindCard';
 import { AuroraForecastCard } from '../cards/AuroraForecastCard';
 import { SolarFlaresCard } from '../cards/SolarFlaresCard';
 import { AsteroidsCard } from '../cards/AsteroidsCard';
+import { NaturalEventsCard } from '../cards/NaturalEventsCard';
+import { LaunchesCard } from '../cards/LaunchesCard';
+import { ApodCard } from '../cards/ApodCard';
+import { FireMapCard } from '../cards/FireMapCard';
 import type { CardDefinition } from './types';
 
 export const cardRegistry: CardDefinition[] = [
@@ -14,6 +18,16 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: true,
     defaultLayout: { x: 0, y: 0, w: 2, h: 2, minW: 2, minH: 2 },
     component: IssGlobeCard,
+    settings: [
+      {
+        kind: 'multiselect',
+        id: 'categories',
+        label: 'Satellite groups',
+        options: SATELLITE_CATEGORIES,
+        defaultValue: ['stations'],
+      },
+      { kind: 'number', id: 'maxSatellites', label: 'Max satellites', min: 10, max: 300, step: 10, defaultValue: 30 },
+    ],
   },
   {
     id: 'solar-system',
@@ -28,13 +42,16 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: true,
     defaultLayout: { x: 0, y: 2, w: 1, h: 1 },
     component: KpIndexCard,
+    settings: [{ kind: 'number', id: 'barCount', label: 'Bars shown', min: 4, max: 24, defaultValue: 8 }],
   },
   {
     id: 'solar-wind',
     title: 'Solar Wind',
     defaultVisible: true,
-    defaultLayout: { x: 1, y: 2, w: 1, h: 1 },
+    // Two stacked line charts + a time axis need two rows to stay readable.
+    defaultLayout: { x: 1, y: 2, w: 1, h: 2, minH: 2 },
     component: SolarWindCard,
+    settings: [{ kind: 'number', id: 'points', label: 'Data points', min: 12, max: 120, step: 12, defaultValue: 48 }],
   },
   {
     id: 'aurora-forecast',
@@ -49,6 +66,7 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: false,
     defaultLayout: { x: 2, y: 3, w: 1, h: 2 },
     component: SolarFlaresCard,
+    settings: [{ kind: 'number', id: 'maxEvents', label: 'Events shown', min: 5, max: 50, step: 5, defaultValue: 30 }],
   },
   {
     id: 'asteroids',
@@ -56,5 +74,36 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: false,
     defaultLayout: { x: 0, y: 5, w: 2, h: 1 },
     component: AsteroidsCard,
+  },
+  {
+    id: 'natural-events',
+    title: 'Natural Events (EONET)',
+    defaultVisible: false,
+    defaultLayout: { x: 2, y: 5, w: 2, h: 2 },
+    component: NaturalEventsCard,
+    settings: [{ kind: 'number', id: 'maxEvents', label: 'Events shown', min: 5, max: 60, step: 5, defaultValue: 25 }],
+  },
+  {
+    id: 'launches',
+    title: 'Upcoming Launches',
+    defaultVisible: false,
+    defaultLayout: { x: 0, y: 6, w: 2, h: 2 },
+    component: LaunchesCard,
+    settings: [{ kind: 'number', id: 'count', label: 'Launches shown', min: 3, max: 20, defaultValue: 8 }],
+  },
+  {
+    id: 'apod',
+    title: 'Astronomy Picture of the Day',
+    defaultVisible: false,
+    defaultLayout: { x: 2, y: 7, w: 2, h: 2 },
+    component: ApodCard,
+  },
+  {
+    id: 'fire-map',
+    title: 'Active Fires (FIRMS)',
+    defaultVisible: false,
+    defaultLayout: { x: 0, y: 8, w: 2, h: 2, minW: 2, minH: 2 },
+    component: FireMapCard,
+    settings: [{ kind: 'number', id: 'dayRange', label: 'Days back', min: 1, max: 7, defaultValue: 1 }],
   },
 ];

@@ -1,17 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApiResource } from '../../hooks/useApiResource';
-import { fetchTleGroup } from '../../api/celestrak';
+import { fetchTleGroups } from '../../api/celestrak';
 import { computeSatellitePosition } from '../../astro/satellitePosition';
 import { geodeticToSceneVector, type SceneVector3 } from '../../astro/coords';
-import { createEarthScene, EARTH_RADIUS_UNITS, type EarthSceneHandle } from '../../render/earthScene';
+import { createEarthScene, EARTH_RADIUS_UNITS, type EarthSceneHandle, type NamedPosition } from '../../render/earthScene';
 import type { TleRecord } from '../../api/types';
+import type { CardComponentProps } from '../../layout/types';
+import { listSetting, numberSetting } from '../../layout/layoutState';
 
-const CACHE_KEY = 'space-radar:tle-stations';
 const TTL_MS = 6 * 60 * 60 * 1000;
 const POLL_MS = 6 * 60 * 60 * 1000;
 const POSITION_UPDATE_MS = 1000;
 const ORBIT_SAMPLE_COUNT = 120;
 const ORBIT_SAMPLE_SPAN_MS = 100 * 60 * 1000;
+
+const DEFAULT_CATEGORIES = ['stations'];
+const DEFAULT_MAX_SATELLITES = 30;
+
+// Curated CelesTrak GP groups; see https://celestrak.org/NORAD/elements/.
+export const SATELLITE_CATEGORIES: { value: string; label: string }[] = [
+  { value: 'stations', label: 'Space stations (ISS, CSS)' },
+  { value: 'visual', label: 'Brightest / visible' },
+  { value: 'active', label: 'All active' },
+  { value: 'starlink', label: 'Starlink' },
+  { value: 'oneweb', label: 'OneWeb' },
+  { value: 'gps-ops', label: 'GPS' },
+  { value: 'galileo', label: 'Galileo' },
+  { value: 'weather', label: 'Weather' },
+  { value: 'noaa', label: 'NOAA' },
+  { value: 'science', label: 'Science' },
+  { value: 'amateur', label: 'Amateur radio' },
+];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -46,23 +65,31 @@ function sampleOrbit(tle: TleRecord, now: number): SceneVector3[] {
   return points;
 }
 
-function currentPositions(records: TleRecord[], now: Date): SceneVector3[] {
-  const points: SceneVector3[] = [];
+function currentPositions(records: TleRecord[], now: Date): NamedPosition[] {
+  const points: NamedPosition[] = [];
   for (const record of records) {
     const position = computeSatellitePosition(record, now);
     if (position) {
-      points.push(geodeticToSceneVector(position.latitudeDeg, position.longitudeDeg, position.altitudeKm, EARTH_RADIUS_UNITS));
+      points.push({
+        name: record.name,
+        position: geodeticToSceneVector(position.latitudeDeg, position.longitudeDeg, position.altitudeKm, EARTH_RADIUS_UNITS),
+      });
     }
   }
   return points;
 }
 
-export function IssGlobeCard() {
+export function IssGlobeCard({ settings = {} }: CardComponentProps) {
+  const categories = listSetting(settings, 'categories', DEFAULT_CATEGORIES);
+  const maxSatellites = numberSetting(settings, 'maxSatellites', DEFAULT_MAX_SATELLITES);
+  const categoryKey = [...categories].sort().join(',');
+  const cacheKey = `space-radar:tle:${categoryKey}`;
+
   const { data, loading, error } = useApiResource<TleRecord[]>({
-    key: CACHE_KEY,
+    key: cacheKey,
     ttlMs: TTL_MS,
     pollMs: POLL_MS,
-    fetcher: () => fetchTleGroup('stations'),
+    fetcher: () => fetchTleGroups(categoryKey.split(',')),
     isValue: isTleRecords,
   });
 
@@ -89,34 +116,41 @@ export function IssGlobeCard() {
   }, []);
 
   const iss = data ? findIss(data) : null;
-  const otherSatellites = useMemo(
-    () => (data && iss ? data.filter((record) => record !== iss) : (data ?? [])),
-    [data, iss],
-  );
+  const otherSatellites = useMemo(() => {
+    const others = data && iss ? data.filter((record) => record !== iss) : (data ?? []);
+    return others.slice(0, maxSatellites);
+  }, [data, iss, maxSatellites]);
 
   useEffect(() => {
     const scene = sceneRef.current;
-    if (!iss || !scene) {
+    // Don't drive the scene until TLEs have loaded — otherwise the first mount
+    // pushes an empty/null frame before any data arrives.
+    if (!scene || !data) {
       return;
     }
 
-    scene.setOrbitPath(sampleOrbit(iss, Date.now()));
+    scene.setOrbitPath(iss ? sampleOrbit(iss, Date.now()) : []);
 
     function updatePositions() {
-      const scene2 = sceneRef.current;
-      if (!scene2 || !iss) {
+      const activeScene = sceneRef.current;
+      if (!activeScene) {
         return;
       }
-      const position = computeSatellitePosition(iss, new Date());
-      scene2.setIssPosition(
-        position ? geodeticToSceneVector(position.latitudeDeg, position.longitudeDeg, position.altitudeKm, EARTH_RADIUS_UNITS) : null,
+      const now = new Date();
+      const issPosition = iss ? computeSatellitePosition(iss, now) : null;
+      activeScene.setIssPosition(
+        issPosition
+          ? geodeticToSceneVector(issPosition.latitudeDeg, issPosition.longitudeDeg, issPosition.altitudeKm, EARTH_RADIUS_UNITS)
+          : null,
       );
-      scene2.setSatellites(currentPositions(otherSatellites, new Date()));
+      activeScene.setSatellites(currentPositions(otherSatellites, now));
     }
     updatePositions();
     const interval = setInterval(updatePositions, POSITION_UPDATE_MS);
     return () => clearInterval(interval);
-  }, [iss, otherSatellites]);
+  }, [data, iss, otherSatellites]);
+
+  const satelliteCount = otherSatellites.length + (iss ? 1 : 0);
 
   return (
     <div className="globe-wrap">
@@ -124,8 +158,11 @@ export function IssGlobeCard() {
       {sceneError && <p className="card-status card-status-error globe-overlay">{sceneError}</p>}
       {!sceneError && loading && <p className="card-status globe-overlay">Loading…</p>}
       {!sceneError && error && <p className="card-status card-status-error globe-overlay">{error}</p>}
-      {!sceneError && !loading && !error && data && !iss && (
-        <p className="card-status globe-overlay">ISS not found in this group.</p>
+      {!sceneError && !loading && !error && data && (
+        <p className="card-status globe-overlay">
+          {satelliteCount} satellite{satelliteCount === 1 ? '' : 's'}
+          {!iss && ' · ISS not in selection'}
+        </p>
       )}
     </div>
   );

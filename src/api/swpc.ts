@@ -1,8 +1,9 @@
-import type { KpIndexPoint, SolarWindPoint } from './types';
+import type { KpIndexPoint, SolarWindPoint, SpaceWeatherEvent } from './types';
 
 const KP_INDEX_URL = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
 const SOLAR_WIND_URL = 'https://services.swpc.noaa.gov/products/geospace/propagated-solar-wind-1-hour.json';
 const AURORA_IMAGE_URL = 'https://services.swpc.noaa.gov/images/animations/ovation/north/latest.jpg';
+const GOES_FLARES_URL = 'https://services.swpc.noaa.gov/json/goes/primary/xray-flares-7-day.json';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -70,6 +71,33 @@ export function parseSolarWind(raw: unknown): SolarWindPoint[] {
   return points;
 }
 
+// GOES X-ray flare events: array of objects, ISO time tags, flare class in
+// `max_class` (e.g. "M3.2"). No source location in this product.
+export function parseGoesFlares(raw: unknown): SpaceWeatherEvent[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const events: SpaceWeatherEvent[] = [];
+  for (const item of raw) {
+    if (!isRecord(item)) {
+      continue;
+    }
+    const time = item.begin_time;
+    if (typeof time !== 'string') {
+      continue;
+    }
+    const satellite = typeof item.satellite === 'number' ? item.satellite : 0;
+    events.push({
+      kind: 'flare',
+      id: `goes${satellite}-${time}`,
+      time,
+      classType: typeof item.max_class === 'string' ? item.max_class : null,
+      sourceLocation: null,
+    });
+  }
+  return events;
+}
+
 interface FetchResponse {
   ok: boolean;
   status?: number;
@@ -92,6 +120,14 @@ export async function fetchSolarWind(fetchFn: FetchFn = fetch): Promise<SolarWin
     throw new Error(`NOAA SWPC solar wind request failed with status ${response.status ?? 'unknown'}`);
   }
   return parseSolarWind(await response.json());
+}
+
+export async function fetchGoesFlares(fetchFn: FetchFn = fetch): Promise<SpaceWeatherEvent[]> {
+  const response = await fetchFn(GOES_FLARES_URL);
+  if (!response.ok) {
+    throw new Error(`NOAA SWPC GOES flares request failed with status ${response.status ?? 'unknown'}`);
+  }
+  return parseGoesFlares(await response.json());
 }
 
 export function auroraForecastImageUrl(): string {

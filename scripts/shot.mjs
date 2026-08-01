@@ -19,6 +19,10 @@ const CARD_TITLES = {
   'aurora-forecast': 'Aurora Forecast',
   'solar-flares': 'Solar Flares & CME',
   asteroids: 'Near-Earth Asteroids',
+  'natural-events': 'Natural Events (EONET)',
+  launches: 'Upcoming Launches',
+  apod: 'Astronomy Picture of the Day',
+  'fire-map': 'Active Fires (FIRMS)',
 };
 const DEFAULT_VISIBLE = ['iss-globe', 'kp-index', 'solar-wind'];
 

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { HeliocentricVector, PlanetPosition } from '../astro/planetPositions';
 import { heliocentricToSceneVector } from '../astro/coords';
+import { createStarfield } from './starfield';
 
 const UNITS_PER_AU = 6;
 
@@ -66,6 +67,9 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   controls.minDistance = 10;
   controls.maxDistance = 300;
 
+  const starfield = createStarfield(400);
+  scene.add(starfield.mesh);
+
   scene.add(new THREE.AmbientLight(0x556688, 1.8));
 
   const sun = new THREE.Mesh(new THREE.SphereGeometry(1.6, 24, 24), new THREE.MeshBasicMaterial({ color: 0xfab219 }));
@@ -120,6 +124,7 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
       resizeObserver.disconnect();
       controls.dispose();
       renderer.dispose();
+      starfield.dispose();
     },
   };
 }

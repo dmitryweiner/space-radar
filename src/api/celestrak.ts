@@ -32,3 +32,33 @@ export async function fetchTleGroup(group: string, fetchFn: FetchFn = fetch): Pr
   const text = await response.text();
   return parseTleText(text);
 }
+
+// Fetches several groups and merges them, de-duplicating satellites that appear
+// in more than one group (e.g. the ISS is in both `stations` and `visual`) by
+// their NORAD id (the 5-digit field at the start of TLE line 1). If at least
+// one group resolves, partial failures are tolerated so a single bad group
+// doesn't blank the card; only an all-groups failure rethrows.
+export async function fetchTleGroups(groups: string[], fetchFn: FetchFn = fetch): Promise<TleRecord[]> {
+  const results = await Promise.allSettled(groups.map((group) => fetchTleGroup(group, fetchFn)));
+  const merged: TleRecord[] = [];
+  const seen = new Set<string>();
+  let firstError: unknown = null;
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      firstError = firstError ?? result.reason;
+      continue;
+    }
+    for (const record of result.value) {
+      const noradId = record.line1.slice(2, 7).trim() || record.name;
+      if (seen.has(noradId)) {
+        continue;
+      }
+      seen.add(noradId);
+      merged.push(record);
+    }
+  }
+  if (merged.length === 0 && firstError) {
+    throw firstError instanceof Error ? firstError : new Error(String(firstError));
+  }
+  return merged;
+}

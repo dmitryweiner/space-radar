@@ -1,7 +1,10 @@
 import { useApiResource } from '../../hooks/useApiResource';
 import { fetchKpIndex } from '../../api/swpc';
 import type { KpIndexPoint } from '../../api/types';
+import type { CardComponentProps } from '../../layout/types';
+import { numberSetting } from '../../layout/layoutState';
 import { formatUtcTimestamp } from '../formatTimestamp';
+import { TimeAxis } from '../TimeAxis';
 
 const CACHE_KEY = 'space-radar:kp-index';
 const TTL_MS = 5 * 60 * 1000;
@@ -38,7 +41,9 @@ function kpStatus(kp: number): KpStatus {
   return { label: 'Quiet', color: 'var(--status-good)' };
 }
 
-export function KpIndexCard() {
+const DEFAULT_BAR_COUNT = 8;
+
+export function KpIndexCard({ settings = {} }: CardComponentProps) {
   const { data, loading, error } = useApiResource<KpIndexPoint[]>({
     key: CACHE_KEY,
     ttlMs: TTL_MS,
@@ -57,7 +62,7 @@ export function KpIndexCard() {
     return <p className="card-status">No data available.</p>;
   }
 
-  const points = data.slice(-8);
+  const points = data.slice(-numberSetting(settings, 'barCount', DEFAULT_BAR_COUNT));
   const latest = points[points.length - 1];
   const status = kpStatus(latest.kp);
   const barWidth = 100 / points.length;
@@ -90,6 +95,7 @@ export function KpIndexCard() {
           );
         })}
       </svg>
+      <TimeAxis times={points.map((point) => point.time)} align="bar" />
       <p className="kp-status-line">
         Current: <strong>Kp {latest.kp.toFixed(2)}</strong> —{' '}
         <span style={{ color: status.color }}>{status.label}</span>

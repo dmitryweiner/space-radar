@@ -67,8 +67,23 @@ rather than by `vitest`.
 |---|---|---|
 | [CelesTrak](https://celestrak.org/) | satellite TLEs | none |
 | [NOAA SWPC](https://www.swpc.noaa.gov/) | Kp-index, solar wind, aurora | none |
-| [NASA DONKI](https://ccmc.gsfc.nasa.gov/tools/DONKI/) | flares, CMEs | personal key |
+| [NOAA SWPC GOES](https://www.swpc.noaa.gov/) | solar flares (X-ray events) | none |
+| [NASA DONKI](https://ccmc.gsfc.nasa.gov/tools/DONKI/) | CMEs (best-effort) | personal key |
 | [NASA NeoWs](https://api.nasa.gov/) | near-Earth asteroids | personal key |
+| [NASA EONET](https://eonet.gsfc.nasa.gov/) | natural events (wildfires, volcanoes, …) | none |
+| [Launch Library 2](https://thespacedevs.com/llapi) | upcoming rocket launches | none |
+| [NASA APOD](https://api.nasa.gov/) | astronomy picture of the day | personal key |
+| [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/) | active fire detections (VIIRS/MODIS) | MAP_KEY |
+
+The starfield background in the 3D cards is the Milky Way panorama texture
+from [Solar System Scope](https://www.solarsystemscope.com/textures/)
+(CC BY 4.0).
+
+FIRMS uses a separate free MAP_KEY (not the `api.nasa.gov` key) — get one at
+[firms.modaps.eosdis.nasa.gov/api/map_key](https://firms.modaps.eosdis.nasa.gov/api/map_key/)
+and paste it into `src/api/firmsMapKey.ts`. Note FIRMS did not send CORS headers
+in testing, so the Fire Map card may need the request proxied through a small
+server when deployed as a static site.
 
 The NASA key lives in `src/api/nasaApiKey.ts` (1000 requests/hour, no daily
 cap — a big step up from the shared `DEMO_KEY`'s 30/hour). This is a

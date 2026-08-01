@@ -13,31 +13,6 @@ function toNullableString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
-export function parseFlares(raw: unknown): SpaceWeatherEvent[] {
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-  const events: SpaceWeatherEvent[] = [];
-  for (const item of raw) {
-    if (!isRecord(item)) {
-      continue;
-    }
-    const id = item.flrID;
-    const time = item.beginTime;
-    if (typeof id !== 'string' || typeof time !== 'string') {
-      continue;
-    }
-    events.push({
-      kind: 'flare',
-      id,
-      time,
-      classType: toNullableString(item.classType),
-      sourceLocation: toNullableString(item.sourceLocation),
-    });
-  }
-  return events;
-}
-
 export function parseCmes(raw: unknown): SpaceWeatherEvent[] {
   if (!Array.isArray(raw)) {
     return [];
@@ -89,24 +64,9 @@ async function fetchJson(url: string, fetchFn: FetchFn): Promise<unknown> {
   return response.json();
 }
 
-function byTimeDescending(a: SpaceWeatherEvent, b: SpaceWeatherEvent): number {
-  if (a.time < b.time) {
-    return 1;
-  }
-  if (a.time > b.time) {
-    return -1;
-  }
-  return 0;
-}
-
-export async function fetchSpaceWeatherEvents(
-  fetchFn: FetchFn = fetch,
-  now: Date = new Date(),
-): Promise<SpaceWeatherEvent[]> {
-  const params = dateRangeParams(now);
-  const [flrRaw, cmeRaw] = await Promise.all([
-    fetchJson(`${API_BASE}/FLR?${params}`, fetchFn),
-    fetchJson(`${API_BASE}/CME?${params}`, fetchFn),
-  ]);
-  return [...parseFlares(flrRaw), ...parseCmes(cmeRaw)].sort(byTimeDescending);
+// Flares now come from the far more reliable SWPC GOES feed (see
+// src/api/swpc.ts); DONKI is only queried for CMEs, which SWPC has no
+// equivalent JSON product for.
+export async function fetchCmeEvents(fetchFn: FetchFn = fetch, now: Date = new Date()): Promise<SpaceWeatherEvent[]> {
+  return parseCmes(await fetchJson(`${API_BASE}/CME?${dateRangeParams(now)}`, fetchFn));
 }

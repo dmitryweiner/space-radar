@@ -26,10 +26,12 @@ describe('GridLayout', () => {
         registry={registry}
         visibleIds={['a']}
         layout={layout}
+        cardSettings={{}}
         onLayoutChange={() => {}}
         onHide={() => {}}
         fullscreenId={null}
         onToggleFullscreen={() => {}}
+        onOpenSettings={() => {}}
       />,
     );
     expect(screen.getByText('Card A')).toBeInTheDocument();
@@ -43,10 +45,12 @@ describe('GridLayout', () => {
         registry={registry}
         visibleIds={['a', 'b']}
         layout={layout}
+        cardSettings={{}}
         onLayoutChange={() => {}}
         onHide={() => {}}
         fullscreenId={null}
         onToggleFullscreen={() => {}}
+        onOpenSettings={() => {}}
       />,
     );
     expect(screen.getByText('Card A')).toBeInTheDocument();
@@ -59,10 +63,12 @@ describe('GridLayout', () => {
         registry={registry}
         visibleIds={['a', 'b']}
         layout={layout}
+        cardSettings={{}}
         onLayoutChange={() => {}}
         onHide={() => {}}
         fullscreenId="a"
         onToggleFullscreen={() => {}}
+        onOpenSettings={() => {}}
       />,
     );
     expect(screen.queryByText('content a')).not.toBeInTheDocument();

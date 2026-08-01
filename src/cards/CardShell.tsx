@@ -4,16 +4,28 @@ interface CardShellProps {
   title: string;
   onHide: () => void;
   onToggleFullscreen: () => void;
+  onOpenSettings?: () => void;
   isFullscreen?: boolean;
   children: ReactNode;
 }
 
-export function CardShell({ title, onHide, onToggleFullscreen, isFullscreen = false, children }: CardShellProps) {
+export function CardShell({ title, onHide, onToggleFullscreen, onOpenSettings, isFullscreen = false, children }: CardShellProps) {
   return (
     <div className={isFullscreen ? 'card-shell card-shell-fullscreen' : 'card-shell'}>
       <div className="card-shell-header card-drag-handle">
         <span className="card-shell-title">{title}</span>
         <div className="card-shell-actions">
+          {onOpenSettings && (
+            <button
+              type="button"
+              className="card-shell-action"
+              aria-label={`Settings for ${title}`}
+              title="Settings"
+              onClick={onOpenSettings}
+            >
+              ⚙️
+            </button>
+          )}
           <button
             type="button"
             className="card-shell-action"
