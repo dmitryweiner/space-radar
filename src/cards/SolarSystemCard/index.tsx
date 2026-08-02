@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { computePlanetOrbitPath, computePlanetPositions } from '../../astro/planetPositions';
+import { computeMoonPositions } from '../../astro/moonPositions';
 import { createSolarSystemScene, type SolarSystemSceneHandle } from '../../render/solarSystemScene';
 
 const POSITION_UPDATE_MS = 60_000;
@@ -29,7 +30,10 @@ export function SolarSystemCard() {
     scene.setOrbitPaths(initialPositions.map((p) => ({ name: p.name, points: computePlanetOrbitPath(p.name, now) })));
 
     function updatePositions() {
-      scene.setPlanetPositions(computePlanetPositions(new Date()));
+      const at = new Date();
+      // Planet positions first: setMoons reads the planet meshes' positions.
+      scene.setPlanetPositions(computePlanetPositions(at));
+      scene.setMoons(computeMoonPositions(at));
     }
     updatePositions();
     const interval = setInterval(updatePositions, POSITION_UPDATE_MS);

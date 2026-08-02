@@ -17,6 +17,7 @@ vi.mock('../src/render/solarSystemScene', () => ({
   createSolarSystemScene: vi.fn(() => ({
     setPlanetPositions: vi.fn(),
     setOrbitPaths: vi.fn(),
+    setMoons: vi.fn(),
     resize: vi.fn(),
     dispose: vi.fn(),
   })),

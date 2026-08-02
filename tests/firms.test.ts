@@ -35,8 +35,20 @@ describe('parseFirmsCsv', () => {
 });
 
 describe('fetchFirePoints', () => {
-  it('throws a helpful message when no MAP_KEY is configured', async () => {
-    // FIRMS_MAP_KEY ships empty by default.
-    await expect(fetchFirePoints(vi.fn())).rejects.toThrow(/MAP_KEY/i);
+  it('requests the FIRMS area CSV and parses the body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(VIIRS_CSV) });
+    const points = await fetchFirePoints(fetchMock, { source: 'VIIRS_SNPP_NRT', dayRange: 2 });
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/VIIRS_SNPP_NRT/world/2'));
+    expect(points).toHaveLength(2);
+  });
+
+  it('surfaces a plain-text error body (e.g. Invalid MAP_KEY) returned with HTTP 200', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('Invalid MAP_KEY.') });
+    await expect(fetchFirePoints(fetchMock)).rejects.toThrow(/Invalid MAP_KEY/i);
+  });
+
+  it('throws when the request is not ok', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, text: () => Promise.resolve('') });
+    await expect(fetchFirePoints(fetchMock)).rejects.toThrow();
   });
 });

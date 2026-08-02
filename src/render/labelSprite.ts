@@ -6,19 +6,23 @@ const FONT = `600 ${FONT_PX}px system-ui, -apple-system, 'Segoe UI', sans-serif`
 
 export interface LabelSprite {
   sprite: THREE.Sprite;
+  /** width / height of the label texture, used to keep text un-stretched. */
+  aspect: number;
   dispose(): void;
 }
 
 // A camera-facing text label drawn onto a canvas texture. Kept small and
 // depth-tested so labels behind the globe are naturally hidden by the opaque
-// Earth mesh — no manual occlusion math needed.
+// Earth mesh — no manual occlusion math needed. The world-space scale is set
+// per-frame by the scene (see earthScene) so the on-screen size stays constant
+// regardless of zoom.
 export function makeLabelSprite(text: string, color = '#e6ecff'): LabelSprite {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   if (!context) {
     // Fall back to an empty sprite; label text is non-essential decoration.
     const empty = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0 }));
-    return { sprite: empty, dispose: () => empty.material.dispose() };
+    return { sprite: empty, aspect: 1, dispose: () => empty.material.dispose() };
   }
 
   context.font = FONT;
@@ -40,14 +44,12 @@ export function makeLabelSprite(text: string, color = '#e6ecff'): LabelSprite {
 
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true });
   const sprite = new THREE.Sprite(material);
-
-  // World size proportional to the text aspect ratio so labels aren't stretched.
   const aspect = canvas.width / canvas.height;
-  const height = 0.32;
-  sprite.scale.set(height * aspect, height, 1);
+  sprite.scale.set(aspect, 1, 1);
 
   return {
     sprite,
+    aspect,
     dispose() {
       material.dispose();
       texture.dispose();

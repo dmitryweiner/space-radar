@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type {
   CardDefinition,
   CardLayoutRect,
@@ -29,6 +30,31 @@ interface NumberFieldProps {
 }
 
 function NumberField({ id, label, value, min, max, step = 1, onChange }: NumberFieldProps) {
+  // Track the raw text while editing so typing a multi-digit value (or briefly
+  // clearing the field) isn't clamped on every keystroke — clamping mid-edit is
+  // what made "type 2 into a field showing 1" land on 4/8. Commit on blur/Enter.
+  const [draft, setDraft] = useState(String(value));
+  // Re-sync the draft when the committed value changes (our own commit, or an
+  // external layout update) — the render-time "adjust state on prop change"
+  // pattern, avoiding an effect. Mid-edit `value` doesn't change, so typing a
+  // multi-digit number isn't disturbed.
+  const [lastValue, setLastValue] = useState(value);
+  if (value !== lastValue) {
+    setLastValue(value);
+    setDraft(String(value));
+  }
+
+  function commit() {
+    const next = Number(draft);
+    if (Number.isFinite(next) && draft.trim() !== '') {
+      const clamped = Math.min(max, Math.max(min, Math.round(next)));
+      onChange(clamped);
+      setDraft(String(clamped));
+    } else {
+      setDraft(String(value));
+    }
+  }
+
   return (
     <label className="settings-field" htmlFor={id}>
       <span>{label}</span>
@@ -38,11 +64,13 @@ function NumberField({ id, label, value, min, max, step = 1, onChange }: NumberF
         min={min}
         max={max}
         step={step}
-        value={value}
-        onChange={(event) => {
-          const next = Number(event.target.value);
-          if (Number.isFinite(next)) {
-            onChange(Math.min(max, Math.max(min, next)));
+        value={draft}
+        onFocus={(event) => event.target.select()}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.currentTarget.blur();
           }
         }}
       />

@@ -37,7 +37,12 @@ npm run build       # production build → ./docs (GitHub Pages)
 - `src/astro/` is pure math — **never** import Three.js or React there
   (mirrors `src/geo/` in the sibling `mathsculpt` project). It wraps
   `satellite.js` (TLE → geodetic position) and `astronomy-engine` (planet
-  heliocentric vectors), plus `coords.ts` for lat/lon/AU → 3D scene vectors.
+  heliocentric vectors + `moonPositions.ts`), plus `coords.ts` for lat/lon/AU →
+  3D scene vectors. **astronomy-engine only has moon ephemerides for Earth's
+  Moon (`GeoMoon`) and Jupiter's four Galilean moons (`JupiterMoons`)** — there
+  is no data for Saturn/Uranus/Neptune moons, so the Solar System card shows
+  only those five (drawn on exaggerated display orbits since real separations
+  are far smaller than a planet's rendered radius).
 - `src/api/` is pure fetch+parse — **never** import React there. Each module
   takes an injectable fetch function (default: global `fetch`) so tests can
   mock it without touching the network.
@@ -58,6 +63,16 @@ npm run build       # production build → ./docs (GitHub Pages)
   (a single `THREE.Points` cloud). Label sprites (`src/render/labelSprite.ts`)
   are depth-tested, so the opaque Earth mesh hides labels on the far side for
   free — there is no manual occlusion math.
+- **Numeric settings inputs commit on blur/Enter, not per keystroke** (see
+  `CardSettingsPopup`). Clamping every keystroke made "type 2 into a field
+  showing 1" become "12" → clamped to the max (4/8). The field keeps a raw
+  draft string and clamps once on commit; focus selects-all so typing replaces.
+- **A 3D scene's camera `far` must clear the far side of its star sphere at max
+  zoom-out** (`camera distance + starfield radius`). The Solar System card
+  showed a grey disc because `far` (500) was less than 300 + 400.
+- **Globe/solar-system labels keep a constant on-screen size** by rescaling each
+  sprite every frame to `K × cameraDistance` (see `earthScene` / the moon
+  labels) — sprite world-size otherwise changes apparent size with zoom.
 - **`IssGlobeCard`'s scene effect must guard `if (!scene || !data) return`.**
   Without the `!data` guard it pushes a null ISS frame on first mount before
   TLEs load, which makes `waitFor(setIssPosition called)` in the test resolve

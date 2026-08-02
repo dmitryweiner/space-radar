@@ -8,4 +8,4 @@
 // from a static site may be blocked regardless of the key. If the Fire Map
 // card shows a network/CORS error, the data needs to be proxied through a
 // small server (or a serverless function) that adds `Access-Control-Allow-Origin`.
-export const FIRMS_MAP_KEY = '';
+export const FIRMS_MAP_KEY = '4333fb080ca0f0df0c8304450bfc3a1a';

@@ -5,6 +5,7 @@ import { createSolarSystemScene } from '../src/render/solarSystemScene';
 const sceneHandle = {
   setPlanetPositions: vi.fn(),
   setOrbitPaths: vi.fn(),
+  setMoons: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),
 };

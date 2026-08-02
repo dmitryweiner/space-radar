@@ -11,8 +11,10 @@ import { listSetting, numberSetting } from '../../layout/layoutState';
 const TTL_MS = 6 * 60 * 60 * 1000;
 const POLL_MS = 6 * 60 * 60 * 1000;
 const POSITION_UPDATE_MS = 1000;
-const ORBIT_SAMPLE_COUNT = 120;
-const ORBIT_SAMPLE_SPAN_MS = 100 * 60 * 1000;
+// The fading orbit trail behind each satellite: a ~40-minute arc (≈0.4 of a LEO
+// orbit) sampled at a handful of points, recomputed each tick so it follows.
+const TRAIL_SAMPLES = 20;
+const TRAIL_SPAN_MS = 40 * 60 * 1000;
 
 const DEFAULT_CATEGORIES = ['stations'];
 const DEFAULT_MAX_SATELLITES = 30;
@@ -53,10 +55,12 @@ function findIss(records: TleRecord[]): TleRecord | null {
   return records.find((record) => /zarya|\biss\b/i.test(record.name)) ?? null;
 }
 
-function sampleOrbit(tle: TleRecord, now: number): SceneVector3[] {
+// Positions from now backward over TRAIL_SPAN_MS, ordered tail → head so the
+// last point is the satellite's current location (the bright end of the trail).
+function sampleTrail(tle: TleRecord, nowMs: number): SceneVector3[] {
   const points: SceneVector3[] = [];
-  for (let i = 0; i <= ORBIT_SAMPLE_COUNT; i += 1) {
-    const t = new Date(now + (i / ORBIT_SAMPLE_COUNT) * ORBIT_SAMPLE_SPAN_MS);
+  for (let i = TRAIL_SAMPLES - 1; i >= 0; i -= 1) {
+    const t = new Date(nowMs - (i / (TRAIL_SAMPLES - 1)) * TRAIL_SPAN_MS);
     const position = computeSatellitePosition(tle, t);
     if (position) {
       points.push(geodeticToSceneVector(position.latitudeDeg, position.longitudeDeg, position.altitudeKm, EARTH_RADIUS_UNITS));
@@ -65,14 +69,16 @@ function sampleOrbit(tle: TleRecord, now: number): SceneVector3[] {
   return points;
 }
 
-function currentPositions(records: TleRecord[], now: Date): NamedPosition[] {
+function currentPositions(records: TleRecord[], nowMs: number): NamedPosition[] {
   const points: NamedPosition[] = [];
+  const now = new Date(nowMs);
   for (const record of records) {
     const position = computeSatellitePosition(record, now);
     if (position) {
       points.push({
         name: record.name,
         position: geodeticToSceneVector(position.latitudeDeg, position.longitudeDeg, position.altitudeKm, EARTH_RADIUS_UNITS),
+        trail: sampleTrail(record, nowMs),
       });
     }
   }
@@ -129,21 +135,20 @@ export function IssGlobeCard({ settings = {} }: CardComponentProps) {
       return;
     }
 
-    scene.setOrbitPath(iss ? sampleOrbit(iss, Date.now()) : []);
-
     function updatePositions() {
       const activeScene = sceneRef.current;
       if (!activeScene) {
         return;
       }
-      const now = new Date();
-      const issPosition = iss ? computeSatellitePosition(iss, now) : null;
+      const nowMs = Date.now();
+      const issPosition = iss ? computeSatellitePosition(iss, new Date(nowMs)) : null;
       activeScene.setIssPosition(
         issPosition
           ? geodeticToSceneVector(issPosition.latitudeDeg, issPosition.longitudeDeg, issPosition.altitudeKm, EARTH_RADIUS_UNITS)
           : null,
+        iss ? sampleTrail(iss, nowMs) : [],
       );
-      activeScene.setSatellites(currentPositions(otherSatellites, now));
+      activeScene.setSatellites(currentPositions(otherSatellites, nowMs));
     }
     updatePositions();
     const interval = setInterval(updatePositions, POSITION_UPDATE_MS);

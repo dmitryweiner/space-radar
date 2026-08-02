@@ -66,7 +66,6 @@ describe('IssGlobeCard', () => {
 
     await vi.waitFor(() => expect(sceneHandle.setIssPosition).toHaveBeenCalled());
     expect(createEarthScene).toHaveBeenCalledOnce();
-    expect(sceneHandle.setOrbitPath).toHaveBeenCalled();
     const calls = sceneHandle.setIssPosition.mock.calls;
     const [positionArg] = calls[calls.length - 1];
     expect(positionArg).toEqual(expect.objectContaining({ x: expect.any(Number), y: expect.any(Number), z: expect.any(Number) }));

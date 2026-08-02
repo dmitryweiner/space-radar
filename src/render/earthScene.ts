@@ -4,12 +4,19 @@ import type { SceneVector3 } from '../astro/coords';
 import earthTextureUrl from '../assets/earth-diffuse.jpg';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, type LabelSprite } from './labelSprite';
+import { makeTrail, type TrailLine } from './trailLine';
 
 export const EARTH_RADIUS_UNITS = 2;
+
+// Constant on-screen label size: world height scales with camera distance so
+// the apparent size doesn't change as the user zooms.
+const SCREEN_LABEL_K = 0.045;
 
 export interface NamedPosition {
   name: string;
   position: SceneVector3;
+  /** Orbit trail ordered tail → head (head = current position). */
+  trail: SceneVector3[];
 }
 
 export interface GlobeMarker {
@@ -26,8 +33,7 @@ export interface FirePoint {
 }
 
 export interface EarthSceneHandle {
-  setIssPosition(position: SceneVector3 | null): void;
-  setOrbitPath(points: SceneVector3[]): void;
+  setIssPosition(position: SceneVector3 | null, trail?: SceneVector3[]): void;
   setSatellites(satellites: NamedPosition[]): void;
   setMarkers(markers: GlobeMarker[]): void;
   setFirePoints(points: FirePoint[]): void;
@@ -105,12 +111,15 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   const issLabel = makeLabelSprite('ISS', '#fab219');
   issLabel.sprite.visible = false;
   scene.add(issLabel.sprite);
+  const issTrail = makeTrail(0xfab219);
+  scene.add(issTrail.line);
 
+  const SATELLITE_COLOR = 0x9fd8ff;
   const satelliteGeometry = new THREE.SphereGeometry(0.035, 8, 8);
-  const satelliteMaterial = new THREE.MeshBasicMaterial({ color: 0x9fd8ff });
+  const satelliteMaterial = new THREE.MeshBasicMaterial({ color: SATELLITE_COLOR });
   const satelliteGroup = new THREE.Group();
   scene.add(satelliteGroup);
-  const satelliteMarkers = new Map<string, { mesh: THREE.Mesh; label: LabelSprite }>();
+  const satelliteMarkers = new Map<string, { mesh: THREE.Mesh; label: LabelSprite; trail: TrailLine }>();
 
   const markerGeometry = new THREE.SphereGeometry(0.06, 12, 12);
   const markerGroup = new THREE.Group();
@@ -118,14 +127,21 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   const eventMarkers = new Map<string, { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; label: LabelSprite }>();
 
   let firePoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
-  let orbitLine: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial> | null = null;
 
   const scratch = new THREE.Vector3();
 
-  function disposeSatellite(entry: { mesh: THREE.Mesh; label: LabelSprite }) {
+  function rescaleLabel(label: LabelSprite) {
+    const distance = camera.position.distanceTo(label.sprite.position);
+    const height = SCREEN_LABEL_K * distance;
+    label.sprite.scale.set(height * label.aspect, height, 1);
+  }
+
+  function disposeSatellite(entry: { mesh: THREE.Mesh; label: LabelSprite; trail: TrailLine }) {
     satelliteGroup.remove(entry.mesh);
     scene.remove(entry.label.sprite);
+    scene.remove(entry.trail.line);
     entry.label.dispose();
+    entry.trail.dispose();
   }
 
   function disposeEventMarker(entry: { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; label: LabelSprite }) {
@@ -139,38 +155,30 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   function animate() {
     frameId = requestAnimationFrame(animate);
     controls.update();
+    rescaleLabel(issLabel);
+    for (const entry of satelliteMarkers.values()) {
+      rescaleLabel(entry.label);
+    }
+    for (const entry of eventMarkers.values()) {
+      rescaleLabel(entry.label);
+    }
     renderer.render(scene, camera);
   }
   animate();
 
   return {
-    setIssPosition(position) {
+    setIssPosition(position, trail = []) {
       if (!position) {
         issMarker.visible = false;
         issLabel.sprite.visible = false;
+        issTrail.setPoints([]);
         return;
       }
       issMarker.visible = true;
       issMarker.position.set(position.x, position.y, position.z);
       issLabel.sprite.visible = true;
       issLabel.sprite.position.copy(labelPosition(position, scratch));
-    },
-    setOrbitPath(points) {
-      if (orbitLine) {
-        scene.remove(orbitLine);
-        orbitLine.geometry.dispose();
-        orbitLine.material.dispose();
-        orbitLine = null;
-      }
-      if (points.length < 2) {
-        return;
-      }
-      const geometry = new THREE.BufferGeometry().setFromPoints(
-        points.map((p) => new THREE.Vector3(p.x, p.y, p.z)),
-      );
-      const material = new THREE.LineBasicMaterial({ color: 0x5eb1ff });
-      orbitLine = new THREE.Line(geometry, material);
-      scene.add(orbitLine);
+      issTrail.setPoints(trail);
     },
     setSatellites(satellites) {
       const incoming = new Set(satellites.map((sat) => sat.name));
@@ -180,18 +188,21 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
           satelliteMarkers.delete(name);
         }
       }
-      for (const { name, position } of satellites) {
+      for (const { name, position, trail } of satellites) {
         let entry = satelliteMarkers.get(name);
         if (!entry) {
           const mesh = new THREE.Mesh(satelliteGeometry, satelliteMaterial);
           satelliteGroup.add(mesh);
           const label = makeLabelSprite(name, '#9fd8ff');
           scene.add(label.sprite);
-          entry = { mesh, label };
+          const trailLine = makeTrail(SATELLITE_COLOR);
+          scene.add(trailLine.line);
+          entry = { mesh, label, trail: trailLine };
           satelliteMarkers.set(name, entry);
         }
         entry.mesh.position.set(position.x, position.y, position.z);
         entry.label.sprite.position.copy(labelPosition(position, scratch));
+        entry.trail.setPoints(trail);
       }
     },
     setMarkers(markers) {
@@ -277,6 +288,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       satelliteMaterial.dispose();
       markerGeometry.dispose();
       issLabel.dispose();
+      issTrail.dispose();
       renderer.dispose();
       earthTexture.dispose();
       starfield.dispose();
