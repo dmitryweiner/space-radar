@@ -27,6 +27,11 @@ export async function fetchTleGroup(group: string, fetchFn: FetchFn = fetch): Pr
   const url = `${CELESTRAK_BASE}?GROUP=${group}&FORMAT=tle`;
   const response = await fetchFn(url);
   if (!response.ok) {
+    // CelesTrak rate-limits by returning 403 with an HTML page (common when
+    // requesting several large groups in quick succession).
+    if (response.status === 403 || response.status === 429) {
+      throw new Error(`CelesTrak is rate-limiting requests (HTTP ${response.status}) — try again in a minute.`);
+    }
     throw new Error(`CelesTrak request for group "${group}" failed with status ${response.status ?? 'unknown'}`);
   }
   const text = await response.text();

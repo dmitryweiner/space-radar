@@ -63,6 +63,14 @@ npm run build       # production build → ./docs (GitHub Pages)
   (a single `THREE.Points` cloud). Label sprites (`src/render/labelSprite.ts`)
   are depth-tested, so the opaque Earth mesh hides labels on the far side for
   free — there is no manual occlusion math.
+- **The ISS card caches TLEs per CelesTrak group, not per group-combination**
+  (`useTleSatellites`), under `space-radar:tle-group:<name>` keys. Caching by
+  combination (the earlier design) re-fetched huge groups on every toggle —
+  tripping CelesTrak's 403 rate-limit — and piled up unbounded localStorage
+  entries (a `QuotaExceededError` on `setItem`). `writeCache` now also swallows
+  quota/storage errors. CelesTrak's `stations` group is the whole "Space
+  Stations" set (cargo ships + cubesats deployed from the ISS), not just
+  ISS/CSS — hence the "Space stations & nearby" label.
 - **Numeric settings inputs commit on blur/Enter, not per keystroke** (see
   `CardSettingsPopup`). Clamping every keystroke made "type 2 into a field
   showing 1" become "12" → clamped to the max (4/8). The field keeps a raw

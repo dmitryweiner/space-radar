@@ -74,6 +74,7 @@ export function App() {
             title={fullscreenCard.title}
             isFullscreen
             onToggleFullscreen={() => setFullscreenId(null)}
+            onOpenSettings={() => setSettingsCardId(fullscreenCard.id)}
             onHide={() => {
               toggleVisible(fullscreenCard.id);
               setFullscreenId(null);

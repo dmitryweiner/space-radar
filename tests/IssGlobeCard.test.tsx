@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { IssGlobeCard } from '../src/cards/IssGlobeCard';
-import { fetchTleGroups } from '../src/api/celestrak';
+import { fetchTleGroup } from '../src/api/celestrak';
 import { createEarthScene } from '../src/render/earthScene';
 
 vi.mock('../src/api/celestrak', () => ({
-  fetchTleGroups: vi.fn(),
+  fetchTleGroup: vi.fn(),
 }));
 
 const sceneHandle = {
@@ -36,7 +36,7 @@ const POISK_TLE = {
 
 beforeEach(() => {
   window.localStorage.clear();
-  vi.mocked(fetchTleGroups).mockReset();
+  vi.mocked(fetchTleGroup).mockReset();
   vi.mocked(createEarthScene).mockClear();
   sceneHandle.setIssPosition.mockClear();
   sceneHandle.setOrbitPath.mockClear();
@@ -46,19 +46,19 @@ beforeEach(() => {
 
 describe('IssGlobeCard', () => {
   it('shows a loading state before TLE data arrives', () => {
-    vi.mocked(fetchTleGroups).mockReturnValue(new Promise(() => {}));
+    vi.mocked(fetchTleGroup).mockReturnValue(new Promise(() => {}));
     render(<IssGlobeCard />);
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
 
   it('shows an error message when the TLE fetch fails', async () => {
-    vi.mocked(fetchTleGroups).mockRejectedValue(new Error('CelesTrak unreachable'));
+    vi.mocked(fetchTleGroup).mockRejectedValue(new Error('CelesTrak unreachable'));
     render(<IssGlobeCard />);
     expect(await screen.findByText(/celestrak unreachable/i)).toBeInTheDocument();
   });
 
   it('mounts the Three.js scene and feeds it the ISS position and orbit path once data loads', async () => {
-    vi.mocked(fetchTleGroups).mockResolvedValue([
+    vi.mocked(fetchTleGroup).mockResolvedValue([
       { name: 'NOAA 15', line1: 'garbage', line2: 'garbage' },
       ISS_TLE,
     ]);
@@ -72,7 +72,7 @@ describe('IssGlobeCard', () => {
   });
 
   it('feeds every other satellite in the group to the scene, excluding the ISS itself', async () => {
-    vi.mocked(fetchTleGroups).mockResolvedValue([ISS_TLE, POISK_TLE]);
+    vi.mocked(fetchTleGroup).mockResolvedValue([ISS_TLE, POISK_TLE]);
     render(<IssGlobeCard />);
 
     await vi.waitFor(() => expect(sceneHandle.setSatellites).toHaveBeenCalled());
@@ -82,16 +82,33 @@ describe('IssGlobeCard', () => {
   });
 
   it('shows a message when the ISS is not in the selected groups', async () => {
-    vi.mocked(fetchTleGroups).mockResolvedValue([{ name: 'NOAA 15', line1: 'a', line2: 'b' }]);
+    vi.mocked(fetchTleGroup).mockResolvedValue([{ name: 'NOAA 15', line1: 'a', line2: 'b' }]);
     render(<IssGlobeCard />);
     expect(await screen.findByText(/iss not in selection/i)).toBeInTheDocument();
   });
 
   it('disposes the scene on unmount', async () => {
-    vi.mocked(fetchTleGroups).mockResolvedValue([ISS_TLE]);
+    vi.mocked(fetchTleGroup).mockResolvedValue([ISS_TLE]);
     const { unmount } = render(<IssGlobeCard />);
     await vi.waitFor(() => expect(createEarthScene).toHaveBeenCalledOnce());
     unmount();
     expect(sceneHandle.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('fetches each group once and reuses the cache when the selection grows', async () => {
+    vi.mocked(fetchTleGroup).mockImplementation((group) =>
+      Promise.resolve(group === 'stations' ? [ISS_TLE] : [POISK_TLE]),
+    );
+    const { rerender } = render(<IssGlobeCard settings={{ categories: ['stations'] }} />);
+    await vi.waitFor(() => expect(fetchTleGroup).toHaveBeenCalledWith('stations'));
+
+    rerender(<IssGlobeCard settings={{ categories: ['stations', 'visual'] }} />);
+    await vi.waitFor(() => expect(fetchTleGroup).toHaveBeenCalledWith('visual'));
+
+    const requested = vi.mocked(fetchTleGroup).mock.calls.map((call) => call[0]);
+    // 'stations' was cached on the first render, so growing the selection only
+    // fetches the newly-added 'visual' group.
+    expect(requested.filter((group) => group === 'stations')).toHaveLength(1);
+    expect(requested.filter((group) => group === 'visual')).toHaveLength(1);
   });
 });

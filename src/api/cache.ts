@@ -29,5 +29,11 @@ export function readCache<T>(
 }
 
 export function writeCache<T>(key: string, value: T, now: number = Date.now()): void {
-  window.localStorage.setItem(key, JSON.stringify({ value, fetchedAt: now }));
+  try {
+    window.localStorage.setItem(key, JSON.stringify({ value, fetchedAt: now }));
+  } catch {
+    // Storage full (QuotaExceededError) or unavailable — the cache is
+    // best-effort and the in-memory value is unaffected, so skip persisting
+    // rather than letting a large response (e.g. a full satellite group) throw.
+  }
 }

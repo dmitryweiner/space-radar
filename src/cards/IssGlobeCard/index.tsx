@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useApiResource } from '../../hooks/useApiResource';
-import { fetchTleGroups } from '../../api/celestrak';
 import { computeSatellitePosition } from '../../astro/satellitePosition';
 import { geodeticToSceneVector, type SceneVector3 } from '../../astro/coords';
 import { createEarthScene, EARTH_RADIUS_UNITS, type EarthSceneHandle, type NamedPosition } from '../../render/earthScene';
 import type { TleRecord } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
 import { listSetting, numberSetting } from '../../layout/layoutState';
+import { useTleSatellites } from './useTleSatellites';
 
-const TTL_MS = 6 * 60 * 60 * 1000;
-const POLL_MS = 6 * 60 * 60 * 1000;
 const POSITION_UPDATE_MS = 1000;
 // The fading orbit trail behind each satellite: a ~40-minute arc (≈0.4 of a LEO
 // orbit) sampled at a handful of points, recomputed each tick so it follows.
@@ -21,7 +18,7 @@ const DEFAULT_MAX_SATELLITES = 30;
 
 // Curated CelesTrak GP groups; see https://celestrak.org/NORAD/elements/.
 export const SATELLITE_CATEGORIES: { value: string; label: string }[] = [
-  { value: 'stations', label: 'Space stations (ISS, CSS)' },
+  { value: 'stations', label: 'Space stations & nearby' },
   { value: 'visual', label: 'Brightest / visible' },
   { value: 'active', label: 'All active' },
   { value: 'starlink', label: 'Starlink' },
@@ -33,23 +30,6 @@ export const SATELLITE_CATEGORIES: { value: string; label: string }[] = [
   { value: 'science', label: 'Science' },
   { value: 'amateur', label: 'Amateur radio' },
 ];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isTleRecords(value: unknown): value is TleRecord[] {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (item) =>
-        isRecord(item) &&
-        typeof item.name === 'string' &&
-        typeof item.line1 === 'string' &&
-        typeof item.line2 === 'string',
-    )
-  );
-}
 
 function findIss(records: TleRecord[]): TleRecord | null {
   return records.find((record) => /zarya|\biss\b/i.test(record.name)) ?? null;
@@ -88,16 +68,8 @@ function currentPositions(records: TleRecord[], nowMs: number): NamedPosition[] 
 export function IssGlobeCard({ settings = {} }: CardComponentProps) {
   const categories = listSetting(settings, 'categories', DEFAULT_CATEGORIES);
   const maxSatellites = numberSetting(settings, 'maxSatellites', DEFAULT_MAX_SATELLITES);
-  const categoryKey = [...categories].sort().join(',');
-  const cacheKey = `space-radar:tle:${categoryKey}`;
 
-  const { data, loading, error } = useApiResource<TleRecord[]>({
-    key: cacheKey,
-    ttlMs: TTL_MS,
-    pollMs: POLL_MS,
-    fetcher: () => fetchTleGroups(categoryKey.split(',')),
-    isValue: isTleRecords,
-  });
+  const { data, loading, error } = useTleSatellites(categories);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<EarthSceneHandle | null>(null);
