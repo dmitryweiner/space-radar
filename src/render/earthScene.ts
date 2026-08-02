@@ -5,8 +5,13 @@ import earthTextureUrl from '../assets/earth-diffuse.jpg';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
 import { makeTrail, type TrailLine } from './trailLine';
+import { attachKeyboardZoom } from './orbitControlsExtras';
 
 export const EARTH_RADIUS_UNITS = 2;
+
+// Slow idle spin, in OrbitControls units (2.0 ≈ one turn per 30 s at 60 fps),
+// so a fresh globe drifts gently until the user grabs or zooms it.
+const AUTO_ROTATE_SPEED = 0.4;
 
 // Labels and markers keep a constant on-screen *pixel* size — unchanged by zoom
 // and by expanding a card to full screen (see scaleLabelToScreen). Marker sizes
@@ -87,6 +92,16 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   controls.enableDamping = true;
   controls.minDistance = 3;
   controls.maxDistance = 20;
+
+  // Gently auto-rotate until the user takes over (drags, wheels, or presses
+  // +/-); OrbitControls fires 'start' on any pointer interaction.
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
+  const stopAutoRotate = () => {
+    controls.autoRotate = false;
+  };
+  controls.addEventListener('start', stopAutoRotate);
+  const detachKeyboardZoom = attachKeyboardZoom(controls, camera, canvas, stopAutoRotate);
 
   const starfield = createStarfield(100);
   scene.add(starfield.mesh);
@@ -378,6 +393,8 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerleave', clearHover);
       clearHover();
+      controls.removeEventListener('start', stopAutoRotate);
+      detachKeyboardZoom();
       controls.dispose();
       for (const entry of satelliteMarkers.values()) {
         disposeSatellite(entry);

@@ -76,18 +76,28 @@ body {
   background: #232f56;
 }
 
-/* Overlays the grid (fixed under the topbar) instead of pushing cards aside. */
+/* Pressed/recessed look while the Cards sidebar is open. */
+.tb-btn-active,
+.tb-btn-active:hover {
+  background: #0a1122;
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6);
+}
+
+/* Overlays the grid (fixed under the topbar) on the right — next to the Cards
+   button that opens it — instead of pushing cards aside. */
 #cardMenu {
   position: fixed;
   top: var(--topbar-height);
-  left: 0;
+  right: 0;
   bottom: 0;
   z-index: 90;
   width: 260px;
   padding: 16px;
   background: var(--panel);
-  border-right: 1px solid var(--panel-border);
-  box-shadow: 6px 0 18px rgba(0, 0, 0, 0.45);
+  border-left: 1px solid var(--panel-border);
+  box-shadow: -6px 0 18px rgba(0, 0, 0, 0.45);
   overflow-y: auto;
 }
 
@@ -98,7 +108,7 @@ body {
     bottom: auto;
     width: auto;
     max-height: 60vh;
-    border-right: none;
+    border-left: none;
     border-bottom: 1px solid var(--panel-border);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   }

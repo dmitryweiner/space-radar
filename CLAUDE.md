@@ -65,6 +65,14 @@ npm run build       # production build → ./docs (GitHub Pages)
   card with the `numberSetting(values, id, fallback)` /
   `listSetting(values, id, fallback)` helpers from `layoutState.ts` — never
   index `settings[id]` directly, since the value type is `number | string[]`.
+- **All four 3D scenes share `orbitControlsExtras.attachKeyboardZoom`** — it
+  makes the canvas focusable (`tabIndex`) and binds `+`/`-` to dolly the camera
+  along its view direction (clamped to the controls' min/max distance), so the
+  keys only affect the card the user has clicked into. The three
+  `createEarthScene` globes additionally auto-rotate (`controls.autoRotate`,
+  `AUTO_ROTATE_SPEED`); OrbitControls' `start` event and any keyboard zoom stop
+  the spin the moment the user takes over. The solar-system scene gets keyboard
+  zoom but no auto-rotate.
 - **Three of the cards (`iss-globe`, `natural-events`, `fire-map`) share
   `createEarthScene`.** The globe exposes `setSatellites` (named markers with
   labels), `setMarkers` (generic id/colour/label markers), and `setFirePoints`
@@ -119,9 +127,15 @@ npm run build       # production build → ./docs (GitHub Pages)
   fetches several categories in parallel (`Promise.allSettled`, one erroring
   category tolerated; only all-failing throws) **without** a `days` filter —
   long-running open events like volcanoes have older last-geometry dates and get
-  dropped by `days`. `NaturalEventsCard.pickDiverse` then round-robins across
-  categories so volcanoes/storms/sea-ice show alongside the far more numerous
-  wildfires instead of being crowded out of the `maxEvents` slice.
+  dropped by `days`. **Category queries alone still miss non-US wildfires**
+  (e.g. Europe): those events are open but their last-geometry dates are old, so
+  they never make the newest-first `limit` cut. So `fetchNaturalEvents` *also*
+  fetches per-continent `bbox` queries (`REGION_BBOXES`, minus North America
+  which the category queries already cover) to pull them into the pool.
+  `NaturalEventsCard.pickDiverse` then round-robins across **region+category**
+  buckets (region via the exported `regionOf`), so both geography and type are
+  spread — Europe/Asia/etc. show alongside the far more numerous US wildfires
+  instead of being crowded out of the `maxEvents` slice.
 - **Default layout is six cards in two columns** (`w:2`), reading order
   ISS · Solar System / Natural Events · APOD / Launches · Asteroids. The
   registry lists these first (all `defaultVisible:true`); the rest are hidden and

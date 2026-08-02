@@ -23,6 +23,35 @@ const CATEGORIES = [
   'earthquakes',
 ] as const;
 const PER_CATEGORY_LIMIT = 60;
+const PER_REGION_LIMIT = 50;
+
+// Coarse continental bounding boxes as [west, north, east, south]. EONET orders
+// events newest-first, and frequently-updated US wildfires (InciWeb) dominate
+// that ordering — so a plain category query never returns the older-but-still-
+// open events elsewhere (e.g. wildfires in Europe). An extra per-region query
+// pulls those into the pool; `regionOf` then labels each event so the card can
+// spread its selection geographically.
+export const REGION_BBOXES: Record<string, [number, number, number, number]> = {
+  'North America': [-170, 72, -52, 7],
+  'South America': [-82, 13, -34, -56],
+  Europe: [-25, 72, 45, 34],
+  Africa: [-20, 38, 52, -35],
+  Asia: [45, 78, 180, 5],
+  Oceania: [110, 0, 180, -50],
+};
+
+// North America is already well-covered by the category queries, so we only
+// spend extra requests on the regions those queries under-fetch.
+const FETCH_REGIONS = Object.keys(REGION_BBOXES).filter((name) => name !== 'North America');
+
+export function regionOf(latitude: number, longitude: number): string {
+  for (const [name, [west, north, east, south]] of Object.entries(REGION_BBOXES)) {
+    if (latitude >= south && latitude <= north && longitude >= west && longitude <= east) {
+      return name;
+    }
+  }
+  return 'Other';
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -113,8 +142,7 @@ interface FetchResponse {
 
 type FetchFn = (url: string) => Promise<FetchResponse>;
 
-async function fetchCategory(fetchFn: FetchFn, category: string): Promise<NaturalEvent[]> {
-  const url = `${API_BASE}?status=open&category=${category}&limit=${PER_CATEGORY_LIMIT}`;
+async function fetchEvents(fetchFn: FetchFn, url: string): Promise<NaturalEvent[]> {
   const response = await fetchFn(url);
   if (!response.ok) {
     throw new Error(describeHttpError('NASA EONET', response.status, url));
@@ -122,8 +150,20 @@ async function fetchCategory(fetchFn: FetchFn, category: string): Promise<Natura
   return parseNaturalEvents(await response.json());
 }
 
+function categoryUrl(category: string): string {
+  return `${API_BASE}?status=open&category=${category}&limit=${PER_CATEGORY_LIMIT}`;
+}
+
+function regionUrl(region: string): string {
+  const [west, north, east, south] = REGION_BBOXES[region];
+  return `${API_BASE}?status=open&bbox=${west},${north},${east},${south}&limit=${PER_REGION_LIMIT}`;
+}
+
 export async function fetchNaturalEvents(fetchFn: FetchFn = fetch): Promise<NaturalEvent[]> {
-  const settled = await Promise.allSettled(CATEGORIES.map((category) => fetchCategory(fetchFn, category)));
+  const settled = await Promise.allSettled([
+    ...CATEGORIES.map((category) => fetchEvents(fetchFn, categoryUrl(category))),
+    ...FETCH_REGIONS.map((region) => fetchEvents(fetchFn, regionUrl(region))),
+  ]);
 
   const fulfilled = settled.filter((result) => result.status === 'fulfilled');
   // Only fail if *every* category request failed (EONET down); a single

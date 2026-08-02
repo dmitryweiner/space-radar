@@ -27,6 +27,23 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [fullscreenId]);
 
+  // Dismiss the Cards sidebar when clicking anywhere outside it (the toggle
+  // button is excluded so its own onClick still handles the close).
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Element && (target.closest('#cardMenu') || target.closest('#cardsMenuBtn'))) {
+        return;
+      }
+      setMenuOpen(false);
+    }
+    window.addEventListener('pointerdown', handlePointerDown);
+    return () => window.removeEventListener('pointerdown', handlePointerDown);
+  }, [menuOpen]);
+
   function toggleFullscreen(id: string) {
     setFullscreenId((current) => (current === id ? null : id));
   }
@@ -41,7 +58,13 @@ export function App() {
       <header id="topbar">
         <span id="brand">Space Radar</span>
         <span className="tb-spacer" />
-        <button id="cardsMenuBtn" type="button" className="tb-btn" onClick={() => setMenuOpen((open) => !open)}>
+        <button
+          id="cardsMenuBtn"
+          type="button"
+          className={menuOpen ? 'tb-btn tb-btn-active' : 'tb-btn'}
+          aria-pressed={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
           Cards
         </button>
         <button id="resetLayoutBtn" type="button" className="tb-btn" onClick={resetLayout}>

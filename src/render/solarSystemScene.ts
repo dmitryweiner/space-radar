@@ -5,6 +5,7 @@ import type { MoonPosition } from '../astro/moonPositions';
 import { heliocentricToSceneVector } from '../astro/coords';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
+import { attachKeyboardZoom } from './orbitControlsExtras';
 
 const UNITS_PER_AU = 6;
 // Moons sit far too close to their planet to see at true scale, so they're
@@ -97,6 +98,7 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   controls.enableDamping = true;
   controls.minDistance = 10;
   controls.maxDistance = 300;
+  const detachKeyboardZoom = attachKeyboardZoom(controls, camera, canvas);
 
   const starfield = createStarfield(400);
   scene.add(starfield.mesh);
@@ -226,6 +228,7 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
     dispose() {
       cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
+      detachKeyboardZoom();
       controls.dispose();
       clearMoons();
       for (const label of planetLabels.values()) {

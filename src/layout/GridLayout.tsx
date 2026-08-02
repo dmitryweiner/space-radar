@@ -76,7 +76,10 @@ export function GridLayout({
           layout={rglLayout}
           width={width}
           gridConfig={{ cols: GRID_COLS, rowHeight: ROW_HEIGHT, margin: [12, 12] }}
-          dragConfig={{ enabled: true, handle: '.card-drag-handle' }}
+          // The header action buttons live inside the drag handle; `cancel`
+          // keeps a tap on them from starting a drag, which on touch devices
+          // otherwise swallowed the tap so the buttons never fired.
+          dragConfig={{ enabled: true, handle: '.card-drag-handle', cancel: '.card-shell-actions' }}
           resizeConfig={{ enabled: true }}
           onLayoutChange={handleLayoutChange}
         >
