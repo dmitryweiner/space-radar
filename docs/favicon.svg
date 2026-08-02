@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Space Radar">
+  <defs>
+    <radialGradient id="scope" cx="50%" cy="45%" r="72%">
+      <stop offset="0%" stop-color="#13233f"/>
+      <stop offset="100%" stop-color="#05070d"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0.7">
+      <stop offset="0%" stop-color="#5eb1ff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#5eb1ff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#scope)" stroke="#1c2540" stroke-width="2"/>
+
+  <!-- radar range rings -->
+  <g fill="none" stroke="#5eb1ff" stroke-opacity="0.32" stroke-width="1.6">
+    <circle cx="32" cy="32" r="22"/>
+    <circle cx="32" cy="32" r="14.5"/>
+    <circle cx="32" cy="32" r="7"/>
+  </g>
+
+  <!-- crosshair -->
+  <g stroke="#5eb1ff" stroke-opacity="0.2" stroke-width="1.4">
+    <line x1="32" y1="9" x2="32" y2="55"/>
+    <line x1="9" y1="32" x2="55" y2="32"/>
+  </g>
+
+  <!-- sweep wedge + leading edge -->
+  <path d="M32 32 L32 10 A22 22 0 0 1 52.5 22.5 Z" fill="url(#sweep)"/>
+  <line x1="32" y1="32" x2="32" y2="10" stroke="#9fd0ff" stroke-width="2.2" stroke-linecap="round"/>
+
+  <!-- target blip -->
+  <circle cx="44.5" cy="24" r="6.5" fill="none" stroke="#fab219" stroke-opacity="0.45" stroke-width="1.6"/>
+  <circle cx="44.5" cy="24" r="3.6" fill="#fab219"/>
+</svg>
