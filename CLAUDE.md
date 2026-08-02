@@ -9,13 +9,14 @@ tooling in `scripts/` **once**, give it CLI flags, and call it thereafter.
 Existing helpers:
 
 - `scripts/smoke.mjs` — headless Chromium: default card visibility, toggling
-  every card via the Cards menu, canvases mounting for the two 3D cards,
+  every card via the Cards menu, canvases mounting for the four WebGL cards
+  (`iss-globe`, `solar-system`, `natural-events`, `fire-map`),
   drag-to-reposition, resize, `localStorage` persistence across reload, and
   layout reset. `--screenshot <path>`, `--preview` (prod build on :4173).
   Any console/page error → exit code 2.
 - `scripts/snap.mjs` — single debug screenshot. Flags: `--out <path>`
-  (required), `--show <cardId>` / `--hide <cardId>` (repeatable), `--width`,
-  `--height`, `--wait <ms>`, `--preview`.
+  (required), `--show <cardId>` / `--hide <cardId>` / `--click <selector>`
+  (repeatable), `--width`, `--height`, `--wait <ms>`, `--preview`.
 - `scripts/shot.mjs` — one screenshot per card into `./shots`.
 
 Card ids: `iss-globe`, `solar-system`, `kp-index`, `solar-wind`,
@@ -46,6 +47,10 @@ npm run build       # production build → ./docs (GitHub Pages)
 - `src/api/` is pure fetch+parse — **never** import React there. Each module
   takes an injectable fetch function (default: global `fetch`) so tests can
   mock it without touching the network.
+- Static assets live in `public/` (copied verbatim to `docs/` on build) —
+  currently `favicon.svg`, a self-contained SVG radar scope referenced from
+  `index.html`. Reference it with a **relative** `./favicon.svg` (not `/…`) so
+  it resolves under the GitHub Pages sub-path (`vite.config.ts` sets `base: './'`).
 - `src/render/` is the only place that touches Three.js. It can't be unit
   tested (`jsdom` has no WebGL) — verified via `scripts/smoke.mjs` instead
   (canvas mounts, no console errors). Both scene modules self-manage sizing
@@ -85,10 +90,12 @@ npm run build       # production build → ./docs (GitHub Pages)
   Without the `!data` guard it pushes a null ISS frame on first mount before
   TLEs load, which makes `waitFor(setIssPosition called)` in the test resolve
   on that premature null call instead of the real position.
-- **FIRMS needs a separate MAP_KEY** (`src/api/firmsMapKey.ts`, empty by
-  default) and, in testing, did **not** send CORS headers — the Fire Map card
-  may need a proxy to work from the static site. The card degrades gracefully
-  (add-key prompt / network error) rather than throwing.
+- **FIRMS needs a separate MAP_KEY** (`src/api/firmsMapKey.ts`, now populated).
+  Valid FIRMS requests **do** send `access-control-allow-origin: *`, so the Fire
+  Map card works from the browser with no proxy — the earlier "no CORS" note was
+  only the invalid-key **400 error page**, which omits the header. The card
+  still degrades gracefully (empty-key prompt / network error) rather than
+  throwing.
 - ESLint bans `as` type assertions (`@typescript-eslint/consistent-type-assertions:
   'never'`). Narrow `unknown` with a type-predicate helper
   (`function isRecord(v): v is Record<string, unknown>`) instead of casting.

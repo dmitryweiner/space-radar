@@ -2,30 +2,38 @@
 
 **A space situational awareness dashboard.** A web app that pulls live data
 from public space agencies — satellite orbits, planetary positions, space
-weather, solar flares/CMEs, near-Earth asteroids — into a grid of cards you
-can show, hide, drag and resize. Your layout is saved locally, so the
-dashboard looks the same next time you open it.
+weather, solar flares/CMEs, near-Earth asteroids, natural events, rocket
+launches and active fires — into a grid of cards you can show, hide, drag and
+resize. Your layout is saved locally, so the dashboard looks the same next time
+you open it.
 
 ## Features
 
-- **ISS & Satellites** — 3D Earth (Three.js) with the ISS marker and its
-  next-orbit ground track, propagated client-side from a CelesTrak TLE via
-  SGP4 (`satellite.js`).
-- **Solar System** — 3D top-down view of the Sun and eight planets, positions
-  computed client-side (no network) via `astronomy-engine`.
-- **Geomagnetic Activity (Kp-index)** — bar chart of recent planetary
-  Kp readings from NOAA SWPC, colour-coded by storm severity.
-- **Solar Wind** — speed and density mini-charts from NOAA's propagated
-  solar-wind product.
-- **Aurora Forecast** — NOAA OVATION aurora oval image, refreshed
-  periodically.
-- **Solar Flares & CME** — recent flare and coronal-mass-ejection events from
-  NASA DONKI.
-- **Near-Earth Asteroids** — sortable table of close approaches from NASA
-  NeoWs.
-- Every card can be shown or hidden from the **Cards** menu; the grid
-  position/size of every card is saved to `localStorage` and restored on
-  reload. **Reset layout** returns everything to the defaults.
+- **ISS & Satellites** — 3D Earth (Three.js) showing the ISS plus satellites
+  from selectable CelesTrak groups (stations, Starlink, GPS, weather, …), each
+  labelled by name with a fading orbit trail, propagated client-side via SGP4
+  (`satellite.js`).
+- **Solar System** — 3D view of the Sun, the eight planets, and the large moons
+  (Earth's Moon and Jupiter's four Galilean moons), positions computed
+  client-side (no network) via `astronomy-engine`.
+- **Geomagnetic Activity (Kp-index)** — bar chart of recent planetary Kp
+  readings from NOAA SWPC with a time axis, colour-coded by storm severity.
+- **Solar Wind** — speed and density mini-charts (with a time axis) from NOAA's
+  propagated solar-wind product.
+- **Aurora Forecast** — NOAA OVATION aurora oval image, refreshed periodically.
+- **Solar Flares & CME** — recent X-ray flares from NOAA SWPC GOES plus
+  coronal-mass-ejection events from NASA DONKI (best-effort).
+- **Near-Earth Asteroids** — sortable table of close approaches from NASA NeoWs.
+- **Natural Events** — wildfires, volcanoes, storms and more from NASA EONET,
+  plotted on a 3D globe with a category legend.
+- **Upcoming Launches** — the next orbital launches from Launch Library 2.
+- **Astronomy Picture of the Day** — NASA APOD image with its caption.
+- **Active Fires** — VIIRS/MODIS fire detections from NASA FIRMS as a point
+  cloud on a 3D globe (needs a free FIRMS MAP_KEY — see below).
+- Every card can be shown or hidden from the **Cards** menu, dragged/resized on
+  the grid, opened full-screen, or tuned via its **⚙ settings** popup (size in
+  rows/columns plus card-specific options). Layout and settings are saved to
+  `localStorage` and restored on reload; **Reset layout** returns the defaults.
 
 ## Development
 
@@ -44,21 +52,24 @@ npm run build     # production build → ./docs (GitHub Pages)
 ## Architecture
 
 ```
-src/api/       fetch + parse for each data source (CelesTrak, NOAA SWPC,
-               NASA DONKI, NASA NeoWs) — pure functions, no React/Three
+src/api/       fetch + parse for each data source (CelesTrak, NOAA SWPC + GOES,
+               NASA DONKI/NeoWs/EONET/APOD/FIRMS, Launch Library 2) — pure
+               functions, no React/Three
 src/astro/     pure orbital/astronomical math: TLE -> geodetic position
-               (satellite.js), planet heliocentric vectors (astronomy-engine),
+               (satellite.js), planet + moon vectors (astronomy-engine),
                lat/lon/AU -> 3D scene coordinates. Never imports Three.js.
-src/render/    thin Three.js layer: Earth globe scene, solar system scene
+src/render/    thin Three.js layer: Earth globe + solar-system scenes, plus
+               starfield / label-sprite / orbit-trail helpers
 src/hooks/     useApiResource — generic polling + localStorage TTL cache
-src/layout/    card registry, grid/visibility state, react-grid-layout wiring
+src/layout/    card registry, grid/visibility/settings state, react-grid-layout
+               wiring, per-card settings popup
 src/cards/     one React component per card
 ```
 
 `src/astro/` never imports Three.js and `src/api/` never imports React — the
 same core/UI separation used in the sibling `mathsculpt` project. Three.js
 scenes can't run in `jsdom` (no WebGL), so `render/` and the mounting effects
-in the two 3D cards are exercised by `scripts/smoke.mjs` in a real browser
+in the four WebGL cards are exercised by `scripts/smoke.mjs` in a real browser
 rather than by `vitest`.
 
 ## Data sources
@@ -79,11 +90,17 @@ The starfield background in the 3D cards is the Milky Way panorama texture
 from [Solar System Scope](https://www.solarsystemscope.com/textures/)
 (CC BY 4.0).
 
+The favicon (`public/favicon.svg`) is a self-contained SVG radar scope in the
+app's palette. It lives in `public/` (copied verbatim to `docs/` on build) and
+is referenced from `index.html` with a relative `./favicon.svg` path so it
+resolves under the GitHub Pages sub-path.
+
 FIRMS uses a separate free MAP_KEY (not the `api.nasa.gov` key) — get one at
 [firms.modaps.eosdis.nasa.gov/api/map_key](https://firms.modaps.eosdis.nasa.gov/api/map_key/)
-and paste it into `src/api/firmsMapKey.ts`. Note FIRMS did not send CORS headers
-in testing, so the Fire Map card may need the request proxied through a small
-server when deployed as a static site.
+and paste it into `src/api/firmsMapKey.ts`. Valid FIRMS requests send
+`Access-Control-Allow-Origin: *`, so the Fire Map card works directly from the
+browser — no proxy needed. (Only the invalid-key **400** error page omits the
+CORS header.)
 
 The NASA key lives in `src/api/nasaApiKey.ts` (1000 requests/hour, no daily
 cap — a big step up from the shared `DEMO_KEY`'s 30/hour). This is a
