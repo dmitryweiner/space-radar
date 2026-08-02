@@ -3,14 +3,26 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { SceneVector3 } from '../astro/coords';
 import earthTextureUrl from '../assets/earth-diffuse.jpg';
 import { createStarfield } from './starfield';
-import { makeLabelSprite, type LabelSprite } from './labelSprite';
+import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
 import { makeTrail, type TrailLine } from './trailLine';
 
 export const EARTH_RADIUS_UNITS = 2;
 
-// Constant on-screen label size: world height scales with camera distance so
-// the apparent size doesn't change as the user zooms.
-const SCREEN_LABEL_K = 0.045;
+// Labels and markers keep a constant on-screen *pixel* size — unchanged by zoom
+// and by expanding a card to full screen (see scaleLabelToScreen). Marker sizes
+// below are on-screen radii in CSS pixels.
+const LABEL_PX = 13;
+const ISS_MARKER_PX = 5;
+const SATELLITE_MARKER_PX = 2.4;
+const EVENT_MARKER_PX = 3.2;
+const FIRE_POINT_PX = 2.5;
+const HOVER_LABEL_PX = 12;
+
+// Base sphere radii the marker meshes are built with; scaleMarker rescales them
+// each frame so their rendered radius matches the pixel targets above.
+const ISS_MARKER_RADIUS = 0.1;
+const SATELLITE_MARKER_RADIUS = 0.035;
+const EVENT_MARKER_RADIUS = 0.06;
 
 export interface NamedPosition {
   name: string;
@@ -30,6 +42,8 @@ export interface FirePoint {
   position: SceneVector3;
   /** 0..1, drives the yellow→red colour ramp. */
   intensity: number;
+  /** Optional detail shown in a tooltip when the point is hovered. */
+  info?: string;
 }
 
 export interface EarthSceneHandle {
@@ -103,7 +117,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   scene.add(grid);
 
   const issMarker = new THREE.Mesh(
-    new THREE.SphereGeometry(0.1, 16, 16),
+    new THREE.SphereGeometry(ISS_MARKER_RADIUS, 16, 16),
     new THREE.MeshBasicMaterial({ color: 0xfab219 }),
   );
   issMarker.visible = false;
@@ -115,25 +129,99 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   scene.add(issTrail.line);
 
   const SATELLITE_COLOR = 0x9fd8ff;
-  const satelliteGeometry = new THREE.SphereGeometry(0.035, 8, 8);
+  const satelliteGeometry = new THREE.SphereGeometry(SATELLITE_MARKER_RADIUS, 8, 8);
   const satelliteMaterial = new THREE.MeshBasicMaterial({ color: SATELLITE_COLOR });
   const satelliteGroup = new THREE.Group();
   scene.add(satelliteGroup);
   const satelliteMarkers = new Map<string, { mesh: THREE.Mesh; label: LabelSprite; trail: TrailLine }>();
 
-  const markerGeometry = new THREE.SphereGeometry(0.06, 12, 12);
+  const markerGeometry = new THREE.SphereGeometry(EVENT_MARKER_RADIUS, 12, 12);
   const markerGroup = new THREE.Group();
   scene.add(markerGroup);
   const eventMarkers = new Map<string, { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; label: LabelSprite }>();
 
   let firePoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
+  let firePointInfos: string[] = [];
 
   const scratch = new THREE.Vector3();
 
-  function rescaleLabel(label: LabelSprite) {
-    const distance = camera.position.distanceTo(label.sprite.position);
-    const height = SCREEN_LABEL_K * distance;
-    label.sprite.scale.set(height * label.aspect, height, 1);
+  const FOV_TAN = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+
+  function rescaleLabel(label: LabelSprite, pixelHeight = LABEL_PX) {
+    scaleLabelToScreen(label, camera, canvas.clientHeight, pixelHeight);
+  }
+
+  // Rescale a marker mesh so its rendered radius is `pxRadius` CSS pixels
+  // regardless of camera distance — markers stay a constant on-screen size when
+  // zooming, matching the labels.
+  function scaleMarker(mesh: THREE.Object3D, pxRadius: number, baseRadius: number) {
+    const distance = camera.position.distanceTo(mesh.position);
+    const worldRadius = (pxRadius * 2 * FOV_TAN * distance) / Math.max(1, canvas.clientHeight);
+    const s = worldRadius / baseRadius;
+    mesh.scale.set(s, s, s);
+  }
+
+  // --- Fire-point hover tooltip -------------------------------------------
+  const raycaster = new THREE.Raycaster();
+  raycaster.params.Points = { threshold: 0.04 };
+  const pointerNdc = new THREE.Vector2();
+  const hoverScratch = new THREE.Vector3();
+  let hoverLabel: LabelSprite | null = null;
+  let hoverText = '';
+
+  function clearHover() {
+    if (hoverLabel) {
+      scene.remove(hoverLabel.sprite);
+      hoverLabel.dispose();
+      hoverLabel = null;
+    }
+    hoverText = '';
+    canvas.style.cursor = '';
+  }
+
+  // A fire point sits on the Earth's surface; it's only visible (hoverable)
+  // when the camera is on the same side — i.e. above its local horizon.
+  function isFacingCamera(point: THREE.Vector3): boolean {
+    hoverScratch.copy(camera.position).sub(point);
+    return hoverScratch.dot(point) > 0;
+  }
+
+  function onPointerMove(event: PointerEvent) {
+    if (!firePoints || firePointInfos.length === 0) {
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      return;
+    }
+    pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointerNdc, camera);
+    const hit = raycaster
+      .intersectObject(firePoints)
+      .find((intersection) => intersection.index !== undefined && isFacingCamera(intersection.point));
+    if (!hit || hit.index === undefined) {
+      clearHover();
+      return;
+    }
+    const info = firePointInfos[hit.index] ?? '';
+    if (!info) {
+      clearHover();
+      return;
+    }
+    canvas.style.cursor = 'pointer';
+    if (info !== hoverText) {
+      if (hoverLabel) {
+        scene.remove(hoverLabel.sprite);
+        hoverLabel.dispose();
+      }
+      hoverLabel = makeLabelSprite(info, '#ffd7a0');
+      scene.add(hoverLabel.sprite);
+      hoverText = info;
+    }
+    if (hoverLabel) {
+      hoverLabel.sprite.position.copy(labelPosition({ x: hit.point.x, y: hit.point.y, z: hit.point.z }, scratch));
+    }
   }
 
   function disposeSatellite(entry: { mesh: THREE.Mesh; label: LabelSprite; trail: TrailLine }) {
@@ -151,16 +239,27 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     entry.label.dispose();
   }
 
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerleave', clearHover);
+
   let frameId = 0;
   function animate() {
     frameId = requestAnimationFrame(animate);
     controls.update();
     rescaleLabel(issLabel);
+    if (issMarker.visible) {
+      scaleMarker(issMarker, ISS_MARKER_PX, ISS_MARKER_RADIUS);
+    }
     for (const entry of satelliteMarkers.values()) {
       rescaleLabel(entry.label);
+      scaleMarker(entry.mesh, SATELLITE_MARKER_PX, SATELLITE_MARKER_RADIUS);
     }
     for (const entry of eventMarkers.values()) {
       rescaleLabel(entry.label);
+      scaleMarker(entry.mesh, EVENT_MARKER_PX, EVENT_MARKER_RADIUS);
+    }
+    if (hoverLabel) {
+      rescaleLabel(hoverLabel, HOVER_LABEL_PX);
     }
     renderer.render(scene, camera);
   }
@@ -238,6 +337,8 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
         firePoints.material.dispose();
         firePoints = null;
       }
+      clearHover();
+      firePointInfos = points.map((point) => point.info ?? '');
       if (points.length === 0) {
         return;
       }
@@ -255,10 +356,13 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      // sizeAttenuation:false keeps every fire point a constant on-screen size
+      // when zooming; size is in framebuffer pixels, so scale by the pixel ratio
+      // to land on the intended CSS-pixel size.
       const material = new THREE.PointsMaterial({
-        size: 0.05,
+        size: FIRE_POINT_PX * renderer.getPixelRatio(),
         vertexColors: true,
-        sizeAttenuation: true,
+        sizeAttenuation: false,
         transparent: true,
         opacity: 0.9,
       });
@@ -271,6 +375,9 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     dispose() {
       cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerleave', clearHover);
+      clearHover();
       controls.dispose();
       for (const entry of satelliteMarkers.values()) {
         disposeSatellite(entry);

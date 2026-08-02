@@ -31,17 +31,8 @@ const preview = flags.has('preview');
 const PORT = preview ? 4173 : 5173;
 const BASE = `http://localhost:${PORT}`;
 
-const DEFAULT_VISIBLE = ['iss-globe', 'kp-index', 'solar-wind'];
-const HIDDEN_BY_DEFAULT = [
-  'solar-system',
-  'aurora-forecast',
-  'solar-flares',
-  'asteroids',
-  'natural-events',
-  'launches',
-  'apod',
-  'fire-map',
-];
+const DEFAULT_VISIBLE = ['iss-globe', 'solar-system', 'natural-events', 'apod', 'launches', 'asteroids'];
+const HIDDEN_BY_DEFAULT = ['kp-index', 'solar-wind', 'aurora-forecast', 'solar-flares', 'fire-map'];
 const ALL_CARDS = [...DEFAULT_VISIBLE, ...HIDDEN_BY_DEFAULT];
 // Cards that mount a WebGL <canvas> (globe / solar-system scenes).
 const CANVAS_CARDS = ['iss-globe', 'solar-system', 'natural-events', 'fire-map'];

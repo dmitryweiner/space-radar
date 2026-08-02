@@ -4,7 +4,7 @@ import type { HeliocentricVector, PlanetPosition } from '../astro/planetPosition
 import type { MoonPosition } from '../astro/moonPositions';
 import { heliocentricToSceneVector } from '../astro/coords';
 import { createStarfield } from './starfield';
-import { makeLabelSprite, type LabelSprite } from './labelSprite';
+import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
 
 const UNITS_PER_AU = 6;
 // Moons sit far too close to their planet to see at true scale, so they're
@@ -12,8 +12,12 @@ const UNITS_PER_AU = 6;
 // inclination flattened into the ecliptic plane).
 const MOON_BASE_RADIUS = 0.8;
 const MOON_RADIUS_STEP = 0.55;
-// Constant on-screen label size: world height = K × camera distance.
-const MOON_LABEL_K = 0.008;
+// Constant on-screen label sizes, in CSS pixels — unchanged by zoom or by
+// expanding the card to full screen (see scaleLabelToScreen).
+const PLANET_LABEL_PX = 13;
+const MOON_LABEL_PX = 11;
+// How far a planet's name sits above the planet, radially outward from the Sun.
+const PLANET_LABEL_OFFSET = 0.9;
 
 const PLANET_COLORS: Record<string, number> = {
   Mercury: 0x9c9c9c,
@@ -51,6 +55,10 @@ function moonRingGeometry(radius: number): THREE.BufferGeometry {
 
 function planetColor(name: string): number {
   return PLANET_COLORS[name] ?? 0xffffff;
+}
+
+function hexToCss(hex: number): string {
+  return `#${hex.toString(16).padStart(6, '0')}`;
 }
 
 function createOrbitLine(points: HeliocentricVector[]): THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial> {
@@ -100,7 +108,15 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   scene.add(new THREE.PointLight(0xffffff, 3, 0, 0));
 
   const planetMeshes = new Map<string, THREE.Mesh>();
+  const planetLabels = new Map<string, LabelSprite>();
   const orbitRings = new Map<string, THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial>>();
+
+  const scratchLabel = new THREE.Vector3();
+  function planetLabelPosition(planet: THREE.Vector3): THREE.Vector3 {
+    scratchLabel.copy(planet);
+    const length = scratchLabel.length() || 1;
+    return scratchLabel.multiplyScalar((length + PLANET_LABEL_OFFSET) / length);
+  }
 
   const moonGeometry = new THREE.SphereGeometry(0.12, 12, 12);
   const moonMaterial = new THREE.MeshStandardMaterial({ color: 0xcfd4e0, emissive: 0x222831 });
@@ -126,9 +142,11 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   function animate() {
     frameId = requestAnimationFrame(animate);
     controls.update();
+    for (const label of planetLabels.values()) {
+      scaleLabelToScreen(label, camera, canvas.clientHeight, PLANET_LABEL_PX);
+    }
     for (const { label } of moonObjects) {
-      const height = MOON_LABEL_K * camera.position.distanceTo(label.sprite.position);
-      label.sprite.scale.set(height * label.aspect, height, 1);
+      scaleLabelToScreen(label, camera, canvas.clientHeight, MOON_LABEL_PX);
     }
     renderer.render(scene, camera);
   }
@@ -148,6 +166,14 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
         }
         const vector = heliocentricToSceneVector(planet.xAu, planet.yAu, planet.zAu, UNITS_PER_AU);
         mesh.position.set(vector.x, vector.y, vector.z);
+
+        let label = planetLabels.get(planet.name);
+        if (!label) {
+          label = makeLabelSprite(planet.name, hexToCss(planetColor(planet.name)));
+          scene.add(label.sprite);
+          planetLabels.set(planet.name, label);
+        }
+        label.sprite.position.copy(planetLabelPosition(mesh.position));
       }
     },
     setOrbitPaths(paths) {
@@ -202,6 +228,11 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
       resizeObserver.disconnect();
       controls.dispose();
       clearMoons();
+      for (const label of planetLabels.values()) {
+        scene.remove(label.sprite);
+        label.dispose();
+      }
+      planetLabels.clear();
       moonGeometry.dispose();
       moonMaterial.dispose();
       moonRingMaterial.dispose();

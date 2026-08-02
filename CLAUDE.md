@@ -48,9 +48,12 @@ npm run build       # production build → ./docs (GitHub Pages)
   takes an injectable fetch function (default: global `fetch`) so tests can
   mock it without touching the network.
 - Static assets live in `public/` (copied verbatim to `docs/` on build) —
-  currently `favicon.svg`, a self-contained SVG radar scope referenced from
-  `index.html`. Reference it with a **relative** `./favicon.svg` (not `/…`) so
-  it resolves under the GitHub Pages sub-path (`vite.config.ts` sets `base: './'`).
+  currently `favicon.svg`, a self-contained SVG radar scope (cropped to its
+  top-right quarter via `viewBox="28 0 32 32"`, full-bleed; the `#scope`
+  gradient uses `gradientUnits="userSpaceOnUse"` so the crop stays dark toward
+  the corner) referenced from `index.html`. Reference it with a **relative**
+  `./favicon.svg` (not `/…`) so it resolves under the GitHub Pages sub-path
+  (`vite.config.ts` sets `base: './'`).
 - `src/render/` is the only place that touches Three.js. It can't be unit
   tested (`jsdom` has no WebGL) — verified via `scripts/smoke.mjs` instead
   (canvas mounts, no console errors). Both scene modules self-manage sizing
@@ -68,6 +71,13 @@ npm run build       # production build → ./docs (GitHub Pages)
   (a single `THREE.Points` cloud). Label sprites (`src/render/labelSprite.ts`)
   are depth-tested, so the opaque Earth mesh hides labels on the far side for
   free — there is no manual occlusion math.
+- **Fire points carry an optional `info` string and get a hover tooltip.**
+  `setFirePoints` stores the per-point `info` (built in `FireMapCard`:
+  detection time + brightness K + confidence). A `pointermove` listener on the
+  canvas raycasts the `THREE.Points` cloud (`raycaster.params.Points.threshold`)
+  and shows a reusable label sprite at the hovered point. Points on the far side
+  are skipped via a horizon test (`dot(camera − point, point) > 0`) since the
+  Points cloud isn't occluded by the Earth mesh the way opaque meshes are.
 - **The ISS card caches TLEs per CelesTrak group, not per group-combination**
   (`useTleSatellites`), under `space-radar:tle-group:<name>` keys. Caching by
   combination (the earlier design) re-fetched huge groups on every toggle —
@@ -83,9 +93,16 @@ npm run build       # production build → ./docs (GitHub Pages)
 - **A 3D scene's camera `far` must clear the far side of its star sphere at max
   zoom-out** (`camera distance + starfield radius`). The Solar System card
   showed a grey disc because `far` (500) was less than 300 + 400.
-- **Globe/solar-system labels keep a constant on-screen size** by rescaling each
-  sprite every frame to `K × cameraDistance` (see `earthScene` / the moon
-  labels) — sprite world-size otherwise changes apparent size with zoom.
+- **Globe/solar-system labels and markers keep a constant on-screen *pixel*
+  size** via `scaleLabelToScreen` (in `labelSprite.ts`) and `scaleMarker` (in
+  `earthScene`), which rescale every frame to `px × worldPerPx × cameraDistance`
+  where `worldPerPx = 2·tan(fov/2) / canvas.clientHeight`. Dividing by the
+  canvas pixel height is the crucial part: the earlier `K × cameraDistance`
+  scale was constant only as a *fraction* of the viewport, so labels/markers
+  **grew when a card was expanded to full screen** (a larger canvas). Fire
+  points use `sizeAttenuation:false` (size in framebuffer px, so multiply by
+  `renderer.getPixelRatio()`) for the same constant-size effect. Solar-system
+  planet names are labels too (added alongside the moon labels).
 - **`IssGlobeCard`'s scene effect must guard `if (!scene || !data) return`.**
   Without the `!data` guard it pushes a null ISS frame on first mount before
   TLEs load, which makes `waitFor(setIssPosition called)` in the test resolve
@@ -96,6 +113,21 @@ npm run build       # production build → ./docs (GitHub Pages)
   only the invalid-key **400 error page**, which omits the header. The card
   still degrades gracefully (empty-key prompt / network error) rather than
   throwing.
+- **EONET looks US-only from a naive query** — its events are sorted newest-
+  first and open *wildfire* events (mostly the US-only InciWeb source) dominate,
+  so `status=open&limit=50` comes back ~all US. `fetchNaturalEvents` instead
+  fetches several categories in parallel (`Promise.allSettled`, one erroring
+  category tolerated; only all-failing throws) **without** a `days` filter —
+  long-running open events like volcanoes have older last-geometry dates and get
+  dropped by `days`. `NaturalEventsCard.pickDiverse` then round-robins across
+  categories so volcanoes/storms/sea-ice show alongside the far more numerous
+  wildfires instead of being crowded out of the `maxEvents` slice.
+- **Default layout is six cards in two columns** (`w:2`), reading order
+  ISS · Solar System / Natural Events · APOD / Launches · Asteroids. The
+  registry lists these first (all `defaultVisible:true`); the rest are hidden and
+  parked below (`y ≥ 6`). `scripts/smoke.mjs`'s `DEFAULT_VISIBLE` /
+  `HIDDEN_BY_DEFAULT` and `tests/app.test.tsx` (which fullscreens a
+  *default-visible* card) must be kept in sync with these defaults.
 - ESLint bans `as` type assertions (`@typescript-eslint/consistent-type-assertions:
   'never'`). Narrow `unknown` with a type-predicate helper
   (`function isRecord(v): v is Record<string, unknown>`) instead of casting.

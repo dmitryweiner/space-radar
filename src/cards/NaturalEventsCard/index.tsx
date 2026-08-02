@@ -74,6 +74,34 @@ function hasLocation(event: NaturalEvent): event is LocatedEvent {
   return event.latitude !== null && event.longitude !== null;
 }
 
+// Round-robin across categories so globally-distributed events (volcanoes,
+// storms, sea ice) get shown alongside the far more numerous US wildfires,
+// instead of the newest-first list being all wildfires.
+function pickDiverse(events: LocatedEvent[], max: number): LocatedEvent[] {
+  const byCategory = new Map<string, LocatedEvent[]>();
+  for (const event of events) {
+    const bucket = byCategory.get(event.category);
+    if (bucket) {
+      bucket.push(event);
+    } else {
+      byCategory.set(event.category, [event]);
+    }
+  }
+  const buckets = [...byCategory.values()];
+  const picked: LocatedEvent[] = [];
+  for (let round = 0; picked.length < max && buckets.some((bucket) => bucket.length > round); round += 1) {
+    for (const bucket of buckets) {
+      if (picked.length >= max) {
+        break;
+      }
+      if (round < bucket.length) {
+        picked.push(bucket[round]);
+      }
+    }
+  }
+  return picked;
+}
+
 export function NaturalEventsCard({ settings = {} }: CardComponentProps) {
   const maxEvents = numberSetting(settings, 'maxEvents', DEFAULT_MAX_EVENTS);
   const { data, loading, error } = useApiResource<NaturalEvent[]>({
@@ -107,7 +135,7 @@ export function NaturalEventsCard({ settings = {} }: CardComponentProps) {
   }, []);
 
   const located = useMemo(
-    () => (data ?? []).filter(hasLocation).slice(0, maxEvents),
+    () => pickDiverse((data ?? []).filter(hasLocation), maxEvents),
     [data, maxEvents],
   );
 

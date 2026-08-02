@@ -3,7 +3,26 @@ import { describeHttpError } from './httpError';
 
 // NASA EONET (Earth Observatory Natural Event Tracker): open natural events
 // (wildfires, volcanoes, severe storms, …). No API key required, CORS-open.
-const API_URL = 'https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=50';
+const API_BASE = 'https://eonet.gsfc.nasa.gov/api/v3/events';
+
+// EONET sorts events by most-recent geometry date, and open wildfire events —
+// which come mostly from the US-only InciWeb source — dominate that list, so a
+// single unfiltered request comes back looking US-only. Fetching per category
+// (no `days` filter, so long-running events like volcanoes still surface) and
+// merging gives genuinely global coverage. Categories with no current events
+// simply return nothing.
+const CATEGORIES = [
+  'wildfires',
+  'volcanoes',
+  'severeStorms',
+  'seaLakeIce',
+  'floods',
+  'drought',
+  'dustHaze',
+  'landslides',
+  'earthquakes',
+] as const;
+const PER_CATEGORY_LIMIT = 60;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -94,10 +113,31 @@ interface FetchResponse {
 
 type FetchFn = (url: string) => Promise<FetchResponse>;
 
-export async function fetchNaturalEvents(fetchFn: FetchFn = fetch): Promise<NaturalEvent[]> {
-  const response = await fetchFn(API_URL);
+async function fetchCategory(fetchFn: FetchFn, category: string): Promise<NaturalEvent[]> {
+  const url = `${API_BASE}?status=open&category=${category}&limit=${PER_CATEGORY_LIMIT}`;
+  const response = await fetchFn(url);
   if (!response.ok) {
-    throw new Error(describeHttpError('NASA EONET', response.status, API_URL));
+    throw new Error(describeHttpError('NASA EONET', response.status, url));
   }
   return parseNaturalEvents(await response.json());
+}
+
+export async function fetchNaturalEvents(fetchFn: FetchFn = fetch): Promise<NaturalEvent[]> {
+  const settled = await Promise.allSettled(CATEGORIES.map((category) => fetchCategory(fetchFn, category)));
+
+  const fulfilled = settled.filter((result) => result.status === 'fulfilled');
+  // Only fail if *every* category request failed (EONET down); a single
+  // category erroring shouldn't blank the whole map.
+  if (fulfilled.length === 0) {
+    const firstRejection = settled.find((result) => result.status === 'rejected');
+    throw firstRejection?.reason ?? new Error('NASA EONET: request failed');
+  }
+
+  const byId = new Map<string, NaturalEvent>();
+  for (const result of fulfilled) {
+    for (const event of result.value) {
+      byId.set(event.id, event);
+    }
+  }
+  return [...byId.values()].sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''));
 }

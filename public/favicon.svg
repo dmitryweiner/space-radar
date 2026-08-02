@@ -1,6 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Space Radar">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="28 0 32 32" role="img" aria-label="Space Radar">
   <defs>
-    <radialGradient id="scope" cx="50%" cy="45%" r="72%">
+    <!-- Anchored in the original scope's coordinates (userSpaceOnUse) so the
+         cropped top-right quarter stays dark toward the corner and lighter
+         toward the scope centre at the bottom-left. -->
+    <radialGradient id="scope" gradientUnits="userSpaceOnUse" cx="32" cy="29" r="46">
       <stop offset="0%" stop-color="#13233f"/>
       <stop offset="100%" stop-color="#05070d"/>
     </radialGradient>
@@ -10,22 +13,23 @@
     </linearGradient>
   </defs>
 
-  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#scope)" stroke="#1c2540" stroke-width="2"/>
+  <!-- full-bleed background of the cropped top-right quarter -->
+  <rect x="28" y="0" width="32" height="32" fill="url(#scope)"/>
 
-  <!-- radar range rings -->
+  <!-- radar range rings (centred on the original scope centre) -->
   <g fill="none" stroke="#5eb1ff" stroke-opacity="0.32" stroke-width="1.6">
     <circle cx="32" cy="32" r="22"/>
     <circle cx="32" cy="32" r="14.5"/>
     <circle cx="32" cy="32" r="7"/>
   </g>
 
-  <!-- crosshair -->
+  <!-- crosshair (left + bottom edges of the quarter) -->
   <g stroke="#5eb1ff" stroke-opacity="0.2" stroke-width="1.4">
     <line x1="32" y1="9" x2="32" y2="55"/>
     <line x1="9" y1="32" x2="55" y2="32"/>
   </g>
 
-  <!-- sweep wedge + leading edge -->
+  <!-- sweep wedge + bright leading edge -->
   <path d="M32 32 L32 10 A22 22 0 0 1 52.5 22.5 Z" fill="url(#sweep)"/>
   <line x1="32" y1="32" x2="32" y2="10" stroke="#9fd0ff" stroke-width="2.2" stroke-linecap="round"/>
 

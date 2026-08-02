@@ -45,6 +45,22 @@ function intensity(point: FirePoint): number {
   return Math.min(1, Math.max(0, point.confidence ?? base));
 }
 
+// Tooltip text for a hovered fire point. acquiredAt is "YYYY-MM-DD HHMM" (UTC);
+// pretty-print the HHMM time and append brightness + confidence when present.
+function fireInfo(point: FirePoint): string {
+  const [date, rawTime] = point.acquiredAt.split(' ');
+  const digits = (rawTime ?? '').padStart(4, '0');
+  const when = rawTime ? `${date} ${digits.slice(0, 2)}:${digits.slice(2)} UTC` : date;
+  const parts = [when];
+  if (Number.isFinite(point.brightnessKelvin) && point.brightnessKelvin > 0) {
+    parts.push(`${Math.round(point.brightnessKelvin)} K`);
+  }
+  if (point.confidence !== null) {
+    parts.push(`${Math.round(point.confidence * 100)}% conf`);
+  }
+  return parts.join(' · ');
+}
+
 export function FireMapCard({ settings = {} }: CardComponentProps) {
   const dayRange = numberSetting(settings, 'dayRange', DEFAULT_DAY_RANGE);
   const { data, loading, error } = useApiResource<FirePoint[]>({
@@ -82,6 +98,7 @@ export function FireMapCard({ settings = {} }: CardComponentProps) {
       (data ?? []).map((point) => ({
         position: geodeticToSceneVector(point.latitude, point.longitude, 0, EARTH_RADIUS_UNITS),
         intensity: intensity(point),
+        info: fireInfo(point),
       })),
     [data],
   );
@@ -99,6 +116,7 @@ export function FireMapCard({ settings = {} }: CardComponentProps) {
       {!sceneError && !loading && !error && data && (
         <p className="card-status globe-overlay">
           {data.length.toLocaleString()} active fire{data.length === 1 ? '' : 's'} · last {dayRange}d (VIIRS)
+          {data.length > 0 && ' · hover a point for details'}
         </p>
       )}
     </div>
