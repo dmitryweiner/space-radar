@@ -35,15 +35,17 @@ export function CardShell({ title, onHide, onToggleFullscreen, onOpenSettings, i
           >
             ⛶
           </button>
-          <button
-            type="button"
-            className="card-shell-action card-shell-hide"
-            aria-label={`Hide ${title}`}
-            title="Hide"
-            onClick={onHide}
-          >
-            ×
-          </button>
+          {!isFullscreen && (
+            <button
+              type="button"
+              className="card-shell-action card-shell-hide"
+              aria-label={`Hide ${title}`}
+              title="Hide"
+              onClick={onHide}
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
       <div className="card-shell-body">{children}</div>

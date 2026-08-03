@@ -43,4 +43,13 @@ describe('CardShell', () => {
     );
     expect(screen.getByRole('button', { name: 'Exit full screen for Kp-index' })).toBeInTheDocument();
   });
+
+  it('hides the hide button in fullscreen so the card cannot be closed by mistake', () => {
+    render(
+      <CardShell title="Kp-index" onHide={() => {}} onToggleFullscreen={() => {}} isFullscreen>
+        <p>chart</p>
+      </CardShell>,
+    );
+    expect(screen.queryByRole('button', { name: 'Hide Kp-index' })).not.toBeInTheDocument();
+  });
 });
