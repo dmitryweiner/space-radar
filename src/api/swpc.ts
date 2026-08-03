@@ -1,9 +1,24 @@
-import type { KpIndexPoint, SolarWindPoint, SpaceWeatherEvent } from './types';
+import type {
+  AuroraSample,
+  KpIndexPoint,
+  SolarCycleData,
+  SolarCyclePoint,
+  SolarCyclePrediction,
+  SolarWindPoint,
+  SpaceWeatherEvent,
+} from './types';
 
 const KP_INDEX_URL = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
 const SOLAR_WIND_URL = 'https://services.swpc.noaa.gov/products/geospace/propagated-solar-wind-1-hour.json';
 const AURORA_IMAGE_URL = 'https://services.swpc.noaa.gov/images/animations/ovation/north/latest.jpg';
 const GOES_FLARES_URL = 'https://services.swpc.noaa.gov/json/goes/primary/xray-flares-7-day.json';
+const OBSERVED_CYCLE_URL = 'https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json';
+const PREDICTED_CYCLE_URL = 'https://services.swpc.noaa.gov/json/solar-cycle/predicted-solar-cycle.json';
+const OVATION_AURORA_URL = 'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json';
+
+// The observed series runs back to 1749; keep only the recent tail so the cache
+// stays small — 480 months covers the widest (30-year) card horizon.
+const OBSERVED_TAIL_MONTHS = 480;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -98,6 +113,74 @@ export function parseGoesFlares(raw: unknown): SpaceWeatherEvent[] {
   return events;
 }
 
+// SWPC encodes "no value" as -1 in the solar-cycle products.
+function toCycleNumber(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  return value;
+}
+
+// `time-tag` and `f10.7` contain characters that can't be destructured, so read
+// them via string index access (per CLAUDE.md).
+export function parseObservedSolarCycle(raw: unknown): SolarCyclePoint[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const points: SolarCyclePoint[] = [];
+  for (const item of raw) {
+    if (!isRecord(item) || typeof item['time-tag'] !== 'string') {
+      continue;
+    }
+    points.push({
+      time: item['time-tag'],
+      ssn: toCycleNumber(item.ssn),
+      smoothedSsn: toCycleNumber(item.smoothed_ssn),
+      f107: toCycleNumber(item['f10.7']),
+    });
+  }
+  return points;
+}
+
+export function parsePredictedSolarCycle(raw: unknown): SolarCyclePrediction[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const points: SolarCyclePrediction[] = [];
+  for (const item of raw) {
+    if (!isRecord(item) || typeof item['time-tag'] !== 'string') {
+      continue;
+    }
+    points.push({
+      time: item['time-tag'],
+      predictedSsn: toCycleNumber(item.predicted_ssn),
+      predictedF107: toCycleNumber(item['predicted_f10.7']),
+    });
+  }
+  return points;
+}
+
+// OVATION aurora grid: `coordinates` is [[lon, lat, probabilityPercent], ...]
+// on a 1°×1° grid. The vast majority of cells are 0 — drop them so only the
+// visible oval is kept.
+export function parseAurora(raw: unknown): AuroraSample[] {
+  if (!isRecord(raw) || !Array.isArray(raw.coordinates)) {
+    return [];
+  }
+  const samples: AuroraSample[] = [];
+  for (const cell of raw.coordinates) {
+    if (!Array.isArray(cell) || cell.length < 3) {
+      continue;
+    }
+    const [lon, lat, prob] = cell;
+    if (typeof lon !== 'number' || typeof lat !== 'number' || typeof prob !== 'number' || prob <= 0) {
+      continue;
+    }
+    samples.push({ latitude: lat, longitude: lon, probability: prob / 100 });
+  }
+  return samples;
+}
+
 interface FetchResponse {
   ok: boolean;
   status?: number;
@@ -128,6 +211,36 @@ export async function fetchGoesFlares(fetchFn: FetchFn = fetch): Promise<SpaceWe
     throw new Error(`NOAA SWPC GOES flares request failed with status ${response.status ?? 'unknown'}`);
   }
   return parseGoesFlares(await response.json());
+}
+
+// Observed and predicted series in one resource. The predicted feed is
+// best-effort — the observed curve alone is still useful if it fails.
+export async function fetchSolarCycle(fetchFn: FetchFn = fetch): Promise<SolarCycleData> {
+  const observedResponse = await fetchFn(OBSERVED_CYCLE_URL);
+  if (!observedResponse.ok) {
+    throw new Error(`NOAA SWPC solar cycle request failed with status ${observedResponse.status ?? 'unknown'}`);
+  }
+  const observed = parseObservedSolarCycle(await observedResponse.json()).slice(-OBSERVED_TAIL_MONTHS);
+
+  let predicted: SolarCyclePrediction[] = [];
+  try {
+    const predictedResponse = await fetchFn(PREDICTED_CYCLE_URL);
+    if (predictedResponse.ok) {
+      predicted = parsePredictedSolarCycle(await predictedResponse.json());
+    }
+  } catch {
+    // Best-effort; keep the observed series.
+  }
+
+  return { observed, predicted };
+}
+
+export async function fetchAurora(fetchFn: FetchFn = fetch): Promise<AuroraSample[]> {
+  const response = await fetchFn(OVATION_AURORA_URL);
+  if (!response.ok) {
+    throw new Error(`NOAA SWPC OVATION aurora request failed with status ${response.status ?? 'unknown'}`);
+  }
+  return parseAurora(await response.json());
 }
 
 export function auroraForecastImageUrl(): string {

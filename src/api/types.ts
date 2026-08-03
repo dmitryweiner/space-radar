@@ -26,6 +26,36 @@ export interface SpaceWeatherEvent {
   sourceLocation: string | null;
 }
 
+export interface SolarCyclePoint {
+  /** Month, "YYYY-MM". */
+  time: string;
+  /** Observed monthly sunspot number, or null when unreported. */
+  ssn: number | null;
+  /** 13-month smoothed sunspot number, or null (recent months lack it). */
+  smoothedSsn: number | null;
+  /** F10.7 cm radio flux, or null. */
+  f107: number | null;
+}
+
+export interface SolarCyclePrediction {
+  time: string;
+  predictedSsn: number | null;
+  predictedF107: number | null;
+}
+
+export interface SolarCycleData {
+  observed: SolarCyclePoint[];
+  predicted: SolarCyclePrediction[];
+}
+
+export interface AuroraSample {
+  latitude: number;
+  /** Longitude in degrees (OVATION reports 0..360). */
+  longitude: number;
+  /** Aurora probability, 0..1. */
+  probability: number;
+}
+
 export interface NaturalEvent {
   id: string;
   title: string;
@@ -61,6 +91,38 @@ export interface ApodInfo {
   imageUrl: string | null;
   linkUrl: string | null;
   copyright: string | null;
+}
+
+export interface Quake {
+  id: string;
+  magnitude: number;
+  place: string;
+  /** Origin time, epoch milliseconds. */
+  time: number;
+  latitude: number;
+  longitude: number;
+  depthKm: number;
+  url: string;
+}
+
+export interface EpicFrame {
+  /** DSCOVR/EPIC image identifier, e.g. "epic_1b_20260731002712". */
+  image: string;
+  /** Capture time as reported by the API, e.g. "2026-07-31 00:22:24". */
+  date: string;
+  /** Full-resolution JPG URL built from the image id and date. */
+  imageUrl: string;
+  centroidLat: number | null;
+  centroidLon: number | null;
+}
+
+export interface NasaImage {
+  /** NASA library id (nasa_id). */
+  id: string;
+  title: string;
+  description: string | null;
+  dateCreated: string | null;
+  imageUrl: string;
 }
 
 export interface Asteroid {

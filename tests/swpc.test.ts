@@ -2,9 +2,14 @@ import {
   parseKpIndex,
   parseSolarWind,
   parseGoesFlares,
+  parseObservedSolarCycle,
+  parsePredictedSolarCycle,
+  parseAurora,
   fetchKpIndex,
   fetchSolarWind,
   fetchGoesFlares,
+  fetchSolarCycle,
+  fetchAurora,
   auroraForecastImageUrl,
 } from '../src/api/swpc';
 
@@ -106,6 +111,90 @@ describe('fetchKpIndex / fetchSolarWind', () => {
   it('throws when the solar wind response is not ok', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 503, json: () => Promise.resolve(null) });
     await expect(fetchSolarWind(fetchMock)).rejects.toThrow();
+  });
+});
+
+const OBSERVED_CYCLE_SAMPLE = [
+  { 'time-tag': '2026-06', ssn: 90.1, smoothed_ssn: 88.4, 'f10.7': 150.2 },
+  { 'time-tag': '2026-07', ssn: 78.1, smoothed_ssn: -1, 'f10.7': 136.01 },
+];
+
+const PREDICTED_CYCLE_SAMPLE = [
+  { 'time-tag': '2026-08', predicted_ssn: 101.4, 'predicted_f10.7': 139.2 },
+  { 'time-tag': '2026-09', predicted_ssn: -1, 'predicted_f10.7': -1 },
+];
+
+describe('parseObservedSolarCycle', () => {
+  it('reads bracket-keyed fields and maps -1 to null', () => {
+    expect(parseObservedSolarCycle(OBSERVED_CYCLE_SAMPLE)).toEqual([
+      { time: '2026-06', ssn: 90.1, smoothedSsn: 88.4, f107: 150.2 },
+      { time: '2026-07', ssn: 78.1, smoothedSsn: null, f107: 136.01 },
+    ]);
+  });
+
+  it('returns an empty array for malformed input', () => {
+    expect(parseObservedSolarCycle(null)).toEqual([]);
+    expect(parseObservedSolarCycle([{ ssn: 1 }])).toEqual([]);
+  });
+});
+
+describe('parsePredictedSolarCycle', () => {
+  it('reads predicted fields and maps -1 to null', () => {
+    expect(parsePredictedSolarCycle(PREDICTED_CYCLE_SAMPLE)).toEqual([
+      { time: '2026-08', predictedSsn: 101.4, predictedF107: 139.2 },
+      { time: '2026-09', predictedSsn: null, predictedF107: null },
+    ]);
+  });
+});
+
+describe('fetchSolarCycle', () => {
+  it('fetches both series and tolerates a failing prediction feed', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      url.includes('predicted')
+        ? Promise.resolve({ ok: false, status: 503, json: () => Promise.resolve(null) })
+        : Promise.resolve({ ok: true, json: () => Promise.resolve(OBSERVED_CYCLE_SAMPLE) }),
+    );
+    const data = await fetchSolarCycle(fetchMock);
+    expect(data.observed).toHaveLength(2);
+    expect(data.predicted).toEqual([]);
+  });
+
+  it('throws when the observed feed fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 503, json: () => Promise.resolve(null) });
+    await expect(fetchSolarCycle(fetchMock)).rejects.toThrow();
+  });
+});
+
+const AURORA_SAMPLE = {
+  'Observation Time': '2026-08-03T05:46:00Z',
+  'Forecast Time': '2026-08-03T06:57:00Z',
+  coordinates: [
+    [0, -90, 3],
+    [0, -89, 0],
+    [120, 65, 40],
+  ],
+};
+
+describe('parseAurora', () => {
+  it('keeps non-zero cells and normalises probability to 0..1', () => {
+    expect(parseAurora(AURORA_SAMPLE)).toEqual([
+      { latitude: -90, longitude: 0, probability: 0.03 },
+      { latitude: 65, longitude: 120, probability: 0.4 },
+    ]);
+  });
+
+  it('returns an empty array for malformed input', () => {
+    expect(parseAurora(null)).toEqual([]);
+    expect(parseAurora({ coordinates: [[1, 2]] })).toEqual([]);
+  });
+});
+
+describe('fetchAurora', () => {
+  it('fetches the OVATION endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(AURORA_SAMPLE) });
+    const samples = await fetchAurora(fetchMock);
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('ovation_aurora_latest.json'));
+    expect(samples).toHaveLength(2);
   });
 });
 

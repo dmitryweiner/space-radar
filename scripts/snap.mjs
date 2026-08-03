@@ -52,6 +52,13 @@ const CARD_TITLES = {
   launches: 'Upcoming Launches',
   apod: 'Astronomy Picture of the Day',
   'fire-map': 'Active Fires (FIRMS)',
+  epic: 'Earth from L1 (EPIC)',
+  quakes: 'Earthquakes (USGS)',
+  'solar-imagery': 'Live Sun (SDO)',
+  'solar-cycle': 'Solar Cycle',
+  moon: 'Moon & Eclipses',
+  'aurora-globe': 'Aurora Oval (3D)',
+  'nasa-images': 'NASA Image Library',
 };
 
 const preview = flags.has('preview');

@@ -539,6 +539,230 @@ body {
   background: #000;
 }
 
+.epic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.epic-image-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.epic-image {
+  max-width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #000;
+}
+
+.epic-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.epic-play {
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.epic-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.epic-frame-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.solar-imagery-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.solar-imagery-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  align-content: start;
+  overflow: auto;
+}
+
+.solar-imagery-item {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.solar-imagery-img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #000;
+}
+
+.solar-imagery-caption {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.solar-cycle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+}
+
+.solar-cycle-svg {
+  width: 100%;
+  flex: 1;
+  min-height: 60px;
+}
+
+.solar-cycle-observed {
+  stroke: var(--accent);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.solar-cycle-predicted {
+  stroke: var(--status-warning);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.solar-cycle-now {
+  stroke: var(--text-dim);
+  stroke-width: 0.8;
+  stroke-dasharray: 1 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.solar-cycle-axis {
+  position: relative;
+  height: 14px;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.moon-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.moon-visual {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.moon-svg {
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+}
+
+.moon-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.moon-phase-name {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.moon-illum,
+.moon-distance {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.moon-facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.moon-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  border-top: 1px solid var(--panel-border);
+  padding-top: 6px;
+}
+
+.moon-fact dt {
+  color: var(--text-dim);
+}
+
+.moon-fact dd {
+  margin: 0;
+  color: var(--text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.nasa-images-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.nasa-images-frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.nasa-images-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nasa-images-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nasa-images-more {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 .globe-overlay {
   position: absolute;
   top: 8px;

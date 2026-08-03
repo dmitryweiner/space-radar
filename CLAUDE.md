@@ -9,9 +9,9 @@ tooling in `scripts/` **once**, give it CLI flags, and call it thereafter.
 Existing helpers:
 
 - `scripts/smoke.mjs` — headless Chromium: default card visibility, toggling
-  every card via the Cards menu, canvases mounting for the four WebGL cards
-  (`iss-globe`, `solar-system`, `natural-events`, `fire-map`),
-  drag-to-reposition, resize, `localStorage` persistence across reload, and
+  every card via the Cards menu, canvases mounting for the six WebGL cards
+  (`iss-globe`, `solar-system`, `natural-events`, `fire-map`, `quakes`,
+  `aurora-globe`), drag-to-reposition, resize, `localStorage` persistence across reload, and
   layout reset. `--screenshot <path>`, `--preview` (prod build on :4173).
   Any console/page error → exit code 2.
 - `scripts/snap.mjs` — single debug screenshot. Flags: `--out <path>`
@@ -21,7 +21,8 @@ Existing helpers:
 
 Card ids: `iss-globe`, `solar-system`, `kp-index`, `solar-wind`,
 `aurora-forecast`, `solar-flares`, `asteroids`, `natural-events`, `launches`,
-`apod`, `fire-map` (see `src/layout/cardRegistry.ts`).
+`apod`, `fire-map`, `epic`, `quakes`, `solar-imagery`, `solar-cycle`, `moon`,
+`aurora-globe`, `nasa-images` (see `src/layout/cardRegistry.ts`).
 
 ## Build / test commands
 
@@ -65,20 +66,23 @@ npm run build       # production build → ./docs (GitHub Pages)
   card with the `numberSetting(values, id, fallback)` /
   `listSetting(values, id, fallback)` helpers from `layoutState.ts` — never
   index `settings[id]` directly, since the value type is `number | string[]`.
-- **All four 3D scenes share `orbitControlsExtras.attachKeyboardZoom`** — it
+- **All six 3D scenes share `orbitControlsExtras.attachKeyboardZoom`** — it
   makes the canvas focusable (`tabIndex`) and binds `+`/`-` to dolly the camera
   along its view direction (clamped to the controls' min/max distance), so the
-  keys only affect the card the user has clicked into. The three
+  keys only affect the card the user has clicked into. The five
   `createEarthScene` globes additionally auto-rotate (`controls.autoRotate`,
   `AUTO_ROTATE_SPEED`); OrbitControls' `start` event and any keyboard zoom stop
   the spin the moment the user takes over. The solar-system scene gets keyboard
   zoom but no auto-rotate.
-- **Three of the cards (`iss-globe`, `natural-events`, `fire-map`) share
-  `createEarthScene`.** The globe exposes `setSatellites` (named markers with
-  labels), `setMarkers` (generic id/colour/label markers), and `setFirePoints`
-  (a single `THREE.Points` cloud). Label sprites (`src/render/labelSprite.ts`)
-  are depth-tested, so the opaque Earth mesh hides labels on the far side for
-  free — there is no manual occlusion math.
+- **Five of the cards (`iss-globe`, `natural-events`, `fire-map`, `quakes`,
+  `aurora-globe`) share `createEarthScene`.** The globe exposes `setSatellites`
+  (named markers with labels), `setMarkers` (generic id/colour/label markers),
+  `setFirePoints` (a single yellow→red `THREE.Points` cloud), and
+  `setAuroraPoints` (an additive-blended green `THREE.Points` cloud whose
+  brightness scales with per-point probability, `depthWrite:false` so the glow
+  layers). Label sprites (`src/render/labelSprite.ts`) are depth-tested, so the
+  opaque Earth mesh hides labels on the far side for free — there is no manual
+  occlusion math.
 - **Fire points carry an optional `info` string and get a hover tooltip.**
   `setFirePoints` stores the per-point `info` (built in `FireMapCard`:
   detection time + brightness K + confidence). A `pointermove` listener on the
@@ -165,6 +169,17 @@ npm run build       # production build → ./docs (GitHub Pages)
     numeric cells, column order `time_tag,speed,density,temperature,...`).
     `products/solar-wind/plasma-5-minute.json`, which several older
     tutorials reference, 404s.
+  - The `json/solar-cycle/*` products (`observed-solar-cycle-indices.json`,
+    `predicted-solar-cycle.json`) are **arrays of objects**, but their keys
+    `time-tag` and `f10.7` contain characters you can't destructure — read them
+    via string index access (`item['f10.7']`). Missing values are the sentinel
+    **`-1`**, not `null` — map them to `null` (`toCycleNumber` in `swpc.ts`).
+    The observed series runs back to 1749; keep only the recent tail
+    (`OBSERVED_TAIL_MONTHS`) so the localStorage cache stays small.
+  - `json/ovation_aurora_latest.json` is `{ "Observation Time",
+    "Forecast Time", coordinates: [[lon, lat, probabilityPercent], ...] }` on a
+    1°×1° grid with **longitude 0..360** (the trig in `coords.ts` handles that
+    fine). ~⅔ of cells are 0 — `parseAurora` drops them.
   - If you add another SWPC product, `curl` the real endpoint first — don't
     assume the table shape from a similarly-named one.
 - **NASA DONKI on `api.nasa.gov` 503s frequently.** Flares therefore come from

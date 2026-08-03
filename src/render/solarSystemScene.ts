@@ -8,11 +8,54 @@ import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSp
 import { attachKeyboardZoom } from './orbitControlsExtras';
 
 const UNITS_PER_AU = 6;
+
+// Real equatorial radii (km). Planet bodies are sized from these so their
+// relative diameters are correct — Jupiter dwarfs Mercury, Earth edges out
+// Venus — instead of every planet being an identical blob.
+const BODY_RADII_KM: Record<string, number> = {
+  Sun: 696000,
+  Mercury: 2439.7,
+  Venus: 6051.8,
+  Earth: 6371,
+  Mars: 3389.5,
+  Jupiter: 69911,
+  Saturn: 58232,
+  Uranus: 25362,
+  Neptune: 24622,
+  // Moons share the same scale — they are not a special size category. (Note
+  // Ganymede is larger than Mercury, and both edge out the Moon/Io/Europa.)
+  Moon: 1737.4,
+  Io: 1821.6,
+  Europa: 1560.8,
+  Ganymede: 2634.1,
+  Callisto: 2410.3,
+};
+
+// One shared exaggeration factor keeps the planets in true proportion to each
+// other while staying visible. True-to-orbit scale is impossible here: orbital
+// distances are real (UNITS_PER_AU), and at that scale a real-diameter Earth
+// would be ~3e-4 units — sub-pixel. (Same reason moons ride display orbits.)
+// Factor is set so Jupiter ≈ 1.3 units.
+const PLANET_RADIUS_UNITS_PER_KM = 1.3 / 69911;
+// Floor so the smallest bodies (inner planets and moons) stay visible; kept low
+// enough that real differences among them still show — e.g. Ganymede > Mercury >
+// Callisto > Io > Moon > Europa. Labels are always drawn, so nothing is lost.
+const MIN_PLANET_RADIUS = 0.03;
+// The Sun is ~10× Jupiter's diameter; on the planet scale it would be ~14 units
+// and engulf Mercury's orbit (~2.3 units), so it gets its own compressed size —
+// still clearly the largest body, but leaving the inner planets in the clear.
+const SUN_RADIUS_UNITS = 1.8;
+
+function bodyRadiusUnits(name: string): number {
+  const km = BODY_RADII_KM[name] ?? BODY_RADII_KM.Earth;
+  return Math.max(MIN_PLANET_RADIUS, km * PLANET_RADIUS_UNITS_PER_KM);
+}
+
 // Moons sit far too close to their planet to see at true scale, so they're
-// drawn on exaggerated, evenly-spaced display orbits (real longitude kept,
-// inclination flattened into the ecliptic plane).
-const MOON_BASE_RADIUS = 0.8;
-const MOON_RADIUS_STEP = 0.55;
+// drawn on exaggerated display orbits (real longitude kept, inclination
+// flattened into the ecliptic plane) that start just outside the planet body.
+const MOON_ORBIT_GAP = 0.35;
+const MOON_RADIUS_STEP = 0.4;
 // Constant on-screen label sizes, in CSS pixels — unchanged by zoom or by
 // expanding the card to full screen (see scaleLabelToScreen).
 const PLANET_LABEL_PX = 13;
@@ -105,22 +148,29 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
 
   scene.add(new THREE.AmbientLight(0x556688, 1.8));
 
-  const sun = new THREE.Mesh(new THREE.SphereGeometry(1.6, 24, 24), new THREE.MeshBasicMaterial({ color: 0xfab219 }));
+  const sun = new THREE.Mesh(
+    new THREE.SphereGeometry(SUN_RADIUS_UNITS, 32, 32),
+    new THREE.MeshBasicMaterial({ color: 0xfab219 }),
+  );
   scene.add(sun);
   scene.add(new THREE.PointLight(0xffffff, 3, 0, 0));
 
   const planetMeshes = new Map<string, THREE.Mesh>();
+  const planetRadii = new Map<string, number>();
   const planetLabels = new Map<string, LabelSprite>();
   const orbitRings = new Map<string, THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial>>();
 
   const scratchLabel = new THREE.Vector3();
-  function planetLabelPosition(planet: THREE.Vector3): THREE.Vector3 {
+  // Sit the label a fixed gap beyond the planet's surface (radially outward from
+  // the Sun) so it clears large bodies like Jupiter instead of landing on them.
+  function planetLabelPosition(planet: THREE.Vector3, radius: number): THREE.Vector3 {
     scratchLabel.copy(planet);
     const length = scratchLabel.length() || 1;
-    return scratchLabel.multiplyScalar((length + PLANET_LABEL_OFFSET) / length);
+    return scratchLabel.multiplyScalar((length + radius + PLANET_LABEL_OFFSET) / length);
   }
 
-  const moonGeometry = new THREE.SphereGeometry(0.12, 12, 12);
+  // Moon meshes get a per-moon geometry sized to real diameter (below), so only
+  // the material is shared here.
   const moonMaterial = new THREE.MeshStandardMaterial({ color: 0xcfd4e0, emissive: 0x222831 });
   const moonRingMaterial = new THREE.LineBasicMaterial({ color: 0x6f7fa6, transparent: true, opacity: 0.35 });
   const moonGroup = new THREE.Group();
@@ -132,6 +182,7 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
       moonGroup.remove(mesh);
       moonGroup.remove(ring);
       moonGroup.remove(label.sprite);
+      mesh.geometry.dispose();
       ring.geometry.dispose();
       label.dispose();
     }
@@ -159,8 +210,10 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
       for (const planet of positions) {
         let mesh = planetMeshes.get(planet.name);
         if (!mesh) {
+          const radius = bodyRadiusUnits(planet.name);
+          planetRadii.set(planet.name, radius);
           mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(0.5, 16, 16),
+            new THREE.SphereGeometry(radius, 24, 24),
             new THREE.MeshStandardMaterial({ color: planetColor(planet.name) }),
           );
           scene.add(mesh);
@@ -175,7 +228,7 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
           scene.add(label.sprite);
           planetLabels.set(planet.name, label);
         }
-        label.sprite.position.copy(planetLabelPosition(mesh.position));
+        label.sprite.position.copy(planetLabelPosition(mesh.position, planetRadii.get(planet.name) ?? MIN_PLANET_RADIUS));
       }
     },
     setOrbitPaths(paths) {
@@ -205,9 +258,10 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
           scratchDir.set(1, 0, 0);
         }
         scratchDir.normalize();
-        const radius = MOON_BASE_RADIUS + moon.order * MOON_RADIUS_STEP;
+        const planetRadius = planetRadii.get(moon.planet) ?? MIN_PLANET_RADIUS;
+        const radius = planetRadius + MOON_ORBIT_GAP + moon.order * MOON_RADIUS_STEP;
 
-        const mesh = new THREE.Mesh(moonGeometry, moonMaterial);
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(bodyRadiusUnits(moon.name), 16, 16), moonMaterial);
         mesh.position.copy(planet.position).addScaledVector(scratchDir, radius);
         moonGroup.add(mesh);
 
@@ -236,7 +290,6 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
         label.dispose();
       }
       planetLabels.clear();
-      moonGeometry.dispose();
       moonMaterial.dispose();
       moonRingMaterial.dispose();
       renderer.dispose();

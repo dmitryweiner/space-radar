@@ -32,10 +32,23 @@ const PORT = preview ? 4173 : 5173;
 const BASE = `http://localhost:${PORT}`;
 
 const DEFAULT_VISIBLE = ['iss-globe', 'solar-system', 'natural-events', 'apod', 'launches', 'asteroids'];
-const HIDDEN_BY_DEFAULT = ['kp-index', 'solar-wind', 'aurora-forecast', 'solar-flares', 'fire-map'];
+const HIDDEN_BY_DEFAULT = [
+  'kp-index',
+  'solar-wind',
+  'aurora-forecast',
+  'solar-flares',
+  'fire-map',
+  'epic',
+  'quakes',
+  'solar-imagery',
+  'solar-cycle',
+  'moon',
+  'aurora-globe',
+  'nasa-images',
+];
 const ALL_CARDS = [...DEFAULT_VISIBLE, ...HIDDEN_BY_DEFAULT];
 // Cards that mount a WebGL <canvas> (globe / solar-system scenes).
-const CANVAS_CARDS = ['iss-globe', 'solar-system', 'natural-events', 'fire-map'];
+const CANVAS_CARDS = ['iss-globe', 'solar-system', 'natural-events', 'fire-map', 'quakes', 'aurora-globe'];
 const CARD_TITLES = {
   'iss-globe': 'ISS & Satellites',
   'solar-system': 'Solar System',
@@ -48,6 +61,13 @@ const CARD_TITLES = {
   launches: 'Upcoming Launches',
   apod: 'Astronomy Picture of the Day',
   'fire-map': 'Active Fires (FIRMS)',
+  epic: 'Earth from L1 (EPIC)',
+  quakes: 'Earthquakes (USGS)',
+  'solar-imagery': 'Live Sun (SDO)',
+  'solar-cycle': 'Solar Cycle',
+  moon: 'Moon & Eclipses',
+  'aurora-globe': 'Aurora Oval (3D)',
+  'nasa-images': 'NASA Image Library',
 };
 
 async function serverUp() {

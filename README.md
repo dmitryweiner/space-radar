@@ -2,10 +2,11 @@
 
 **A space situational awareness dashboard.** A web app that pulls live data
 from public space agencies — satellite orbits, planetary positions, space
-weather, solar flares/CMEs, near-Earth asteroids, natural events, rocket
-launches and active fires — into a grid of cards you can show, hide, drag and
-resize. Your layout is saved locally, so the dashboard looks the same next time
-you open it.
+weather, solar flares/CMEs, the solar cycle, near-Earth asteroids, earthquakes,
+natural events, rocket launches, active fires, the Moon and eclipses, and
+full-disk Earth and Sun imagery — into a grid of cards you can show, hide, drag
+and resize. Your layout is saved locally, so the dashboard looks the same next
+time you open it.
 
 ## Features
 
@@ -30,6 +31,23 @@ you open it.
 - **Astronomy Picture of the Day** — NASA APOD image with its caption.
 - **Active Fires** — VIIRS/MODIS fire detections from NASA FIRMS as a point
   cloud on a 3D globe (needs a free FIRMS MAP_KEY — see below).
+- **Earth from L1 (EPIC)** — a day's worth of full-disk Earth photos from the
+  DSCOVR/EPIC camera at the L1 point, with a play/scrub slider so you can watch
+  the planet rotate.
+- **Earthquakes (USGS)** — recent quakes on a 3D globe, coloured and sized by
+  magnitude, from selectable USGS feeds (magnitude threshold × time window).
+- **Live Sun (SDO)** — latest full-disk Sun images from NASA SDO in selectable
+  wavelengths (corona, chromosphere, sunspots, magnetogram) plus a live GOES-19
+  Earth disk, refreshed every ~15 minutes.
+- **Solar Cycle** — sunspot-number history and the official SWPC forecast on one
+  chart, with a "now" marker showing where the current cycle stands.
+- **Moon & Eclipses** — current Moon phase (rendered icon + illuminated
+  percentage), distance, and the next perigee/apogee and lunar/solar eclipses —
+  computed entirely offline via `astronomy-engine`.
+- **Aurora Oval (3D)** — the NOAA OVATION aurora probability oval drawn as a
+  glowing point cloud on a 3D globe.
+- **NASA Image Library** — a browsable pick of images from the NASA image
+  archive across selectable topics (nebulae, galaxies, Apollo, planets, …).
 - Every card can be shown or hidden from the **Cards** menu, dragged/resized on
   the grid, opened full-screen, or tuned via its **⚙ settings** popup (size in
   rows/columns plus card-specific options). Layout and settings are saved to
@@ -53,11 +71,12 @@ npm run build     # production build → ./docs (GitHub Pages)
 
 ```
 src/api/       fetch + parse for each data source (CelesTrak, NOAA SWPC + GOES,
-               NASA DONKI/NeoWs/EONET/APOD/FIRMS, Launch Library 2) — pure
-               functions, no React/Three
+               NASA DONKI/NeoWs/EONET/APOD/FIRMS/EPIC/Images, USGS quakes,
+               Launch Library 2) — pure functions, no React/Three
 src/astro/     pure orbital/astronomical math: TLE -> geodetic position
-               (satellite.js), planet + moon vectors (astronomy-engine),
-               lat/lon/AU -> 3D scene coordinates. Never imports Three.js.
+               (satellite.js), planet + moon vectors, Moon phase / apsides /
+               eclipses (astronomy-engine), lat/lon/AU -> 3D scene coordinates.
+               Never imports Three.js.
 src/render/    thin Three.js layer: Earth globe + solar-system scenes, plus
                starfield / label-sprite / orbit-trail helpers
 src/hooks/     useApiResource — generic polling + localStorage TTL cache
@@ -69,7 +88,7 @@ src/cards/     one React component per card
 `src/astro/` never imports Three.js and `src/api/` never imports React — the
 same core/UI separation used in the sibling `mathsculpt` project. Three.js
 scenes can't run in `jsdom` (no WebGL), so `render/` and the mounting effects
-in the four WebGL cards are exercised by `scripts/smoke.mjs` in a real browser
+in the six WebGL cards are exercised by `scripts/smoke.mjs` in a real browser
 rather than by `vitest`.
 
 ## Data sources
@@ -85,6 +104,13 @@ rather than by `vitest`.
 | [Launch Library 2](https://thespacedevs.com/llapi) | upcoming rocket launches | none |
 | [NASA APOD](https://api.nasa.gov/) | astronomy picture of the day | personal key |
 | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/) | active fire detections (VIIRS/MODIS) | MAP_KEY |
+| [NASA EPIC](https://epic.gsfc.nasa.gov/) | full-disk Earth images from DSCOVR/L1 | none |
+| [USGS Earthquakes](https://earthquake.usgs.gov/earthquakes/feed/v1.0/) | realtime earthquake feeds | none |
+| [NASA SDO](https://sdo.gsfc.nasa.gov/) / [NOAA GOES](https://www.star.nesdis.noaa.gov/GOES/) | live Sun / Earth images | none |
+| [NOAA SWPC solar cycle](https://www.swpc.noaa.gov/products/solar-cycle-progression) | observed + predicted sunspot number / F10.7 | none |
+| [NOAA SWPC OVATION](https://www.swpc.noaa.gov/products/aurora-30-minute-forecast) | aurora probability grid | none |
+| `astronomy-engine` (offline) | Moon phase, apsides, eclipses | none |
+| [NASA Images](https://images.nasa.gov/) | NASA image & video library search | none |
 
 The starfield background in the 3D cards is the Milky Way panorama texture
 from [Solar System Scope](https://www.solarsystemscope.com/textures/)

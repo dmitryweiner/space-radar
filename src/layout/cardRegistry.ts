@@ -9,6 +9,15 @@ import { NaturalEventsCard } from '../cards/NaturalEventsCard';
 import { LaunchesCard } from '../cards/LaunchesCard';
 import { ApodCard } from '../cards/ApodCard';
 import { FireMapCard } from '../cards/FireMapCard';
+import { EpicCard } from '../cards/EpicCard';
+import { QuakesCard } from '../cards/QuakesCard';
+import { QUAKE_FEEDS } from '../api/usgsQuakes';
+import { SolarImageryCard, SOLAR_IMAGERY_LAYERS } from '../cards/SolarImageryCard';
+import { SolarCycleCard } from '../cards/SolarCycleCard';
+import { MoonCard } from '../cards/MoonCard';
+import { AuroraGlobeCard } from '../cards/AuroraGlobeCard';
+import { NasaImagesCard } from '../cards/NasaImagesCard';
+import { NASA_IMAGE_TOPICS } from '../api/nasaImages';
 import type { CardDefinition } from './types';
 
 export const cardRegistry: CardDefinition[] = [
@@ -105,5 +114,78 @@ export const cardRegistry: CardDefinition[] = [
     defaultLayout: { x: 0, y: 10, w: 2, h: 2, minW: 2, minH: 2 },
     component: FireMapCard,
     settings: [{ kind: 'number', id: 'dayRange', label: 'Days back', min: 1, max: 7, defaultValue: 1 }],
+  },
+  {
+    id: 'epic',
+    title: 'Earth from L1 (EPIC)',
+    defaultVisible: false,
+    defaultLayout: { x: 2, y: 10, w: 2, h: 2 },
+    component: EpicCard,
+    settings: [{ kind: 'number', id: 'frameSeconds', label: 'Seconds / frame', min: 1, max: 10, defaultValue: 2 }],
+  },
+  {
+    id: 'quakes',
+    title: 'Earthquakes (USGS)',
+    defaultVisible: false,
+    defaultLayout: { x: 0, y: 12, w: 2, h: 2, minW: 2, minH: 2 },
+    component: QuakesCard,
+    settings: [
+      { kind: 'multiselect', id: 'feeds', label: 'Feeds', options: QUAKE_FEEDS, defaultValue: ['2.5_day'] },
+      { kind: 'number', id: 'maxQuakes', label: 'Max quakes', min: 20, max: 200, step: 20, defaultValue: 80 },
+    ],
+  },
+  {
+    id: 'solar-imagery',
+    title: 'Live Sun (SDO)',
+    defaultVisible: false,
+    defaultLayout: { x: 2, y: 12, w: 2, h: 2 },
+    component: SolarImageryCard,
+    settings: [
+      {
+        kind: 'multiselect',
+        id: 'layers',
+        label: 'Wavelengths',
+        options: SOLAR_IMAGERY_LAYERS.map((layer) => ({ value: layer.value, label: layer.label })),
+        defaultValue: ['0193'],
+      },
+    ],
+  },
+  {
+    id: 'solar-cycle',
+    title: 'Solar Cycle',
+    defaultVisible: false,
+    defaultLayout: { x: 0, y: 14, w: 2, h: 2 },
+    component: SolarCycleCard,
+    settings: [{ kind: 'number', id: 'years', label: 'Years shown', min: 5, max: 30, defaultValue: 14 }],
+  },
+  {
+    id: 'moon',
+    title: 'Moon & Eclipses',
+    defaultVisible: false,
+    defaultLayout: { x: 2, y: 14, w: 2, h: 2 },
+    component: MoonCard,
+  },
+  {
+    id: 'aurora-globe',
+    title: 'Aurora Oval (3D)',
+    defaultVisible: false,
+    defaultLayout: { x: 0, y: 16, w: 2, h: 2, minW: 2, minH: 2 },
+    component: AuroraGlobeCard,
+  },
+  {
+    id: 'nasa-images',
+    title: 'NASA Image Library',
+    defaultVisible: false,
+    defaultLayout: { x: 2, y: 16, w: 2, h: 2 },
+    component: NasaImagesCard,
+    settings: [
+      {
+        kind: 'multiselect',
+        id: 'topics',
+        label: 'Topics',
+        options: NASA_IMAGE_TOPICS.map((topic) => ({ value: topic.value, label: topic.label })),
+        defaultValue: ['nebula'],
+      },
+    ],
   },
 ];

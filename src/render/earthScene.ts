@@ -21,6 +21,7 @@ const ISS_MARKER_PX = 5;
 const SATELLITE_MARKER_PX = 2.4;
 const EVENT_MARKER_PX = 3.2;
 const FIRE_POINT_PX = 2.5;
+const AURORA_POINT_PX = 3.5;
 const HOVER_LABEL_PX = 12;
 
 // Base sphere radii the marker meshes are built with; scaleMarker rescales them
@@ -51,11 +52,18 @@ export interface FirePoint {
   info?: string;
 }
 
+export interface AuroraPoint {
+  position: SceneVector3;
+  /** 0..1 probability; brightens the additive green glow. */
+  probability: number;
+}
+
 export interface EarthSceneHandle {
   setIssPosition(position: SceneVector3 | null, trail?: SceneVector3[]): void;
   setSatellites(satellites: NamedPosition[]): void;
   setMarkers(markers: GlobeMarker[]): void;
   setFirePoints(points: FirePoint[]): void;
+  setAuroraPoints(points: AuroraPoint[]): void;
   resize(): void;
   dispose(): void;
 }
@@ -157,6 +165,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
 
   let firePoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
   let firePointInfos: string[] = [];
+  let auroraPoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
 
   const scratch = new THREE.Vector3();
 
@@ -384,6 +393,43 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       firePoints = new THREE.Points(geometry, material);
       scene.add(firePoints);
     },
+    setAuroraPoints(points) {
+      if (auroraPoints) {
+        scene.remove(auroraPoints);
+        auroraPoints.geometry.dispose();
+        auroraPoints.material.dispose();
+        auroraPoints = null;
+      }
+      if (points.length === 0) {
+        return;
+      }
+      const positions = new Float32Array(points.length * 3);
+      const colors = new Float32Array(points.length * 3);
+      points.forEach((point, i) => {
+        positions[i * 3] = point.position.x;
+        positions[i * 3 + 1] = point.position.y;
+        positions[i * 3 + 2] = point.position.z;
+        // Additive green glow: brighter where the probability is higher, so
+        // faint edges of the oval fade out instead of showing a hard mask.
+        const p = Math.min(1, Math.max(0, point.probability));
+        colors[i * 3] = 0.2 * p;
+        colors[i * 3 + 1] = 1.0 * p;
+        colors[i * 3 + 2] = 0.5 * p;
+      });
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      const material = new THREE.PointsMaterial({
+        size: AURORA_POINT_PX * renderer.getPixelRatio(),
+        vertexColors: true,
+        sizeAttenuation: false,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      auroraPoints = new THREE.Points(geometry, material);
+      scene.add(auroraPoints);
+    },
     resize() {
       applySize();
     },
@@ -407,6 +453,10 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       if (firePoints) {
         firePoints.geometry.dispose();
         firePoints.material.dispose();
+      }
+      if (auroraPoints) {
+        auroraPoints.geometry.dispose();
+        auroraPoints.material.dispose();
       }
       satelliteGeometry.dispose();
       satelliteMaterial.dispose();
