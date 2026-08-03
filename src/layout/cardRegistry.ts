@@ -113,7 +113,10 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: false,
     defaultLayout: { x: 0, y: 10, w: 2, h: 2, minW: 2, minH: 2 },
     component: FireMapCard,
-    settings: [{ kind: 'number', id: 'dayRange', label: 'Days back', min: 1, max: 7, defaultValue: 1 }],
+    settings: [
+      { kind: 'number', id: 'dayRange', label: 'Days back', min: 1, max: 7, defaultValue: 1 },
+      { kind: 'number', id: 'labelCount', label: 'Labelled fires', min: 0, max: 100, step: 10, defaultValue: 30 },
+    ],
   },
   {
     id: 'epic',

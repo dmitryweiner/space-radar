@@ -77,7 +77,9 @@ export async function fetchFirePoints(fetchFn: FetchFn = fetch, options: FirmsOp
   if (!FIRMS_MAP_KEY) {
     throw new Error('Add your FIRMS MAP_KEY in src/api/firmsMapKey.ts to load fire detections.');
   }
-  const source = options.source ?? 'VIIRS_SNPP_NRT';
+  // NOAA-20 is the primary operational VIIRS feed; the older Suomi-NPP NRT
+  // source (VIIRS_SNPP_NRT) went intermittent and now returns near-zero rows.
+  const source = options.source ?? 'VIIRS_NOAA20_NRT';
   const area = options.area ?? 'world';
   const dayRange = options.dayRange ?? 1;
   const url = `${API_BASE}/${FIRMS_MAP_KEY}/${source}/${area}/${dayRange}`;

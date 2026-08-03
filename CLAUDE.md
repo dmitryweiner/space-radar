@@ -83,13 +83,18 @@ npm run build       # production build → ./docs (GitHub Pages)
   layers). Label sprites (`src/render/labelSprite.ts`) are depth-tested, so the
   opaque Earth mesh hides labels on the far side for free — there is no manual
   occlusion math.
-- **Fire points carry an optional `info` string and get a hover tooltip.**
-  `setFirePoints` stores the per-point `info` (built in `FireMapCard`:
-  detection time + brightness K + confidence). A `pointermove` listener on the
-  canvas raycasts the `THREE.Points` cloud (`raycaster.params.Points.threshold`)
-  and shows a reusable label sprite at the hovered point. Points on the far side
-  are skipped via a horizon test (`dot(camera − point, point) > 0`) since the
-  Points cloud isn't occluded by the Earth mesh the way opaque meshes are.
+- **Fire points carry an optional `label` string drawn as a permanent sprite
+  beside the point** (not a hover tooltip — there are several thousand points, so
+  `FireMapCard` labels only the strongest `labelCount` fires by brightness; the
+  full `THREE.Points` cloud is unlabelled). The label text (detection time +
+  brightness K + confidence) is built in `FireMapCard`. These are ordinary
+  depth-tested `labelSprite`s, so the opaque Earth hides far-side ones for free —
+  no raycast/horizon math (the earlier hover-tooltip approach needed both).
+- **FIRMS default source is `VIIRS_NOAA20_NRT`, not `VIIRS_SNPP_NRT`.** The
+  Suomi-NPP NRT feed went intermittent and now returns ~0 rows for `world/1`;
+  NOAA-20 (and NOAA-21) are the healthy operational VIIRS feeds. If the fire card
+  ever shows almost no points again, `curl` the source URLs and switch — it's a
+  feed outage, not a parsing bug.
 - **The ISS card caches TLEs per CelesTrak group, not per group-combination**
   (`useTleSatellites`), under `space-radar:tle-group:<name>` keys. Caching by
   combination (the earlier design) re-fetched huge groups on every toggle —

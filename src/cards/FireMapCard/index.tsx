@@ -12,6 +12,7 @@ const CACHE_KEY = 'space-radar:fire-points';
 const TTL_MS = 60 * 60 * 1000;
 const POLL_MS = 60 * 60 * 1000;
 const DEFAULT_DAY_RANGE = 1;
+const DEFAULT_LABEL_COUNT = 30;
 // Normalize brightness temperature (Kelvin) to a 0..1 colour ramp.
 const BRIGHT_MIN = 300;
 const BRIGHT_MAX = 400;
@@ -45,8 +46,9 @@ function intensity(point: FirePoint): number {
   return Math.min(1, Math.max(0, point.confidence ?? base));
 }
 
-// Tooltip text for a hovered fire point. acquiredAt is "YYYY-MM-DD HHMM" (UTC);
-// pretty-print the HHMM time and append brightness + confidence when present.
+// Label text drawn beside the strongest fire points. acquiredAt is
+// "YYYY-MM-DD HHMM" (UTC); pretty-print the HHMM time and append brightness +
+// confidence when present.
 function fireInfo(point: FirePoint): string {
   const [date, rawTime] = point.acquiredAt.split(' ');
   const digits = (rawTime ?? '').padStart(4, '0');
@@ -63,6 +65,7 @@ function fireInfo(point: FirePoint): string {
 
 export function FireMapCard({ settings = {} }: CardComponentProps) {
   const dayRange = numberSetting(settings, 'dayRange', DEFAULT_DAY_RANGE);
+  const labelCount = numberSetting(settings, 'labelCount', DEFAULT_LABEL_COUNT);
   const { data, loading, error } = useApiResource<FirePoint[]>({
     key: `${CACHE_KEY}:${dayRange}`,
     ttlMs: TTL_MS,
@@ -93,15 +96,23 @@ export function FireMapCard({ settings = {} }: CardComponentProps) {
     }
   }, []);
 
-  const scenePoints = useMemo<SceneFirePoint[]>(
-    () =>
-      (data ?? []).map((point) => ({
-        position: geodeticToSceneVector(point.latitude, point.longitude, 0, EARTH_RADIUS_UNITS),
-        intensity: intensity(point),
-        info: fireInfo(point),
-      })),
-    [data],
-  );
+  const scenePoints = useMemo<SceneFirePoint[]>(() => {
+    const points = data ?? [];
+    // Label only the strongest fires (by brightness temperature) — labelling
+    // all several-thousand points would be an unreadable wall of text.
+    const labelled = new Set(
+      points
+        .map((point, index) => ({ index, brightness: point.brightnessKelvin }))
+        .sort((a, b) => b.brightness - a.brightness)
+        .slice(0, Math.max(0, labelCount))
+        .map((entry) => entry.index),
+    );
+    return points.map((point, index) => ({
+      position: geodeticToSceneVector(point.latitude, point.longitude, 0, EARTH_RADIUS_UNITS),
+      intensity: intensity(point),
+      label: labelled.has(index) ? fireInfo(point) : undefined,
+    }));
+  }, [data, labelCount]);
 
   useEffect(() => {
     sceneRef.current?.setFirePoints(scenePoints);
@@ -116,7 +127,7 @@ export function FireMapCard({ settings = {} }: CardComponentProps) {
       {!sceneError && !loading && !error && data && (
         <p className="card-status globe-overlay">
           {data.length.toLocaleString()} active fire{data.length === 1 ? '' : 's'} · last {dayRange}d (VIIRS)
-          {data.length > 0 && ' · hover a point for details'}
+          {data.length > 0 && labelCount > 0 && ` · top ${Math.min(labelCount, data.length)} labelled`}
         </p>
       )}
     </div>

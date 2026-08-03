@@ -22,7 +22,7 @@ const SATELLITE_MARKER_PX = 2.4;
 const EVENT_MARKER_PX = 3.2;
 const FIRE_POINT_PX = 2.5;
 const AURORA_POINT_PX = 3.5;
-const HOVER_LABEL_PX = 12;
+const FIRE_LABEL_PX = 12;
 
 // Base sphere radii the marker meshes are built with; scaleMarker rescales them
 // each frame so their rendered radius matches the pixel targets above.
@@ -48,8 +48,9 @@ export interface FirePoint {
   position: SceneVector3;
   /** 0..1, drives the yellow→red colour ramp. */
   intensity: number;
-  /** Optional detail shown in a tooltip when the point is hovered. */
-  info?: string;
+  /** When set, a permanent label is drawn beside the point (used for the
+   * strongest fires only — labelling every point would be unreadable). */
+  label?: string;
 }
 
 export interface AuroraPoint {
@@ -164,7 +165,9 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   const eventMarkers = new Map<string, { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; label: LabelSprite }>();
 
   let firePoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
-  let firePointInfos: string[] = [];
+  // Permanent labels beside the strongest fire points (depth-tested sprites, so
+  // the opaque Earth hides the ones on the far side for free).
+  let fireLabels: LabelSprite[] = [];
   let auroraPoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
 
   const scratch = new THREE.Vector3();
@@ -185,67 +188,12 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     mesh.scale.set(s, s, s);
   }
 
-  // --- Fire-point hover tooltip -------------------------------------------
-  const raycaster = new THREE.Raycaster();
-  raycaster.params.Points = { threshold: 0.04 };
-  const pointerNdc = new THREE.Vector2();
-  const hoverScratch = new THREE.Vector3();
-  let hoverLabel: LabelSprite | null = null;
-  let hoverText = '';
-
-  function clearHover() {
-    if (hoverLabel) {
-      scene.remove(hoverLabel.sprite);
-      hoverLabel.dispose();
-      hoverLabel = null;
+  function clearFireLabels() {
+    for (const label of fireLabels) {
+      scene.remove(label.sprite);
+      label.dispose();
     }
-    hoverText = '';
-    canvas.style.cursor = '';
-  }
-
-  // A fire point sits on the Earth's surface; it's only visible (hoverable)
-  // when the camera is on the same side — i.e. above its local horizon.
-  function isFacingCamera(point: THREE.Vector3): boolean {
-    hoverScratch.copy(camera.position).sub(point);
-    return hoverScratch.dot(point) > 0;
-  }
-
-  function onPointerMove(event: PointerEvent) {
-    if (!firePoints || firePointInfos.length === 0) {
-      return;
-    }
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) {
-      return;
-    }
-    pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(pointerNdc, camera);
-    const hit = raycaster
-      .intersectObject(firePoints)
-      .find((intersection) => intersection.index !== undefined && isFacingCamera(intersection.point));
-    if (!hit || hit.index === undefined) {
-      clearHover();
-      return;
-    }
-    const info = firePointInfos[hit.index] ?? '';
-    if (!info) {
-      clearHover();
-      return;
-    }
-    canvas.style.cursor = 'pointer';
-    if (info !== hoverText) {
-      if (hoverLabel) {
-        scene.remove(hoverLabel.sprite);
-        hoverLabel.dispose();
-      }
-      hoverLabel = makeLabelSprite(info, '#ffd7a0');
-      scene.add(hoverLabel.sprite);
-      hoverText = info;
-    }
-    if (hoverLabel) {
-      hoverLabel.sprite.position.copy(labelPosition({ x: hit.point.x, y: hit.point.y, z: hit.point.z }, scratch));
-    }
+    fireLabels = [];
   }
 
   function disposeSatellite(entry: { mesh: THREE.Mesh; label: LabelSprite; trail: TrailLine }) {
@@ -263,9 +211,6 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     entry.label.dispose();
   }
 
-  canvas.addEventListener('pointermove', onPointerMove);
-  canvas.addEventListener('pointerleave', clearHover);
-
   let frameId = 0;
   function animate() {
     frameId = requestAnimationFrame(animate);
@@ -282,8 +227,8 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       rescaleLabel(entry.label);
       scaleMarker(entry.mesh, EVENT_MARKER_PX, EVENT_MARKER_RADIUS);
     }
-    if (hoverLabel) {
-      rescaleLabel(hoverLabel, HOVER_LABEL_PX);
+    for (const label of fireLabels) {
+      rescaleLabel(label, FIRE_LABEL_PX);
     }
     renderer.render(scene, camera);
   }
@@ -361,8 +306,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
         firePoints.material.dispose();
         firePoints = null;
       }
-      clearHover();
-      firePointInfos = points.map((point) => point.info ?? '');
+      clearFireLabels();
       if (points.length === 0) {
         return;
       }
@@ -376,6 +320,13 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
         colors[i * 3] = 1;
         colors[i * 3 + 1] = 0.85 - 0.75 * t;
         colors[i * 3 + 2] = 0.2 - 0.18 * t;
+        // Points flagged with a label get a permanent sprite beside them.
+        if (point.label) {
+          const label = makeLabelSprite(point.label, '#ffd7a0');
+          label.sprite.position.copy(labelPosition(point.position, scratch));
+          scene.add(label.sprite);
+          fireLabels.push(label);
+        }
       });
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -436,9 +387,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     dispose() {
       cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerleave', clearHover);
-      clearHover();
+      clearFireLabels();
       controls.removeEventListener('start', stopAutoRotate);
       detachKeyboardZoom();
       controls.dispose();
