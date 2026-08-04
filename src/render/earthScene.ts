@@ -5,7 +5,7 @@ import earthTextureUrl from '../assets/earth-diffuse.jpg';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
 import { makeTrail, type TrailLine } from './trailLine';
-import { attachKeyboardZoom } from './orbitControlsExtras';
+import { attachKeyboardZoom, zoomBy } from './orbitControlsExtras';
 
 export const EARTH_RADIUS_UNITS = 2;
 
@@ -65,6 +65,7 @@ export interface EarthSceneHandle {
   setMarkers(markers: GlobeMarker[]): void;
   setFirePoints(points: FirePoint[]): void;
   setAuroraPoints(points: AuroraPoint[]): void;
+  zoom(direction: 'in' | 'out'): void;
   resize(): void;
   dispose(): void;
 }
@@ -380,6 +381,11 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       });
       auroraPoints = new THREE.Points(geometry, material);
       scene.add(auroraPoints);
+    },
+    zoom(direction) {
+      // Match the keyboard zoom: a button press is user input, so stop the spin.
+      stopAutoRotate();
+      zoomBy(controls, camera, direction);
     },
     resize() {
       applySize();

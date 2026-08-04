@@ -4,6 +4,7 @@ import { fetchAurora } from '../../api/swpc';
 import { geodeticToSceneVector } from '../../astro/coords';
 import { createEarthScene, EARTH_RADIUS_UNITS, type AuroraPoint, type EarthSceneHandle } from '../../render/earthScene';
 import type { AuroraSample } from '../../api/types';
+import { ZoomButtons } from '../ZoomButtons';
 
 const CACHE_KEY = 'space-radar:aurora-globe';
 const TTL_MS = 5 * 60 * 1000;
@@ -81,6 +82,9 @@ export function AuroraGlobeCard() {
   return (
     <div className="globe-wrap">
       <canvas ref={canvasRef} className="globe-canvas" />
+      {!sceneError && (
+        <ZoomButtons onZoomIn={() => sceneRef.current?.zoom('in')} onZoomOut={() => sceneRef.current?.zoom('out')} />
+      )}
       {sceneError && <p className="card-status card-status-error globe-overlay">{sceneError}</p>}
       {!sceneError && loading && <p className="card-status globe-overlay">Loading…</p>}
       {!sceneError && error && <p className="card-status card-status-error globe-overlay">{error}</p>}

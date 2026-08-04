@@ -15,6 +15,12 @@ function dolly(controls: OrbitControls, camera: PerspectiveCamera, factor: numbe
   controls.update();
 }
 
+// One zoom step in/out — shared by the keyboard handler and the on-screen
+// +/- buttons so both take the same ~15% step and honour the distance clamps.
+export function zoomBy(controls: OrbitControls, camera: PerspectiveCamera, direction: 'in' | 'out'): void {
+  dolly(controls, camera, direction === 'in' ? ZOOM_STEP : 1 / ZOOM_STEP);
+}
+
 // Keyboard +/- zoom for a 3D card. The canvas is made focusable so the keys
 // only affect the card the user has clicked into, rather than every globe on
 // the page at once. `onInteract` lets the caller treat a keyboard zoom as user
@@ -29,16 +35,16 @@ export function attachKeyboardZoom(
   canvas.style.outline = 'none';
 
   function onKeyDown(event: KeyboardEvent) {
-    let factor: number;
+    let direction: 'in' | 'out';
     if (event.key === '+' || event.key === '=') {
-      factor = ZOOM_STEP;
+      direction = 'in';
     } else if (event.key === '-' || event.key === '_') {
-      factor = 1 / ZOOM_STEP;
+      direction = 'out';
     } else {
       return;
     }
     event.preventDefault();
-    dolly(controls, camera, factor);
+    zoomBy(controls, camera, direction);
     onInteract?.();
   }
 

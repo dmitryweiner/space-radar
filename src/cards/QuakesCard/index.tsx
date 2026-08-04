@@ -6,6 +6,7 @@ import { createEarthScene, EARTH_RADIUS_UNITS, type EarthSceneHandle, type Globe
 import type { Quake } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
 import { listSetting, numberSetting } from '../../layout/layoutState';
+import { ZoomButtons } from '../ZoomButtons';
 
 const TTL_MS = 5 * 60 * 1000;
 const POLL_MS = 5 * 60 * 1000;
@@ -124,6 +125,9 @@ export function QuakesCard({ settings = {} }: CardComponentProps) {
   return (
     <div className="globe-wrap">
       <canvas ref={canvasRef} className="globe-canvas" />
+      {!sceneError && (
+        <ZoomButtons onZoomIn={() => sceneRef.current?.zoom('in')} onZoomOut={() => sceneRef.current?.zoom('out')} />
+      )}
       {sceneError && <p className="card-status card-status-error globe-overlay">{sceneError}</p>}
       {!sceneError && loading && <p className="card-status globe-overlay">Loading…</p>}
       {!sceneError && error && <p className="card-status card-status-error globe-overlay">{error}</p>}

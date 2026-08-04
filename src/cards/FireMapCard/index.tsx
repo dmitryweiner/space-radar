@@ -6,6 +6,7 @@ import { createEarthScene, EARTH_RADIUS_UNITS, type EarthSceneHandle, type FireP
 import type { FirePoint } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
 import { numberSetting } from '../../layout/layoutState';
+import { ZoomButtons } from '../ZoomButtons';
 
 const CACHE_KEY = 'space-radar:fire-points';
 // FIRMS updates a few times a day and the world CSV is large — poll slowly.
@@ -117,6 +118,9 @@ export function FireMapCard({ settings = {} }: CardComponentProps) {
   return (
     <div className="globe-wrap">
       <canvas ref={canvasRef} className="globe-canvas" />
+      {!sceneError && (
+        <ZoomButtons onZoomIn={() => sceneRef.current?.zoom('in')} onZoomOut={() => sceneRef.current?.zoom('out')} />
+      )}
       {sceneError && <p className="card-status card-status-error globe-overlay">{sceneError}</p>}
       {!sceneError && loading && <p className="card-status globe-overlay">Loading…</p>}
       {!sceneError && error && <p className="card-status card-status-error globe-overlay">{error}</p>}

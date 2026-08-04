@@ -69,7 +69,11 @@ npm run build       # production build → ./docs (GitHub Pages)
 - **All six 3D scenes share `orbitControlsExtras.attachKeyboardZoom`** — it
   makes the canvas focusable (`tabIndex`) and binds `+`/`-` to dolly the camera
   along its view direction (clamped to the controls' min/max distance), so the
-  keys only affect the card the user has clicked into. The five
+  keys only affect the card the user has clicked into. The same dolly step is
+  exposed as `zoomBy(controls, camera, 'in'|'out')`; each scene handle wraps it
+  as a `zoom(direction)` method, and every 3D card renders a shared
+  `<ZoomButtons>` overlay (top-right of the canvas) that calls it — so zoom is
+  available by keyboard, mouse wheel, and on-screen `+`/`-` buttons. The five
   `createEarthScene` globes additionally auto-rotate (`controls.autoRotate`,
   `AUTO_ROTATE_SPEED`); OrbitControls' `start` event and any keyboard zoom stop
   the spin the moment the user takes over. The solar-system scene gets keyboard
