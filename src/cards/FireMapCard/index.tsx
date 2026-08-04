@@ -47,8 +47,7 @@ function intensity(point: FirePoint): number {
 }
 
 // Label text drawn beside the strongest fire points. acquiredAt is
-// "YYYY-MM-DD HHMM" (UTC); pretty-print the HHMM time and append brightness +
-// confidence when present.
+// "YYYY-MM-DD HHMM" (UTC); pretty-print the HHMM time and append brightness.
 function fireInfo(point: FirePoint): string {
   const [date, rawTime] = point.acquiredAt.split(' ');
   const digits = (rawTime ?? '').padStart(4, '0');
@@ -56,9 +55,6 @@ function fireInfo(point: FirePoint): string {
   const parts = [when];
   if (Number.isFinite(point.brightnessKelvin) && point.brightnessKelvin > 0) {
     parts.push(`${Math.round(point.brightnessKelvin)} K`);
-  }
-  if (point.confidence !== null) {
-    parts.push(`${Math.round(point.confidence * 100)}% conf`);
   }
   return parts.join(' · ');
 }
