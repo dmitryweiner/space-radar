@@ -66,18 +66,22 @@ npm run build       # production build → ./docs (GitHub Pages)
   card with the `numberSetting(values, id, fallback)` /
   `listSetting(values, id, fallback)` helpers from `layoutState.ts` — never
   index `settings[id]` directly, since the value type is `number | string[]`.
-- **All six 3D scenes share `orbitControlsExtras.attachKeyboardZoom`** — it
-  makes the canvas focusable (`tabIndex`) and binds `+`/`-` to dolly the camera
-  along its view direction (clamped to the controls' min/max distance), so the
-  keys only affect the card the user has clicked into. The same dolly step is
-  exposed as `zoomBy(controls, camera, 'in'|'out')`; each scene handle wraps it
-  as a `zoom(direction)` method, and every 3D card renders a shared
-  `<ZoomButtons>` overlay (top-right of the canvas) that calls it — so zoom is
-  available by keyboard, mouse wheel, and on-screen `+`/`-` buttons. The five
-  `createEarthScene` globes additionally auto-rotate (`controls.autoRotate`,
-  `AUTO_ROTATE_SPEED`); OrbitControls' `start` event and any keyboard zoom stop
-  the spin the moment the user takes over. The solar-system scene gets keyboard
-  zoom but no auto-rotate.
+- **All six 3D scenes share `orbitControlsExtras.attachKeyboardZoom`** — it binds
+  `+`/`-` (and `=`/`_`) to dolly the camera along its view direction (clamped to
+  the controls' min/max distance). **The keys are routed by *hover*, not DOM
+  focus: a `window` keydown listener acts on whichever canvas the pointer is over
+  (tracked via `pointerenter`/`pointerleave` in a module-level
+  `hoveredCanvases` set).** This is deliberate — a focus-only scheme is a bug:
+  focus can only be gained by clicking, and clicking a globe also stops its
+  auto-rotation, so the keys would never fire *while the globe is still spinning*.
+  A click-focused canvas is a fallback target only when the pointer is over no
+  globe, so two cards never zoom at once. (Zoom is keyboard + mouse-wheel only; an
+  on-screen-button version was tried and removed.) The five `createEarthScene`
+  globes additionally auto-rotate (`controls.autoRotate`, `AUTO_ROTATE_SPEED`);
+  OrbitControls' `start` event and any keyboard zoom stop the spin the moment the
+  user takes over. The solar-system scene gets keyboard zoom but no auto-rotate.
+  `scripts/smoke.mjs` guards this: it *hovers* (does not click) the solar-system
+  canvas, presses `=`, and checks the rendered view changed.
 - **Five of the cards (`iss-globe`, `natural-events`, `fire-map`, `quakes`,
   `aurora-globe`) share `createEarthScene`.** The globe exposes `setSatellites`
   (named markers with labels), `setMarkers` (generic id/colour/label markers),

@@ -5,7 +5,7 @@ import type { MoonPosition } from '../astro/moonPositions';
 import { heliocentricToSceneVector } from '../astro/coords';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
-import { attachKeyboardZoom, zoomBy } from './orbitControlsExtras';
+import { attachKeyboardZoom } from './orbitControlsExtras';
 
 const UNITS_PER_AU = 6;
 
@@ -83,7 +83,6 @@ export interface SolarSystemSceneHandle {
   setPlanetPositions(positions: PlanetPosition[]): void;
   setOrbitPaths(paths: OrbitPath[]): void;
   setMoons(moons: MoonPosition[]): void;
-  zoom(direction: 'in' | 'out'): void;
   resize(): void;
   dispose(): void;
 }
@@ -276,9 +275,6 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
 
         moonObjects.push({ mesh, ring, label });
       }
-    },
-    zoom(direction) {
-      zoomBy(controls, camera, direction);
     },
     resize() {
       applySize();

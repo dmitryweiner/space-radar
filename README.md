@@ -15,8 +15,8 @@ time you open it.
   labelled by name with a fading orbit trail, propagated client-side via SGP4
   (`satellite.js`).
 - **Solar System** — 3D view of the Sun, the eight planets, and the large moons
-  (Earth's Moon and Jupiter's four Galilean moons), positions computed
-  client-side (no network) via `astronomy-engine`.
+  (Earth's Moon and Jupiter's four Galilean moons) sized by their real relative
+  diameters, positions computed client-side (no network) via `astronomy-engine`.
 - **Geomagnetic Activity (Kp-index)** — bar chart of recent planetary Kp
   readings from NOAA SWPC with a time axis, colour-coded by storm severity.
 - **Solar Wind** — speed and density mini-charts (with a time axis) from NOAA's
@@ -30,7 +30,8 @@ time you open it.
 - **Upcoming Launches** — the next orbital launches from Launch Library 2.
 - **Astronomy Picture of the Day** — NASA APOD image with its caption.
 - **Active Fires** — VIIRS/MODIS fire detections from NASA FIRMS as a point
-  cloud on a 3D globe (needs a free FIRMS MAP_KEY — see below).
+  cloud on a 3D globe, with the strongest fires labelled (time + brightness);
+  needs a free FIRMS MAP_KEY — see below.
 - **Earth from L1 (EPIC)** — a day's worth of full-disk Earth photos from the
   DSCOVR/EPIC camera at the L1 point, with a play/scrub slider so you can watch
   the planet rotate.
@@ -48,6 +49,9 @@ time you open it.
   glowing point cloud on a 3D globe.
 - **NASA Image Library** — a browsable pick of images from the NASA image
   archive across selectable topics (nebulae, galaxies, Apollo, planets, …).
+- The 3D cards (globes and the Solar System) can be **rotated by dragging** and
+  **zoomed** with the mouse wheel or the `+`/`-` keys (the keys zoom whichever
+  card the pointer is hovering, even while a globe is still spinning).
 - Every card can be shown or hidden from the **Cards** menu, dragged/resized on
   the grid, opened full-screen, or tuned via its **⚙ settings** popup (size in
   rows/columns plus card-specific options). Layout and settings are saved to

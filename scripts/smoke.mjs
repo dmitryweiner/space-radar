@@ -166,6 +166,24 @@ for (const id of CANVAS_CARDS) {
 }
 console.log('3D canvases present');
 
+// keyboard +/- zoom must work on hover alone — no click needed — so it also
+// works while a globe is still auto-rotating (clicking would stop the spin).
+// Only hover (not click) here; solar-system has no auto-rotate, so any change
+// between the before/after canvas capture is the zoom itself.
+ctxLabel = 'keyboard-zoom';
+{
+  const zoomCanvas = page.locator('[data-card-id="solar-system"] canvas');
+  await zoomCanvas.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  const before = await zoomCanvas.screenshot();
+  await zoomCanvas.hover();
+  for (let i = 0; i < 6; i++) await page.keyboard.press('=');
+  await page.waitForTimeout(300);
+  const after = await zoomCanvas.screenshot();
+  if (before.equals(after)) errors.push('[keyboard-zoom] hover + "+" did not change the solar-system view');
+}
+console.log('keyboard zoom ok');
+
 // let API-backed cards settle (data or a graceful error, no thrown errors)
 await page.waitForTimeout(3000);
 

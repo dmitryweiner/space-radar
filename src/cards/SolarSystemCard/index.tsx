@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { computePlanetOrbitPath, computePlanetPositions } from '../../astro/planetPositions';
 import { computeMoonPositions } from '../../astro/moonPositions';
 import { createSolarSystemScene, type SolarSystemSceneHandle } from '../../render/solarSystemScene';
-import { ZoomButtons } from '../ZoomButtons';
 
 const POSITION_UPDATE_MS = 60_000;
 
@@ -49,9 +48,6 @@ export function SolarSystemCard() {
   return (
     <div className="solar-system-wrap">
       <canvas ref={canvasRef} className="solar-system-canvas" />
-      {!sceneError && (
-        <ZoomButtons onZoomIn={() => sceneRef.current?.zoom('in')} onZoomOut={() => sceneRef.current?.zoom('out')} />
-      )}
       {sceneError && <p className="card-status card-status-error globe-overlay">{sceneError}</p>}
     </div>
   );

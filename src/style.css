@@ -773,36 +773,6 @@ body {
   border-radius: 6px;
 }
 
-.zoom-buttons {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.zoom-btn {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(13, 18, 32, 0.82);
-  color: var(--text);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  user-select: none;
-}
-
-.zoom-btn:hover {
-  background: #232f56;
-  border-color: var(--accent);
-}
-
 .globe-legend {
   position: absolute;
   bottom: 8px;
