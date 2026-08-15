@@ -11,9 +11,14 @@ Existing helpers:
 - `scripts/smoke.mjs` — headless Chromium: default card visibility, toggling
   every card via the Cards menu, canvases mounting for the six WebGL cards
   (`iss-globe`, `solar-system`, `natural-events`, `fire-map`, `quakes`,
-  `aurora-globe`), drag-to-reposition, resize, `localStorage` persistence across reload, and
-  layout reset. `--screenshot <path>`, `--preview` (prod build on :4173).
-  Any console/page error → exit code 2.
+  `aurora-globe`), drag-to-reposition, resize, `localStorage` persistence
+  across reload, layout reset, keyboard/wheel zoom, auto-rotate
+  stop-only-on-move (see the OrbitControls `state` note below), the general
+  settings popup (label scale / auto-rotate speed / card density, live-update
+  + persistence), a per-card `earthStyle` select, full-screen, and the mobile
+  single-column layout (stacking + drag-to-reorder + persistence, on a
+  separate narrow-viewport page). `--screenshot <path>`, `--preview` (prod
+  build on :4173). Any console/page error → exit code 2.
 - `scripts/snap.mjs` — single debug screenshot. Flags: `--out <path>`
   (required), `--show <cardId>` / `--hide <cardId>` / `--click <selector>`
   (repeatable), `--width`, `--height`, `--wait <ms>`, `--preview`.
@@ -61,6 +66,19 @@ npm run build       # production build → ./docs (GitHub Pages)
   the corner) referenced from `index.html`. Reference it with a **relative**
   `./favicon.svg` (not `/…`) so it resolves under the GitHub Pages sub-path
   (`vite.config.ts` sets `base: './'`).
+- **This Vite version (8.x) bundles with Rolldown, not Rollup** — its
+  chunking/output config lives under `build.rolldownOptions` (`rollupOptions`
+  still works but is deprecated; the `manualChunks(id, meta)` function
+  signature is unchanged from Rollup's). `vite.config.ts` uses it to put every
+  `node_modules` import in its own `vendor` chunk, separate from app code —
+  three.js + satellite.js + astronomy-engine + react/react-dom/
+  react-grid-layout are the bulk of the bundle and essentially never change
+  between deploys, so splitting them out keeps that chunk's hash (and browser
+  cache) stable across app-only releases; it doesn't shrink the first-visit
+  download. `chunkSizeWarningLimit: 1000` silences Vite's "chunk >500kB"
+  warning, which the vendor chunk (~900kB min, ~250kB gzip) will always trip —
+  that's an inherent cost of a client-side 3D dashboard, not something worth
+  chasing down further.
 - `src/render/` is the only place that touches Three.js. It can't be unit
   tested (`jsdom` has no WebGL) — verified via `scripts/smoke.mjs` instead
   (canvas mounts, no console errors). Both scene modules self-manage sizing

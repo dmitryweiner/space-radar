@@ -50,12 +50,22 @@ time you open it.
 - **NASA Image Library** — a browsable pick of images from the NASA image
   archive across selectable topics (nebulae, galaxies, Apollo, planets, …).
 - The 3D cards (globes and the Solar System) can be **rotated by dragging** and
-  **zoomed** with the mouse wheel or the `+`/`-` keys (the keys zoom whichever
-  card the pointer is hovering, even while a globe is still spinning).
+  **zoomed** with the mouse wheel, trackpad pinch, or the `+`/`-` keys (the
+  keys zoom whichever card the pointer is hovering, even while a globe is
+  still spinning). The five Earth-globe cards idle-spin until you drag them —
+  zooming never stops that spin, only dragging does — and each has its own
+  **Earth style** setting (⚙ per-card settings) to switch between the
+  photographic globe (day/night shading) and a flat political map with no
+  shadow, for spotting markers on what would otherwise be the dark side.
+- A **Settings** button in the header opens general settings shared by every
+  globe card: label/marker size, auto-rotate speed (0 to turn it off), and a
+  comfortable/compact card-density preset for the whole grid.
 - Every card can be shown or hidden from the **Cards** menu, dragged/resized on
   the grid, opened full-screen, or tuned via its **⚙ settings** popup (size in
   rows/columns plus card-specific options). Layout and settings are saved to
-  `localStorage` and restored on reload; **Reset layout** returns the defaults.
+  `localStorage` and restored on reload; **Reset layout** returns the
+  defaults. On narrow screens, cards stack in a single column and stay
+  draggable for reordering.
 
 ## Development
 
@@ -85,7 +95,7 @@ src/render/    thin Three.js layer: Earth globe + solar-system scenes, plus
                starfield / label-sprite / orbit-trail helpers
 src/hooks/     useApiResource — generic polling + localStorage TTL cache
 src/layout/    card registry, grid/visibility/settings state, react-grid-layout
-               wiring, per-card settings popup
+               wiring, per-card and general settings popups
 src/cards/     one React component per card
 ```
 
