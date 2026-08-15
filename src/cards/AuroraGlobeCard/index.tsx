@@ -31,7 +31,7 @@ function isAuroraSamples(value: unknown): value is AuroraSample[] {
   );
 }
 
-export function AuroraGlobeCard({ settings = {}, labelScale = 1 }: CardComponentProps) {
+export function AuroraGlobeCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: CardComponentProps) {
   const earthStyle = stringSetting(settings, 'earthStyle', 'globe');
   const { data, loading, error } = useApiResource<AuroraSample[]>({
     key: CACHE_KEY,
@@ -70,6 +70,10 @@ export function AuroraGlobeCard({ settings = {}, labelScale = 1 }: CardComponent
   useEffect(() => {
     sceneRef.current?.setEarthStyle(earthStyle);
   }, [earthStyle]);
+
+  useEffect(() => {
+    sceneRef.current?.setAutoRotateSpeed(rotateSpeed);
+  }, [rotateSpeed]);
 
   const points = useMemo<AuroraPoint[]>(
     () =>

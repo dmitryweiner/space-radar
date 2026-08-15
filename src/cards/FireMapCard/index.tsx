@@ -59,7 +59,7 @@ function fireInfo(point: FirePoint): string {
   return parts.join(' · ');
 }
 
-export function FireMapCard({ settings = {}, labelScale = 1 }: CardComponentProps) {
+export function FireMapCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: CardComponentProps) {
   const dayRange = numberSetting(settings, 'dayRange', DEFAULT_DAY_RANGE);
   const labelCount = numberSetting(settings, 'labelCount', DEFAULT_LABEL_COUNT);
   const earthStyle = stringSetting(settings, 'earthStyle', 'globe');
@@ -100,6 +100,10 @@ export function FireMapCard({ settings = {}, labelScale = 1 }: CardComponentProp
   useEffect(() => {
     sceneRef.current?.setEarthStyle(earthStyle);
   }, [earthStyle]);
+
+  useEffect(() => {
+    sceneRef.current?.setAutoRotateSpeed(rotateSpeed);
+  }, [rotateSpeed]);
 
   const scenePoints = useMemo<SceneFirePoint[]>(() => {
     const points = data ?? [];

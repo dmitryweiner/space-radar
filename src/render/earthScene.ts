@@ -89,6 +89,9 @@ export interface EarthSceneHandle {
    * no shadow hiding markers on the dark side. Any other string falls back to
    * 'globe'. */
   setEarthStyle(style: string): void;
+  /** Multiplies the idle auto-rotate speed (see the global "Auto-rotate
+   * speed" setting). 1 = AUTO_ROTATE_SPEED below; 0 stops the spin. */
+  setAutoRotateSpeed(multiplier: number): void;
   resize(): void;
   dispose(): void;
 }
@@ -127,18 +130,26 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   controls.maxDistance = 20;
 
   // Gently auto-rotate until the user actually moves the globe (drag-rotate
-  // or drag-pan); zooming (wheel, keyboard +/-, or a middle-drag dolly)
-  // leaves it spinning. OrbitControls fires 'start' on any pointer
-  // interaction and sets `state` to the specific gesture just before
-  // dispatching it — DOLLY (1) is the only one that's zoom-only. Two-finger
-  // touch gestures always mix a pinch with pan/rotate, so those still count
-  // as a move. `state`'s enum isn't exported by the OrbitControls module, so
-  // the value is hardcoded here with this comment as the source of truth.
+  // or drag-pan); zooming (wheel, trackpad pinch, keyboard +/-, or a
+  // middle-drag dolly) leaves it spinning. OrbitControls fires 'start' on any
+  // pointer interaction, but only *sets* its internal `state` for gestures
+  // that need to track motion across multiple events — a mouse-wheel/pinch
+  // zoom is a one-shot action handled inline in the wheel handler, which
+  // never touches `state`, so it fires 'start' with `state` left at NONE
+  // (-1); a middle-mouse-button-drag dolly *is* a multi-event drag, so it
+  // does get its own state, DOLLY (1). Both are zoom-only and must be
+  // excluded, or trackpad pinch-zoom (delivered as wheel events) stops the
+  // spin exactly like a real drag would. Two-finger touch gestures always mix
+  // a pinch with pan/rotate, so those still count as a move. `state`'s enum
+  // isn't exported by the OrbitControls module, so the values are hardcoded
+  // here with this comment as the source of truth.
+  const ORBIT_CONTROLS_NONE_STATE = -1;
   const ORBIT_CONTROLS_DOLLY_STATE = 1;
   controls.autoRotate = true;
   controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
   const stopAutoRotateOnMove = () => {
-    if (currentControlsState(controls) !== ORBIT_CONTROLS_DOLLY_STATE) {
+    const state = currentControlsState(controls);
+    if (state !== ORBIT_CONTROLS_NONE_STATE && state !== ORBIT_CONTROLS_DOLLY_STATE) {
       controls.autoRotate = false;
     }
   };
@@ -441,6 +452,9 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     },
     setEarthStyle(style) {
       earth.material = style === 'map' ? mapMaterial : globeMaterial;
+    },
+    setAutoRotateSpeed(multiplier) {
+      controls.autoRotateSpeed = AUTO_ROTATE_SPEED * multiplier;
     },
     resize() {
       applySize();

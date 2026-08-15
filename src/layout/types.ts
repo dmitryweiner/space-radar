@@ -56,6 +56,10 @@ export interface CardComponentProps {
   /** Global label/marker scale for the Earth-globe cards, set in the header's
    * general settings popup (defaults to 1 when absent). */
   labelScale?: number;
+  /** Global auto-rotate speed multiplier for the Earth-globe cards, set in
+   * the header's general settings popup (defaults to 1 when absent; 0 stops
+   * the spin). */
+  rotateSpeed?: number;
 }
 
 export interface CardDefinition {

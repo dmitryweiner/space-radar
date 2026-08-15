@@ -65,7 +65,7 @@ function currentPositions(records: TleRecord[], nowMs: number): NamedPosition[] 
   return points;
 }
 
-export function IssGlobeCard({ settings = {}, labelScale = 1 }: CardComponentProps) {
+export function IssGlobeCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: CardComponentProps) {
   const categories = listSetting(settings, 'categories', DEFAULT_CATEGORIES);
   const maxSatellites = numberSetting(settings, 'maxSatellites', DEFAULT_MAX_SATELLITES);
   const earthStyle = stringSetting(settings, 'earthStyle', 'globe');
@@ -101,6 +101,10 @@ export function IssGlobeCard({ settings = {}, labelScale = 1 }: CardComponentPro
   useEffect(() => {
     sceneRef.current?.setEarthStyle(earthStyle);
   }, [earthStyle]);
+
+  useEffect(() => {
+    sceneRef.current?.setAutoRotateSpeed(rotateSpeed);
+  }, [rotateSpeed]);
 
   const iss = data ? findIss(data) : null;
   const otherSatellites = useMemo(() => {

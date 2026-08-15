@@ -13,6 +13,24 @@ export default defineConfig({
   build: {
     outDir: 'docs',
     emptyOutDir: true,
+    // The vendor chunk below (three.js + satellite.js + astronomy-engine +
+    // react/react-dom/react-grid-layout) is inherently >500kB for a
+    // client-side 3D dashboard — raise the warning threshold instead of
+    // chasing an unrealistic budget.
+    chunkSizeWarningLimit: 1000,
+    rolldownOptions: {
+      output: {
+        // Split vendor deps into their own chunk, separate from app code.
+        // Doesn't shrink the first-visit download, but the vendor chunk's
+        // hash stays stable across app-only releases, so repeat visitors
+        // don't re-download three.js et al. on every deploy.
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        },
+      },
+    },
   },
   test: {
     globals: true,

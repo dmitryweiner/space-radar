@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { GLOBAL_SETTINGS_STORAGE_KEY, defaultGlobalSettings, sanitizeGlobalSettings } from './globalSettings';
-import type { GlobalSettings } from './globalSettings';
+import type { CardDensity, GlobalSettings } from './globalSettings';
 
 function loadInitialSettings(storageKey: string): GlobalSettings {
   const raw = window.localStorage.getItem(storageKey);
@@ -25,5 +25,13 @@ export function useGlobalSettings(storageKey: string = GLOBAL_SETTINGS_STORAGE_K
     setSettings((prev) => ({ ...prev, labelScale }));
   }, []);
 
-  return { settings, updateLabelScale };
+  const updateRotateSpeed = useCallback((rotateSpeed: number) => {
+    setSettings((prev) => ({ ...prev, rotateSpeed }));
+  }, []);
+
+  const updateDensity = useCallback((density: CardDensity) => {
+    setSettings((prev) => ({ ...prev, density }));
+  }, []);
+
+  return { settings, updateLabelScale, updateRotateSpeed, updateDensity };
 }

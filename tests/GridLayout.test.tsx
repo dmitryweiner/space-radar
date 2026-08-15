@@ -29,6 +29,8 @@ describe('GridLayout', () => {
         cardSettings={{}}
         mobileOrder={['a']}
         labelScale={1}
+        rotateSpeed={1}
+        rowHeight={160}
         onLayoutChange={() => {}}
         onMobileOrderChange={() => {}}
         onHide={() => {}}
@@ -51,6 +53,8 @@ describe('GridLayout', () => {
         cardSettings={{}}
         mobileOrder={['a', 'b']}
         labelScale={1}
+        rotateSpeed={1}
+        rowHeight={160}
         onLayoutChange={() => {}}
         onMobileOrderChange={() => {}}
         onHide={() => {}}
@@ -72,6 +76,8 @@ describe('GridLayout', () => {
         cardSettings={{}}
         mobileOrder={['a', 'b']}
         labelScale={1}
+        rotateSpeed={1}
+        rowHeight={160}
         onLayoutChange={() => {}}
         onMobileOrderChange={() => {}}
         onHide={() => {}}

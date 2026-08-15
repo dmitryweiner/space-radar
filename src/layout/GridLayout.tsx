@@ -13,6 +13,8 @@ interface GridLayoutProps {
   cardSettings: Record<string, CardSettingValues>;
   mobileOrder: string[];
   labelScale: number;
+  rotateSpeed: number;
+  rowHeight: number;
   onLayoutChange: (rects: Record<string, CardLayoutRect>) => void;
   onMobileOrderChange: (order: string[]) => void;
   onHide: (id: string) => void;
@@ -25,7 +27,6 @@ export const GRID_COLS = 4;
 // Below this container width, cards stack in a single, still-draggable
 // column instead of the 4-col grid — matches the #cardMenu CSS breakpoint.
 export const MOBILE_BREAKPOINT_PX = 700;
-const ROW_HEIGHT = 160;
 
 function toRglLayout(registry: CardDefinition[], visibleIds: string[], layout: Record<string, CardLayoutRect>): Layout {
   const byId = new Map(registry.map((card) => [card.id, card]));
@@ -106,6 +107,8 @@ export function GridLayout({
   cardSettings,
   mobileOrder,
   labelScale,
+  rotateSpeed,
+  rowHeight,
   onLayoutChange,
   onMobileOrderChange,
   onHide,
@@ -148,7 +151,7 @@ export function GridLayout({
         <ReactGridLayout
           layout={rglLayout}
           width={width}
-          gridConfig={{ cols, rowHeight: ROW_HEIGHT, margin: [12, 12] }}
+          gridConfig={{ cols, rowHeight, margin: [12, 12] }}
           // The header action buttons live inside the drag handle; `cancel`
           // keeps a tap on them from starting a drag, which on touch devices
           // otherwise swallowed the tap so the buttons never fired.
@@ -176,7 +179,11 @@ export function GridLayout({
                     {isFullscreen ? (
                       <p className="card-status">Shown full screen.</p>
                     ) : (
-                      <CardComponent settings={cardSettingsWithDefaults(card, cardSettings[id])} labelScale={labelScale} />
+                      <CardComponent
+                        settings={cardSettingsWithDefaults(card, cardSettings[id])}
+                        labelScale={labelScale}
+                        rotateSpeed={rotateSpeed}
+                      />
                     )}
                   </CardShell>
                 </div>

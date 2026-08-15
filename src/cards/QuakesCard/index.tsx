@@ -53,7 +53,7 @@ function isQuakes(value: unknown): value is Quake[] {
   );
 }
 
-export function QuakesCard({ settings = {}, labelScale = 1 }: CardComponentProps) {
+export function QuakesCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: CardComponentProps) {
   const feeds = listSetting(settings, 'feeds', DEFAULT_FEEDS);
   const maxQuakes = numberSetting(settings, 'maxQuakes', DEFAULT_MAX_QUAKES);
   const earthStyle = stringSetting(settings, 'earthStyle', 'globe');
@@ -97,6 +97,10 @@ export function QuakesCard({ settings = {}, labelScale = 1 }: CardComponentProps
   useEffect(() => {
     sceneRef.current?.setEarthStyle(earthStyle);
   }, [earthStyle]);
+
+  useEffect(() => {
+    sceneRef.current?.setAutoRotateSpeed(rotateSpeed);
+  }, [rotateSpeed]);
 
   // Strongest quakes first so the cap keeps the most significant events.
   const quakes = useMemo(

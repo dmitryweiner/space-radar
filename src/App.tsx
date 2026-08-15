@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { cardRegistry } from './layout/cardRegistry';
 import { useLayoutState } from './layout/useLayoutState';
 import { useGlobalSettings } from './layout/useGlobalSettings';
+import { DENSITY_ROW_HEIGHT } from './layout/globalSettings';
 import { GridLayout } from './layout/GridLayout';
 import { CardVisibilityMenu } from './layout/CardVisibilityMenu';
 import { CardSettingsPopup } from './layout/CardSettingsPopup';
@@ -21,7 +22,7 @@ export function App() {
     updateCardSettings,
     updateMobileOrder,
   } = useLayoutState(cardRegistry);
-  const { settings: globalSettings, updateLabelScale } = useGlobalSettings();
+  const { settings: globalSettings, updateLabelScale, updateRotateSpeed, updateDensity } = useGlobalSettings();
   const [menuOpen, setMenuOpen] = useState(false);
   const [fullscreenId, setFullscreenId] = useState<string | null>(null);
   const [settingsCardId, setSettingsCardId] = useState<string | null>(null);
@@ -107,6 +108,8 @@ export function App() {
             cardSettings={cardSettings}
             mobileOrder={mobileOrder}
             labelScale={globalSettings.labelScale}
+            rotateSpeed={globalSettings.rotateSpeed}
+            rowHeight={DENSITY_ROW_HEIGHT[globalSettings.density]}
             onLayoutChange={updateLayout}
             onMobileOrderChange={updateMobileOrder}
             onHide={toggleVisible}
@@ -131,6 +134,7 @@ export function App() {
             <FullscreenCardComponent
               settings={cardSettingsWithDefaults(fullscreenCard, cardSettings[fullscreenCard.id])}
               labelScale={globalSettings.labelScale}
+              rotateSpeed={globalSettings.rotateSpeed}
             />
           </CardShell>
         </div>
@@ -149,6 +153,8 @@ export function App() {
         <GlobalSettingsPopup
           settings={globalSettings}
           onChangeLabelScale={updateLabelScale}
+          onChangeRotateSpeed={updateRotateSpeed}
+          onChangeDensity={updateDensity}
           onClose={() => setGeneralSettingsOpen(false)}
         />
       )}

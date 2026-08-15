@@ -356,33 +356,61 @@ if (visibleAfterReset.length !== DEFAULT_VISIBLE.length || DEFAULT_VISIBLE.some(
   console.log('reset ok:', visibleAfterReset);
 }
 
-// general settings popup: opens, edits the label-scale coefficient, and the
-// value survives a reload via its own localStorage key.
+// general settings popup: opens, edits the label-scale/rotate-speed/density
+// settings, and the values survive a reload via their own localStorage key.
 ctxLabel = 'global-settings';
 {
+  const heightBefore = await page.locator('[data-card-id="iss-globe"]').boundingBox();
+
   await page.locator('#generalSettingsBtn').click();
   await page.waitForTimeout(150);
   const popup = page.getByTestId('global-settings-popup');
   if ((await popup.count()) !== 1) {
     errors.push('[global-settings] popup did not open');
   } else {
-    const input = popup.locator('#global-setting-label-scale');
-    await input.fill('1.6');
-    await input.blur();
+    await popup.locator('#global-setting-label-scale').fill('1.6');
+    await popup.locator('#global-setting-label-scale').blur();
+    await popup.locator('#global-setting-rotate-speed').fill('0');
+    await popup.locator('#global-setting-rotate-speed').blur();
+    await popup.locator('#global-setting-density-compact').check();
     await page.waitForTimeout(150);
     // The backdrop covers the whole viewport (including the header button
     // underneath) — close via its own "Close settings" button instead.
     await page.getByRole('button', { name: 'Close settings' }).click();
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(300);
+
+    // rotate speed 0 should actually stop the idle spin (not just clamp to a
+    // very slow speed) — reuse the pixel-diff approach from 'auto-rotate'.
+    const globeCanvas = page.locator('[data-card-id="iss-globe"] canvas');
+    const before = await globeCanvas.screenshot();
+    await page.waitForTimeout(600);
+    const after = await globeCanvas.screenshot();
+    const stoppedDiff = countDiffPixels(before, after);
+    if (stoppedDiff >= 500) errors.push(`[global-settings] rotate speed 0 did not stop the spin (diff=${stoppedDiff})`);
+    else console.log('global-settings: rotate speed 0 stops the spin ok, diff=', stoppedDiff);
+
+    // compact density should visibly shrink the card (shorter row height).
+    const heightAfter = await page.locator('[data-card-id="iss-globe"]').boundingBox();
+    if (!heightBefore || !heightAfter || heightAfter.height >= heightBefore.height) {
+      errors.push(
+        `[global-settings] compact density did not shrink card height: ${heightBefore?.height} -> ${heightAfter?.height}`,
+      );
+    } else {
+      console.log('global-settings: compact density shrinks cards ok:', heightBefore.height, '->', heightAfter.height);
+    }
 
     await page.reload();
     await page.waitForSelector('#app');
     await page.waitForTimeout(500);
     await page.locator('#generalSettingsBtn').click();
     await page.waitForTimeout(150);
-    const reopenedValue = await page.locator('#global-setting-label-scale').inputValue();
-    if (reopenedValue !== '1.6') {
-      errors.push(`[global-settings] label scale did not survive reload: got "${reopenedValue}"`);
+    const reopenedLabelScale = await page.locator('#global-setting-label-scale').inputValue();
+    const reopenedRotateSpeed = await page.locator('#global-setting-rotate-speed').inputValue();
+    const reopenedDensityCompact = await page.locator('#global-setting-density-compact').isChecked();
+    if (reopenedLabelScale !== '1.6' || reopenedRotateSpeed !== '0' || !reopenedDensityCompact) {
+      errors.push(
+        `[global-settings] settings did not survive reload: labelScale=${reopenedLabelScale} rotateSpeed=${reopenedRotateSpeed} densityCompact=${reopenedDensityCompact}`,
+      );
     } else {
       console.log('global-settings: opens, edits, persists ok');
     }

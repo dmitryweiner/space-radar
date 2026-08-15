@@ -80,18 +80,34 @@ npm run build       # production build → ./docs (GitHub Pages)
   float noise like `0.30000000000000004`) — needed once a fractional `step`
   (the 0.1 label-scale coefficient below) showed up; for the default `step: 1`
   it's identical to the old `Math.round(next)`.
-- **General settings** (header "Settings" button → `GlobalSettingsPopup`) hold
-  one value today: `labelScale`, a 0.5–2.5× multiplier on every label/marker's
-  on-screen pixel size across all five `createEarthScene` cards (`earthScene.ts`'s
-  `setLabelScale`, applied inside `rescaleLabel`/`scaleMarker` each frame, and
-  patched onto any already-created fire/aurora `PointsMaterial.size` since those
-  bake their size in once at creation). It's a single coefficient, not separate
-  desktop/mobile fields — `useGlobalSettings` persists it to its own
-  `space-radar:global-settings:v1` localStorage key, which is already
-  per-browser, so a phone and a desktop naturally end up with independent
-  values without any viewport-based branching. `App` passes `labelScale` down
-  through `GridLayout`'s `CardComponentProps` to every card (all cards get the
-  prop; only the five globe cards read it).
+- **General settings** (header "Settings" button → `GlobalSettingsPopup`,
+  state in `src/layout/globalSettings.ts` + `useGlobalSettings.ts`) hold three
+  values, all persisted to their own `space-radar:global-settings:v1`
+  localStorage key (which is already per-browser, so desktop and mobile
+  naturally end up with independent values with no viewport-based branching
+  needed) and sanitized *per-field* (`sanitizeGlobalSettings` falls back
+  field-by-field, not all-or-nothing — old storage saved before a new field
+  existed keeps its other values instead of resetting everything):
+  - `labelScale`: a 0.5–2.5× multiplier on every label/marker's on-screen
+    pixel size across all five `createEarthScene` cards (`earthScene.ts`'s
+    `setLabelScale`, applied inside `rescaleLabel`/`scaleMarker` each frame,
+    and patched onto any already-created fire/aurora `PointsMaterial.size`
+    since those bake their size in once at creation).
+  - `rotateSpeed`: a 0–3× multiplier on the same five cards' idle auto-rotate
+    speed (`setAutoRotateSpeed`, multiplies `AUTO_ROTATE_SPEED`). **0 doubles
+    as "off"** — no separate boolean toggle, since a zero speed is a zero
+    per-frame rotation delta regardless of the `autoRotate` flag.
+  - `density`: `'comfortable' | 'compact'`, mapped through
+    `DENSITY_ROW_HEIGHT` to `GridLayout`'s `rowHeight` prop (was a hardcoded
+    module constant; now threaded from `App` through `GridLayout` since it
+    has to be user-configurable). Affects every card, not just the globes.
+  `App` passes `labelScale`/`rotateSpeed` down through `GridLayout`'s
+  `CardComponentProps` to every card (all cards get the props; only the five
+  globe cards read them) and `rowHeight` directly into `GridLayout`'s
+  `gridConfig`. `SelectField` (`src/layout/SelectField.tsx`, extracted
+  alongside `NumberField` once `GlobalSettingsPopup` needed the same
+  radio-group UI `CardSettingsPopup` already had for per-card `select`
+  settings) renders the density choice.
 - **Per-card "Earth style" setting** (`earthStyle`, `'globe' | 'map'`, on
   `iss-globe`/`natural-events`/`fire-map`/`quakes`/`aurora-globe`) swaps
   `earthScene.ts`'s Earth mesh between the default photo texture lit by a
@@ -115,14 +131,24 @@ npm run build       # production build → ./docs (GitHub Pages)
   globe, so two cards never zoom at once. (Zoom is keyboard + mouse-wheel only; an
   on-screen-button version was tried and removed.) The five `createEarthScene`
   globes additionally auto-rotate (`controls.autoRotate`, `AUTO_ROTATE_SPEED`).
-  **Only a rotate/pan move stops the spin — zooming (wheel, keyboard `+`/`-`, or
-  a middle-drag dolly) leaves it spinning.** OrbitControls fires `start` on any
-  pointer interaction and sets its internal `state` to the specific gesture just
-  before dispatching it; `earthScene.ts`'s `stopAutoRotateOnMove` only clears
-  `autoRotate` when that state isn't `DOLLY` (hardcoded as `1` — the enum isn't
+  **Only a rotate/pan move stops the spin — zooming (wheel, trackpad pinch,
+  keyboard `+`/`-`, or a middle-drag dolly) leaves it spinning.** OrbitControls
+  fires `start` on any pointer interaction, but only *sets* its internal
+  `state` for gestures that need to track motion across multiple events — a
+  mouse-wheel/trackpad-pinch zoom is a one-shot action handled inline in the
+  wheel handler, which never touches `state`, so `start` fires with `state`
+  left at `NONE` (`-1`); a middle-mouse-drag dolly *is* a multi-event drag, so
+  it gets its own state, `DOLLY` (`1`). **Both must be excluded** —
+  `earthScene.ts`'s `stopAutoRotateOnMove` only clears `autoRotate` when
+  `state` is neither. (An earlier version excluded only `DOLLY`, on the wrong
+  assumption that wheel zoom also sets `state=DOLLY`; that let trackpad
+  pinch-zoom, which browsers deliver as wheel events, incorrectly stop the
+  spin — caught by manual testing, not the smoke suite, since the zoom's own
+  end-of-gesture damping produced just enough pixel movement to clear the
+  smoke check's "still spinning" threshold by coincidence.) The enum isn't
   part of OrbitControls' public type declarations, so `state` is read via an
-  `isRecord` structural check rather than an `as` cast, and the value is
-  hardcoded with a comment as the source of truth). Two-finger touch gestures
+  `isRecord` structural check rather than an `as` cast, and both values are
+  hardcoded with a comment as the source of truth. Two-finger touch gestures
   always mix a pinch with pan/rotate, so those still stop it. The solar-system
   scene gets keyboard zoom but no auto-rotate. `scripts/smoke.mjs` guards the
   zoom-hover-while-spinning case (hovers, does not click, the solar-system

@@ -1,13 +1,32 @@
-import { LABEL_SCALE_MAX, LABEL_SCALE_MIN, LABEL_SCALE_STEP, type GlobalSettings } from './globalSettings';
+import {
+  DENSITY_OPTIONS,
+  LABEL_SCALE_MAX,
+  LABEL_SCALE_MIN,
+  LABEL_SCALE_STEP,
+  ROTATE_SPEED_MAX,
+  ROTATE_SPEED_MIN,
+  ROTATE_SPEED_STEP,
+  type CardDensity,
+  type GlobalSettings,
+} from './globalSettings';
 import { NumberField } from './NumberField';
+import { SelectField } from './SelectField';
 
 interface GlobalSettingsPopupProps {
   settings: GlobalSettings;
   onChangeLabelScale: (value: number) => void;
+  onChangeRotateSpeed: (value: number) => void;
+  onChangeDensity: (value: CardDensity) => void;
   onClose: () => void;
 }
 
-export function GlobalSettingsPopup({ settings, onChangeLabelScale, onClose }: GlobalSettingsPopupProps) {
+export function GlobalSettingsPopup({
+  settings,
+  onChangeLabelScale,
+  onChangeRotateSpeed,
+  onChangeDensity,
+  onClose,
+}: GlobalSettingsPopupProps) {
   return (
     <div className="settings-backdrop" data-testid="global-settings-popup" onClick={onClose}>
       <div
@@ -30,6 +49,22 @@ export function GlobalSettingsPopup({ settings, onChangeLabelScale, onClose }: G
           max={LABEL_SCALE_MAX}
           step={LABEL_SCALE_STEP}
           onChange={onChangeLabelScale}
+        />
+        <NumberField
+          id="global-setting-rotate-speed"
+          label="Auto-rotate speed (0 = off)"
+          value={settings.rotateSpeed}
+          min={ROTATE_SPEED_MIN}
+          max={ROTATE_SPEED_MAX}
+          step={ROTATE_SPEED_STEP}
+          onChange={onChangeRotateSpeed}
+        />
+        <SelectField
+          idPrefix="global-setting-density"
+          label="Card density"
+          options={DENSITY_OPTIONS}
+          value={settings.density}
+          onChange={(value) => onChangeDensity(value === 'compact' ? 'compact' : 'comfortable')}
         />
       </div>
     </div>
