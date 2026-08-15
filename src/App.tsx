@@ -1,18 +1,31 @@
 import { useEffect, useState } from 'react';
 import { cardRegistry } from './layout/cardRegistry';
 import { useLayoutState } from './layout/useLayoutState';
+import { useGlobalSettings } from './layout/useGlobalSettings';
 import { GridLayout } from './layout/GridLayout';
 import { CardVisibilityMenu } from './layout/CardVisibilityMenu';
 import { CardSettingsPopup } from './layout/CardSettingsPopup';
+import { GlobalSettingsPopup } from './layout/GlobalSettingsPopup';
 import { cardSettingsWithDefaults } from './layout/layoutState';
 import { CardShell } from './cards/CardShell';
 
 export function App() {
-  const { visibleIds, layout, cardSettings, toggleVisible, updateLayout, resetLayout, updateCardSettings } =
-    useLayoutState(cardRegistry);
+  const {
+    visibleIds,
+    layout,
+    cardSettings,
+    mobileOrder,
+    toggleVisible,
+    updateLayout,
+    resetLayout,
+    updateCardSettings,
+    updateMobileOrder,
+  } = useLayoutState(cardRegistry);
+  const { settings: globalSettings, updateLabelScale } = useGlobalSettings();
   const [menuOpen, setMenuOpen] = useState(false);
   const [fullscreenId, setFullscreenId] = useState<string | null>(null);
   const [settingsCardId, setSettingsCardId] = useState<string | null>(null);
+  const [generalSettingsOpen, setGeneralSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (!fullscreenId) {
@@ -70,6 +83,15 @@ export function App() {
         <button id="resetLayoutBtn" type="button" className="tb-btn" onClick={resetLayout}>
           Reset layout
         </button>
+        <button
+          id="generalSettingsBtn"
+          type="button"
+          className={generalSettingsOpen ? 'tb-btn tb-btn-active' : 'tb-btn'}
+          aria-pressed={generalSettingsOpen}
+          onClick={() => setGeneralSettingsOpen((open) => !open)}
+        >
+          Settings
+        </button>
       </header>
       <div id="content">
         {menuOpen && (
@@ -83,7 +105,10 @@ export function App() {
             visibleIds={visibleIds}
             layout={layout}
             cardSettings={cardSettings}
+            mobileOrder={mobileOrder}
+            labelScale={globalSettings.labelScale}
             onLayoutChange={updateLayout}
+            onMobileOrderChange={updateMobileOrder}
             onHide={toggleVisible}
             fullscreenId={fullscreenId}
             onToggleFullscreen={toggleFullscreen}
@@ -103,7 +128,10 @@ export function App() {
               setFullscreenId(null);
             }}
           >
-            <FullscreenCardComponent settings={cardSettingsWithDefaults(fullscreenCard, cardSettings[fullscreenCard.id])} />
+            <FullscreenCardComponent
+              settings={cardSettingsWithDefaults(fullscreenCard, cardSettings[fullscreenCard.id])}
+              labelScale={globalSettings.labelScale}
+            />
           </CardShell>
         </div>
       )}
@@ -115,6 +143,13 @@ export function App() {
           onResize={(w, h) => updateLayout({ [settingsCard.id]: { ...settingsRect, w, h } })}
           onChangeSetting={(id, value) => updateCardSettings(settingsCard.id, { [id]: value })}
           onClose={() => setSettingsCardId(null)}
+        />
+      )}
+      {generalSettingsOpen && (
+        <GlobalSettingsPopup
+          settings={globalSettings}
+          onChangeLabelScale={updateLabelScale}
+          onClose={() => setGeneralSettingsOpen(false)}
         />
       )}
     </div>

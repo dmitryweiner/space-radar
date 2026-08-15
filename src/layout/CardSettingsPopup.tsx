@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type {
   CardDefinition,
   CardLayoutRect,
@@ -7,6 +6,7 @@ import type {
   CardSettingValues,
 } from './types';
 import { GRID_COLS } from './GridLayout';
+import { NumberField } from './NumberField';
 
 const MAX_ROWS = 8;
 
@@ -17,65 +17,6 @@ interface CardSettingsPopupProps {
   onResize: (w: number, h: number) => void;
   onChangeSetting: (id: string, value: CardSettingValue) => void;
   onClose: () => void;
-}
-
-interface NumberFieldProps {
-  id: string;
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (value: number) => void;
-}
-
-function NumberField({ id, label, value, min, max, step = 1, onChange }: NumberFieldProps) {
-  // Track the raw text while editing so typing a multi-digit value (or briefly
-  // clearing the field) isn't clamped on every keystroke — clamping mid-edit is
-  // what made "type 2 into a field showing 1" land on 4/8. Commit on blur/Enter.
-  const [draft, setDraft] = useState(String(value));
-  // Re-sync the draft when the committed value changes (our own commit, or an
-  // external layout update) — the render-time "adjust state on prop change"
-  // pattern, avoiding an effect. Mid-edit `value` doesn't change, so typing a
-  // multi-digit number isn't disturbed.
-  const [lastValue, setLastValue] = useState(value);
-  if (value !== lastValue) {
-    setLastValue(value);
-    setDraft(String(value));
-  }
-
-  function commit() {
-    const next = Number(draft);
-    if (Number.isFinite(next) && draft.trim() !== '') {
-      const clamped = Math.min(max, Math.max(min, Math.round(next)));
-      onChange(clamped);
-      setDraft(String(clamped));
-    } else {
-      setDraft(String(value));
-    }
-  }
-
-  return (
-    <label className="settings-field" htmlFor={id}>
-      <span>{label}</span>
-      <input
-        id={id}
-        type="number"
-        min={min}
-        max={max}
-        step={step}
-        value={draft}
-        onFocus={(event) => event.target.select()}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.currentTarget.blur();
-          }
-        }}
-      />
-    </label>
-  );
 }
 
 interface MultiSelectFieldProps {
@@ -114,6 +55,36 @@ function MultiSelectField({ idPrefix, label, options, selected, onChange }: Mult
   );
 }
 
+interface SelectFieldProps {
+  idPrefix: string;
+  label: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function SelectField({ idPrefix, label, options, value, onChange }: SelectFieldProps) {
+  return (
+    <div className="settings-field settings-field-multiselect">
+      <span>{label}</span>
+      <div className="settings-checkbox-list">
+        {options.map((option) => (
+          <label key={option.value} className="settings-checkbox" htmlFor={`${idPrefix}-${option.value}`}>
+            <input
+              id={`${idPrefix}-${option.value}`}
+              type="radio"
+              name={idPrefix}
+              checked={value === option.value}
+              onChange={() => onChange(option.value)}
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SettingField({
   card,
   definition,
@@ -134,6 +105,18 @@ function SettingField({
         label={definition.label}
         options={definition.options}
         selected={selected}
+        onChange={(next) => onChangeSetting(definition.id, next)}
+      />
+    );
+  }
+  if (definition.kind === 'select') {
+    const value = typeof stored === 'string' ? stored : definition.defaultValue;
+    return (
+      <SelectField
+        idPrefix={`${card.id}-setting-${definition.id}`}
+        label={definition.label}
+        options={definition.options}
+        value={value}
         onChange={(next) => onChangeSetting(definition.id, next)}
       />
     );

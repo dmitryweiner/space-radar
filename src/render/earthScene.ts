@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { SceneVector3 } from '../astro/coords';
 import earthTextureUrl from '../assets/earth-diffuse.jpg';
+import earthMapTextureUrl from '../assets/earth-map.jpg';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
 import { makeTrail, type TrailLine } from './trailLine';
@@ -9,9 +10,24 @@ import { attachKeyboardZoom } from './orbitControlsExtras';
 
 export const EARTH_RADIUS_UNITS = 2;
 
+// How close the camera can dolly in — just above the surface so users can
+// make out fine detail; far enough that geometry never clips the near plane.
+const MIN_CAMERA_DISTANCE = EARTH_RADIUS_UNITS + 0.3;
+
 // Slow idle spin, in OrbitControls units (2.0 ≈ one turn per 30 s at 60 fps),
 // so a fresh globe drifts gently until the user grabs or zooms it.
 const AUTO_ROTATE_SPEED = 0.4;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+// OrbitControls tracks its current gesture in a plain `state` property
+// (`this.state = _STATE.ROTATE` etc. at runtime) that isn't part of its
+// public type declarations — read it structurally instead of an `as` cast.
+function currentControlsState(controls: OrbitControls): unknown {
+  return isRecord(controls) ? controls.state : undefined;
+}
 
 // Labels and markers keep a constant on-screen *pixel* size — unchanged by zoom
 // and by expanding a card to full screen (see scaleLabelToScreen). Marker sizes
@@ -65,6 +81,14 @@ export interface EarthSceneHandle {
   setMarkers(markers: GlobeMarker[]): void;
   setFirePoints(points: FirePoint[]): void;
   setAuroraPoints(points: AuroraPoint[]): void;
+  /** Multiplies every label/marker's on-screen pixel size (see the global
+   * "Globe label size" setting). 1 = the base sizes below. */
+  setLabelScale(scale: number): void;
+  /** 'globe' (default): photo texture lit by a directional "sun" light, so
+   * there's a day/night terminator. 'map': flat, evenly-lit political map —
+   * no shadow hiding markers on the dark side. Any other string falls back to
+   * 'globe'. */
+  setEarthStyle(style: string): void;
   resize(): void;
   dispose(): void;
 }
@@ -99,18 +123,27 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.minDistance = 3;
+  controls.minDistance = MIN_CAMERA_DISTANCE;
   controls.maxDistance = 20;
 
-  // Gently auto-rotate until the user takes over (drags, wheels, or presses
-  // +/-); OrbitControls fires 'start' on any pointer interaction.
+  // Gently auto-rotate until the user actually moves the globe (drag-rotate
+  // or drag-pan); zooming (wheel, keyboard +/-, or a middle-drag dolly)
+  // leaves it spinning. OrbitControls fires 'start' on any pointer
+  // interaction and sets `state` to the specific gesture just before
+  // dispatching it — DOLLY (1) is the only one that's zoom-only. Two-finger
+  // touch gestures always mix a pinch with pan/rotate, so those still count
+  // as a move. `state`'s enum isn't exported by the OrbitControls module, so
+  // the value is hardcoded here with this comment as the source of truth.
+  const ORBIT_CONTROLS_DOLLY_STATE = 1;
   controls.autoRotate = true;
   controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
-  const stopAutoRotate = () => {
-    controls.autoRotate = false;
+  const stopAutoRotateOnMove = () => {
+    if (currentControlsState(controls) !== ORBIT_CONTROLS_DOLLY_STATE) {
+      controls.autoRotate = false;
+    }
   };
-  controls.addEventListener('start', stopAutoRotate);
-  const detachKeyboardZoom = attachKeyboardZoom(controls, camera, canvas, stopAutoRotate);
+  controls.addEventListener('start', stopAutoRotateOnMove);
+  const detachKeyboardZoom = attachKeyboardZoom(controls, camera, canvas);
 
   const starfield = createStarfield(100);
   scene.add(starfield.mesh);
@@ -125,12 +158,19 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   fillLight.position.set(-5, -2, -4);
   scene.add(fillLight);
 
-  const earthTexture = new THREE.TextureLoader().load(earthTextureUrl);
-  earthTexture.colorSpace = THREE.SRGBColorSpace;
+  const earthPhotoTexture = new THREE.TextureLoader().load(earthTextureUrl);
+  earthPhotoTexture.colorSpace = THREE.SRGBColorSpace;
+  const earthMapTexture = new THREE.TextureLoader().load(earthMapTextureUrl);
+  earthMapTexture.colorSpace = THREE.SRGBColorSpace;
 
-  const earth = new THREE.Mesh(
+  const globeMaterial = new THREE.MeshPhongMaterial({ map: earthPhotoTexture, shininess: 6 });
+  // Unlit: ignores the directional "sun" light entirely, so the flat map has
+  // no day/night terminator hiding markers on what would be the dark side.
+  const mapMaterial = new THREE.MeshBasicMaterial({ map: earthMapTexture });
+
+  const earth: THREE.Mesh<THREE.SphereGeometry, THREE.MeshPhongMaterial | THREE.MeshBasicMaterial> = new THREE.Mesh(
     new THREE.SphereGeometry(EARTH_RADIUS_UNITS, 48, 48),
-    new THREE.MeshPhongMaterial({ map: earthTexture, shininess: 6 }),
+    globeMaterial,
   );
   scene.add(earth);
 
@@ -174,8 +214,13 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
 
   const FOV_TAN = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
 
+  // User-controlled multiplier (the global "Globe label size" setting) on top
+  // of the base pixel sizes below — applied here so every label/marker picks
+  // it up every frame without threading it through each call site.
+  let labelScale = 1;
+
   function rescaleLabel(label: LabelSprite, pixelHeight = LABEL_PX) {
-    scaleLabelToScreen(label, camera, canvas.clientHeight, pixelHeight);
+    scaleLabelToScreen(label, camera, canvas.clientHeight, pixelHeight * labelScale);
   }
 
   // Rescale a marker mesh so its rendered radius is `pxRadius` CSS pixels
@@ -183,7 +228,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   // zooming, matching the labels.
   function scaleMarker(mesh: THREE.Object3D, pxRadius: number, baseRadius: number) {
     const distance = camera.position.distanceTo(mesh.position);
-    const worldRadius = (pxRadius * 2 * FOV_TAN * distance) / Math.max(1, canvas.clientHeight);
+    const worldRadius = (pxRadius * labelScale * 2 * FOV_TAN * distance) / Math.max(1, canvas.clientHeight);
     const s = worldRadius / baseRadius;
     mesh.scale.set(s, s, s);
   }
@@ -335,7 +380,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       // when zooming; size is in framebuffer pixels, so scale by the pixel ratio
       // to land on the intended CSS-pixel size.
       const material = new THREE.PointsMaterial({
-        size: FIRE_POINT_PX * renderer.getPixelRatio(),
+        size: FIRE_POINT_PX * labelScale * renderer.getPixelRatio(),
         vertexColors: true,
         sizeAttenuation: false,
         transparent: true,
@@ -371,7 +416,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
       const material = new THREE.PointsMaterial({
-        size: AURORA_POINT_PX * renderer.getPixelRatio(),
+        size: AURORA_POINT_PX * labelScale * renderer.getPixelRatio(),
         vertexColors: true,
         sizeAttenuation: false,
         transparent: true,
@@ -381,6 +426,22 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       auroraPoints = new THREE.Points(geometry, material);
       scene.add(auroraPoints);
     },
+    setLabelScale(scale) {
+      labelScale = scale;
+      // Label/marker sizes above are recomputed every frame in animate(), but
+      // the two Points materials bake their size in at creation time — patch
+      // any already-created cloud so a mid-session setting change is visible
+      // immediately instead of only on the next setFirePoints/setAuroraPoints.
+      if (firePoints) {
+        firePoints.material.size = FIRE_POINT_PX * labelScale * renderer.getPixelRatio();
+      }
+      if (auroraPoints) {
+        auroraPoints.material.size = AURORA_POINT_PX * labelScale * renderer.getPixelRatio();
+      }
+    },
+    setEarthStyle(style) {
+      earth.material = style === 'map' ? mapMaterial : globeMaterial;
+    },
     resize() {
       applySize();
     },
@@ -388,7 +449,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
       clearFireLabels();
-      controls.removeEventListener('start', stopAutoRotate);
+      controls.removeEventListener('start', stopAutoRotateOnMove);
       detachKeyboardZoom();
       controls.dispose();
       for (const entry of satelliteMarkers.values()) {
@@ -413,7 +474,10 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       issLabel.dispose();
       issTrail.dispose();
       renderer.dispose();
-      earthTexture.dispose();
+      globeMaterial.dispose();
+      mapMaterial.dispose();
+      earthPhotoTexture.dispose();
+      earthMapTexture.dispose();
       starfield.dispose();
     },
   };

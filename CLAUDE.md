@@ -18,6 +18,12 @@ Existing helpers:
   (required), `--show <cardId>` / `--hide <cardId>` / `--click <selector>`
   (repeatable), `--width`, `--height`, `--wait <ms>`, `--preview`.
 - `scripts/shot.mjs` — one screenshot per card into `./shots`.
+- `scripts/pngDiff.mjs` — `countDiffPixels(pngBufferA, pngBufferB, tolerance?)`:
+  decodes two 8-bit PNGs and counts pixels that actually changed, for
+  Playwright screenshot comparisons where exact-byte `Buffer.equals()` is too
+  sensitive (see the `earthScene`/headless-rasterizer-noise note below). Used
+  by `smoke.mjs`'s auto-rotate section; reach for it any time a smoke check
+  needs "did this canvas really change" rather than "did any byte change."
 
 Card ids: `iss-globe`, `solar-system`, `kp-index`, `solar-wind`,
 `aurora-forecast`, `solar-flares`, `asteroids`, `natural-events`, `launches`,
@@ -62,10 +68,41 @@ npm run build       # production build → ./docs (GitHub Pages)
   exposed `resize()` method manually.
 - **Card settings** are a discriminated union in `src/layout/types.ts`:
   `{ kind: 'number', ... }` renders a stepper, `{ kind: 'multiselect', options,
-  ... }` renders a checkbox list whose value is a `string[]`. Read them in a
-  card with the `numberSetting(values, id, fallback)` /
-  `listSetting(values, id, fallback)` helpers from `layoutState.ts` — never
-  index `settings[id]` directly, since the value type is `number | string[]`.
+  ... }` renders a checkbox list whose value is a `string[]`, `{ kind: 'select',
+  options, ... }` renders a radio group whose value is a single `string`. Read
+  them in a card with the `numberSetting(values, id, fallback)` /
+  `listSetting(values, id, fallback)` / `stringSetting(values, id, fallback)`
+  helpers from `layoutState.ts` — never index `settings[id]` directly, since the
+  value type is `number | string[] | string`. `NumberField` (`src/layout/
+  NumberField.tsx`, shared by `CardSettingsPopup` and `GlobalSettingsPopup`)
+  rounds its committed value to the nearest `step`, not the nearest integer
+  (`Math.round(next / step) * step`, then a second rounding pass to shake off
+  float noise like `0.30000000000000004`) — needed once a fractional `step`
+  (the 0.1 label-scale coefficient below) showed up; for the default `step: 1`
+  it's identical to the old `Math.round(next)`.
+- **General settings** (header "Settings" button → `GlobalSettingsPopup`) hold
+  one value today: `labelScale`, a 0.5–2.5× multiplier on every label/marker's
+  on-screen pixel size across all five `createEarthScene` cards (`earthScene.ts`'s
+  `setLabelScale`, applied inside `rescaleLabel`/`scaleMarker` each frame, and
+  patched onto any already-created fire/aurora `PointsMaterial.size` since those
+  bake their size in once at creation). It's a single coefficient, not separate
+  desktop/mobile fields — `useGlobalSettings` persists it to its own
+  `space-radar:global-settings:v1` localStorage key, which is already
+  per-browser, so a phone and a desktop naturally end up with independent
+  values without any viewport-based branching. `App` passes `labelScale` down
+  through `GridLayout`'s `CardComponentProps` to every card (all cards get the
+  prop; only the five globe cards read it).
+- **Per-card "Earth style" setting** (`earthStyle`, `'globe' | 'map'`, on
+  `iss-globe`/`natural-events`/`fire-map`/`quakes`/`aurora-globe`) swaps
+  `earthScene.ts`'s Earth mesh between the default photo texture lit by a
+  directional "sun" light (day/night terminator) and a flat, fully *unlit*
+  `MeshBasicMaterial` using `src/assets/earth-map.jpg` — a blank political
+  world map (Wikimedia Commons, FelixCountryBalls163, CC BY 4.0, downscaled to
+  2048×1024) — for cards where the shaded/dark side hides markers. Both
+  textures/materials load eagerly at scene creation (matches the existing
+  eager-load pattern for `earth-diffuse.jpg`); `setEarthStyle` just swaps
+  `earth.material`, so markers/labels/occlusion are unaffected either way (same
+  sphere geometry).
 - **All six 3D scenes share `orbitControlsExtras.attachKeyboardZoom`** — it binds
   `+`/`-` (and `=`/`_`) to dolly the camera along its view direction (clamped to
   the controls' min/max distance). **The keys are routed by *hover*, not DOM
@@ -77,11 +114,32 @@ npm run build       # production build → ./docs (GitHub Pages)
   A click-focused canvas is a fallback target only when the pointer is over no
   globe, so two cards never zoom at once. (Zoom is keyboard + mouse-wheel only; an
   on-screen-button version was tried and removed.) The five `createEarthScene`
-  globes additionally auto-rotate (`controls.autoRotate`, `AUTO_ROTATE_SPEED`);
-  OrbitControls' `start` event and any keyboard zoom stop the spin the moment the
-  user takes over. The solar-system scene gets keyboard zoom but no auto-rotate.
-  `scripts/smoke.mjs` guards this: it *hovers* (does not click) the solar-system
-  canvas, presses `=`, and checks the rendered view changed.
+  globes additionally auto-rotate (`controls.autoRotate`, `AUTO_ROTATE_SPEED`).
+  **Only a rotate/pan move stops the spin — zooming (wheel, keyboard `+`/`-`, or
+  a middle-drag dolly) leaves it spinning.** OrbitControls fires `start` on any
+  pointer interaction and sets its internal `state` to the specific gesture just
+  before dispatching it; `earthScene.ts`'s `stopAutoRotateOnMove` only clears
+  `autoRotate` when that state isn't `DOLLY` (hardcoded as `1` — the enum isn't
+  part of OrbitControls' public type declarations, so `state` is read via an
+  `isRecord` structural check rather than an `as` cast, and the value is
+  hardcoded with a comment as the source of truth). Two-finger touch gestures
+  always mix a pinch with pan/rotate, so those still stop it. The solar-system
+  scene gets keyboard zoom but no auto-rotate. `scripts/smoke.mjs` guards the
+  zoom-hover-while-spinning case (hovers, does not click, the solar-system
+  canvas) and separately guards the stop/no-stop distinction on `aurora-globe`
+  via `scripts/pngDiff.mjs`'s `countDiffPixels` — **exact-byte
+  `Buffer.equals()` is not a reliable "did it move" signal on these canvases**:
+  headless Chromium's software rasterizer leaves small frame-to-frame dithering
+  noise on the transparent label sprites/wireframe grid even when nothing
+  moved, so two screenshots of a genuinely static globe still differ by a few
+  bytes — confirmed empirically (a plain drag/pan *distance*, not just the
+  press, also leaves multiple seconds of OrbitControls damping "coast" that
+  reads as motion; the smoke check uses a zero-movement press to isolate the
+  state transition, plus a 2s settle wait, then thresholds `countDiffPixels`
+  at 1,000 vs. the ~10,000+ pixels genuine rotation moves per 600ms).
+  `MIN_CAMERA_DISTANCE` (`EARTH_RADIUS_UNITS + 0.3`) sets how close the five
+  globes can zoom in — a flat `3` (1 full unit of clearance) was too far to
+  make out detail.
 - **Five of the cards (`iss-globe`, `natural-events`, `fire-map`, `quakes`,
   `aurora-globe`) share `createEarthScene`.** The globe exposes `setSatellites`
   (named markers with labels), `setMarkers` (generic id/colour/label markers),
@@ -154,11 +212,29 @@ npm run build       # production build → ./docs (GitHub Pages)
   spread — Europe/Asia/etc. show alongside the far more numerous US wildfires
   instead of being crowded out of the `maxEvents` slice.
 - **Default layout is six cards in two columns** (`w:2`), reading order
-  ISS · Solar System / Natural Events · APOD / Launches · Asteroids. The
+  ISS · Solar System / Natural Events · APOD / Launches / Asteroids. The
   registry lists these first (all `defaultVisible:true`); the rest are hidden and
   parked below (`y ≥ 6`). `scripts/smoke.mjs`'s `DEFAULT_VISIBLE` /
   `HIDDEN_BY_DEFAULT` and `tests/app.test.tsx` (which fullscreens a
   *default-visible* card) must be kept in sync with these defaults.
+- **Below `GridLayout.MOBILE_BREAKPOINT_PX` (700px container width, matching
+  the `#cardMenu` CSS breakpoint), cards stack in a single, still-draggable
+  column** instead of the 4-col grid (`GridLayout`'s `toMobileRglLayout`, cols
+  forced to 1). Reordering is tracked separately from the desktop
+  x/y/w-per-card `layout` map: `StoredLayoutState.mobileOrder` is just a
+  `string[]` of visible ids in stacked order, defaulting to reading order
+  (top-to-bottom, left-to-right on the desktop layout —
+  `layoutState.ts`'s `readingOrder`) and kept in sync by `toggleVisibility`
+  (hide → remove, show → append at the end). Resizing a card's *height* in
+  mobile mode still writes through to the shared desktop `layout[id].h` (x/y/w
+  there are untouched — mobile's are synthetic). **`toMobileRglLayout` must
+  stack using each card's actual height in grid rows (`y +=
+  rect.h`), not just its array index** — react-grid-layout's drag/collision
+  math operates on the given `y` values directly during an interactive drag,
+  so index-based y's (e.g. every `h:2` card at consecutive integers 0,1,2…,
+  which overlap) confused live reordering even though a *static* render still
+  looked right, because the library's own compaction pass silently resolves
+  overlapping-but-correctly-ordered input on a plain re-render.
 - ESLint bans `as` type assertions (`@typescript-eslint/consistent-type-assertions:
   'never'`). Narrow `unknown` with a type-predicate helper
   (`function isRecord(v): v is Record<string, unknown>`) instead of casting.

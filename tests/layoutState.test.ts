@@ -3,10 +3,12 @@ import {
   sanitizeState,
   toggleVisibility,
   applyLayoutChange,
+  applyMobileOrderChange,
   applySettingsChange,
   cardSettingsWithDefaults,
   numberSetting,
   listSetting,
+  stringSetting,
 } from '../src/layout/layoutState';
 import type { CardDefinition } from '../src/layout/types';
 
@@ -30,6 +32,11 @@ describe('defaultState', () => {
     const state = defaultState(registry);
     expect(Object.keys(state.layout).sort()).toEqual(['a', 'b', 'c']);
     expect(state.layout.b).toEqual({ x: 2, y: 0, w: 1, h: 1 });
+  });
+
+  it('seeds mobileOrder with the visible cards in reading order (top-to-bottom, left-to-right)', () => {
+    const state = defaultState(registry);
+    expect(state.mobileOrder).toEqual(['a', 'c']);
   });
 });
 
@@ -68,6 +75,36 @@ describe('sanitizeState', () => {
     const result = sanitizeState(stored, registry);
     expect(result.layout.c).toEqual({ x: 0, y: 2, w: 1, h: 1 });
   });
+
+  it('synthesizes mobileOrder in reading order when absent, e.g. storage saved before this field existed', () => {
+    const stored = {
+      visibleIds: ['a', 'c'],
+      layout: { a: { x: 0, y: 0, w: 2, h: 2 }, c: { x: 0, y: 2, w: 1, h: 1 } },
+    };
+    const result = sanitizeState(stored, registry);
+    expect(result.mobileOrder).toEqual(['a', 'c']);
+  });
+
+  it('keeps a stored mobileOrder, dropping ids that are unknown or no longer visible', () => {
+    const stored = {
+      visibleIds: ['a', 'c'],
+      layout: { a: { x: 0, y: 0, w: 2, h: 2 }, c: { x: 0, y: 2, w: 1, h: 1 } },
+      mobileOrder: ['c', 'ghost', 'b', 'a'],
+    };
+    const result = sanitizeState(stored, registry);
+    // 'ghost' is unknown and 'b' isn't currently visible — both dropped, order preserved.
+    expect(result.mobileOrder).toEqual(['c', 'a']);
+  });
+
+  it('appends a visible id missing from the stored mobileOrder instead of dropping it', () => {
+    const stored = {
+      visibleIds: ['a', 'c'],
+      layout: { a: { x: 0, y: 0, w: 2, h: 2 }, c: { x: 0, y: 2, w: 1, h: 1 } },
+      mobileOrder: ['c'],
+    };
+    const result = sanitizeState(stored, registry);
+    expect(result.mobileOrder).toEqual(['c', 'a']);
+  });
 });
 
 describe('toggleVisibility', () => {
@@ -89,6 +126,28 @@ describe('toggleVisibility', () => {
     toggleVisibility(state, 'b');
     expect(state.visibleIds).toEqual(before);
   });
+
+  it('appends a newly shown card to the end of mobileOrder', () => {
+    const state = defaultState(registry);
+    const next = toggleVisibility(state, 'b');
+    expect(next.mobileOrder).toEqual(['a', 'c', 'b']);
+  });
+
+  it('removes a hidden card from mobileOrder', () => {
+    const state = defaultState(registry);
+    const next = toggleVisibility(state, 'a');
+    expect(next.mobileOrder).toEqual(['c']);
+  });
+});
+
+describe('applyMobileOrderChange', () => {
+  it('replaces mobileOrder without touching anything else', () => {
+    const state = defaultState(registry);
+    const next = applyMobileOrderChange(state, ['c', 'a']);
+    expect(next.mobileOrder).toEqual(['c', 'a']);
+    expect(next.visibleIds).toEqual(state.visibleIds);
+    expect(next.layout).toEqual(state.layout);
+  });
 });
 
 const settingsRegistry: CardDefinition[] = [
@@ -109,6 +168,16 @@ const settingsRegistry: CardDefinition[] = [
           { value: 'b', label: 'B' },
         ],
         defaultValue: ['a'],
+      },
+      {
+        kind: 'select',
+        id: 'earthStyle',
+        label: 'Earth style',
+        options: [
+          { value: 'globe', label: 'Globe' },
+          { value: 'map', label: 'Map' },
+        ],
+        defaultValue: 'globe',
       },
     ],
   },
@@ -135,6 +204,27 @@ describe('sanitizeState settings', () => {
     expect(result.settings.sat.groups).toBeUndefined();
     expect(cardSettingsWithDefaults(settingsRegistry[0], result.settings.sat).groups).toEqual(['a']);
   });
+
+  it('keeps a select value that matches a known option', () => {
+    const stored = {
+      visibleIds: ['sat'],
+      layout: { sat: { x: 0, y: 0, w: 2, h: 2 } },
+      settings: { sat: { earthStyle: 'map' } },
+    };
+    const result = sanitizeState(stored, settingsRegistry);
+    expect(result.settings.sat.earthStyle).toBe('map');
+  });
+
+  it('drops a select value that is not one of the known options', () => {
+    const stored = {
+      visibleIds: ['sat'],
+      layout: { sat: { x: 0, y: 0, w: 2, h: 2 } },
+      settings: { sat: { earthStyle: 'satellite-photo' } },
+    };
+    const result = sanitizeState(stored, settingsRegistry);
+    expect(result.settings.sat.earthStyle).toBeUndefined();
+    expect(cardSettingsWithDefaults(settingsRegistry[0], result.settings.sat).earthStyle).toBe('globe');
+  });
 });
 
 describe('applySettingsChange', () => {
@@ -158,6 +248,12 @@ describe('setting accessors', () => {
     expect(listSetting({ groups: ['a', 'b'] }, 'groups', ['x'])).toEqual(['a', 'b']);
     expect(listSetting({ groups: 3 }, 'groups', ['x'])).toEqual(['x']);
     expect(listSetting({}, 'groups', ['x'])).toEqual(['x']);
+  });
+
+  it('stringSetting falls back when the value is missing or a list', () => {
+    expect(stringSetting({ earthStyle: 'map' }, 'earthStyle', 'globe')).toBe('map');
+    expect(stringSetting({ earthStyle: ['map'] }, 'earthStyle', 'globe')).toBe('globe');
+    expect(stringSetting({}, 'earthStyle', 'globe')).toBe('globe');
   });
 });
 

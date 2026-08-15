@@ -5,7 +5,7 @@ import { geodeticToSceneVector } from '../../astro/coords';
 import { createEarthScene, EARTH_RADIUS_UNITS, type EarthSceneHandle, type FirePoint as SceneFirePoint } from '../../render/earthScene';
 import type { FirePoint } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
-import { numberSetting } from '../../layout/layoutState';
+import { numberSetting, stringSetting } from '../../layout/layoutState';
 
 const CACHE_KEY = 'space-radar:fire-points';
 // FIRMS updates a few times a day and the world CSV is large — poll slowly.
@@ -59,9 +59,10 @@ function fireInfo(point: FirePoint): string {
   return parts.join(' · ');
 }
 
-export function FireMapCard({ settings = {} }: CardComponentProps) {
+export function FireMapCard({ settings = {}, labelScale = 1 }: CardComponentProps) {
   const dayRange = numberSetting(settings, 'dayRange', DEFAULT_DAY_RANGE);
   const labelCount = numberSetting(settings, 'labelCount', DEFAULT_LABEL_COUNT);
+  const earthStyle = stringSetting(settings, 'earthStyle', 'globe');
   const { data, loading, error } = useApiResource<FirePoint[]>({
     key: `${CACHE_KEY}:${dayRange}`,
     ttlMs: TTL_MS,
@@ -91,6 +92,14 @@ export function FireMapCard({ settings = {} }: CardComponentProps) {
       return undefined;
     }
   }, []);
+
+  useEffect(() => {
+    sceneRef.current?.setLabelScale(labelScale);
+  }, [labelScale]);
+
+  useEffect(() => {
+    sceneRef.current?.setEarthStyle(earthStyle);
+  }, [earthStyle]);
 
   const scenePoints = useMemo<SceneFirePoint[]>(() => {
     const points = data ?? [];

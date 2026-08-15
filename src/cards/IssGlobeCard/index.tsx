@@ -4,7 +4,7 @@ import { geodeticToSceneVector, type SceneVector3 } from '../../astro/coords';
 import { createEarthScene, EARTH_RADIUS_UNITS, type EarthSceneHandle, type NamedPosition } from '../../render/earthScene';
 import type { TleRecord } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
-import { listSetting, numberSetting } from '../../layout/layoutState';
+import { listSetting, numberSetting, stringSetting } from '../../layout/layoutState';
 import { useTleSatellites } from './useTleSatellites';
 
 const POSITION_UPDATE_MS = 1000;
@@ -65,9 +65,10 @@ function currentPositions(records: TleRecord[], nowMs: number): NamedPosition[] 
   return points;
 }
 
-export function IssGlobeCard({ settings = {} }: CardComponentProps) {
+export function IssGlobeCard({ settings = {}, labelScale = 1 }: CardComponentProps) {
   const categories = listSetting(settings, 'categories', DEFAULT_CATEGORIES);
   const maxSatellites = numberSetting(settings, 'maxSatellites', DEFAULT_MAX_SATELLITES);
+  const earthStyle = stringSetting(settings, 'earthStyle', 'globe');
 
   const { data, loading, error } = useTleSatellites(categories);
 
@@ -92,6 +93,14 @@ export function IssGlobeCard({ settings = {} }: CardComponentProps) {
       return undefined;
     }
   }, []);
+
+  useEffect(() => {
+    sceneRef.current?.setLabelScale(labelScale);
+  }, [labelScale]);
+
+  useEffect(() => {
+    sceneRef.current?.setEarthStyle(earthStyle);
+  }, [earthStyle]);
 
   const iss = data ? findIss(data) : null;
   const otherSatellites = useMemo(() => {

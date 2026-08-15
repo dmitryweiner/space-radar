@@ -120,6 +120,11 @@ The starfield background in the 3D cards is the Milky Way panorama texture
 from [Solar System Scope](https://www.solarsystemscope.com/textures/)
 (CC BY 4.0).
 
+The flat "map" Earth style (an alternative to the default photographic globe,
+selectable per-card in Settings) uses a blank political world map from
+[Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Blank_Map_of_The_World_Equirectangular_Projection.png)
+by FelixCountryBalls163 (CC BY 4.0), downscaled to 2048×1024.
+
 The favicon (`public/favicon.svg`) is a self-contained SVG radar scope in the
 app's palette. It lives in `public/` (copied verbatim to `docs/` on build) and
 is referenced from `index.html` with a relative `./favicon.svg` path so it

@@ -27,7 +27,10 @@ describe('GridLayout', () => {
         visibleIds={['a']}
         layout={layout}
         cardSettings={{}}
+        mobileOrder={['a']}
+        labelScale={1}
         onLayoutChange={() => {}}
+        onMobileOrderChange={() => {}}
         onHide={() => {}}
         fullscreenId={null}
         onToggleFullscreen={() => {}}
@@ -46,7 +49,10 @@ describe('GridLayout', () => {
         visibleIds={['a', 'b']}
         layout={layout}
         cardSettings={{}}
+        mobileOrder={['a', 'b']}
+        labelScale={1}
         onLayoutChange={() => {}}
+        onMobileOrderChange={() => {}}
         onHide={() => {}}
         fullscreenId={null}
         onToggleFullscreen={() => {}}
@@ -64,7 +70,10 @@ describe('GridLayout', () => {
         visibleIds={['a', 'b']}
         layout={layout}
         cardSettings={{}}
+        mobileOrder={['a', 'b']}
+        labelScale={1}
         onLayoutChange={() => {}}
+        onMobileOrderChange={() => {}}
         onHide={() => {}}
         fullscreenId="a"
         onToggleFullscreen={() => {}}

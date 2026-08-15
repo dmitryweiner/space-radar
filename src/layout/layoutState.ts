@@ -2,13 +2,19 @@ import type { CardDefinition, CardLayoutRect, CardSettingValues, StoredLayoutSta
 
 export const STORAGE_KEY = 'space-radar:layout:v1';
 
+// Row-major reading order (top-to-bottom, left-to-right) — what the single
+// mobile column falls back to before the user drags anything there.
+function readingOrder(ids: string[], layout: Record<string, CardLayoutRect>): string[] {
+  return [...ids].sort((a, b) => layout[a].y - layout[b].y || layout[a].x - layout[b].x);
+}
+
 export function defaultState(registry: CardDefinition[]): StoredLayoutState {
   const visibleIds = registry.filter((card) => card.defaultVisible).map((card) => card.id);
   const layout: Record<string, CardLayoutRect> = {};
   for (const card of registry) {
     layout[card.id] = { ...card.defaultLayout };
   }
-  return { visibleIds, layout, settings: {} };
+  return { visibleIds, layout, settings: {}, mobileOrder: readingOrder(visibleIds, layout) };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -27,8 +33,33 @@ function isRect(value: unknown): value is CardLayoutRect {
 
 function isStoredShape(
   value: unknown,
-): value is { visibleIds: unknown[]; layout: Record<string, unknown>; settings?: unknown } {
+): value is { visibleIds: unknown[]; layout: Record<string, unknown>; settings?: unknown; mobileOrder?: unknown } {
   return isRecord(value) && Array.isArray(value.visibleIds) && isRecord(value.layout);
+}
+
+// Sanitizes a stored mobile order against the current visible set: drops
+// unknown/duplicate/no-longer-visible ids, then appends any visible id that's
+// missing (a newly shown card, or a first load from storage saved before this
+// field existed) in reading order so nothing visible is left off the stack.
+function sanitizeMobileOrder(raw: unknown, visibleIds: string[], layout: Record<string, CardLayoutRect>): string[] {
+  const knownVisible = new Set(visibleIds);
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  if (Array.isArray(raw)) {
+    for (const id of raw) {
+      if (typeof id === 'string' && knownVisible.has(id) && !seen.has(id)) {
+        seen.add(id);
+        ordered.push(id);
+      }
+    }
+  }
+  for (const id of readingOrder(visibleIds, layout)) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      ordered.push(id);
+    }
+  }
+  return ordered;
 }
 
 function sanitizeSettings(raw: unknown, card: CardDefinition): CardSettingValues {
@@ -41,6 +72,10 @@ function sanitizeSettings(raw: unknown, card: CardDefinition): CardSettingValues
     if (definition.kind === 'number') {
       if (typeof stored === 'number' && Number.isFinite(stored)) {
         values[definition.id] = Math.min(definition.max, Math.max(definition.min, stored));
+      }
+    } else if (definition.kind === 'select') {
+      if (typeof stored === 'string' && definition.options.some((option) => option.value === stored)) {
+        values[definition.id] = stored;
       }
     } else if (Array.isArray(stored)) {
       const allowed = new Set(definition.options.map((option) => option.value));
@@ -73,7 +108,9 @@ export function sanitizeState(raw: unknown, registry: CardDefinition[]): StoredL
     settings[card.id] = sanitizeSettings(rawSettings[card.id], card);
   }
 
-  return { visibleIds, layout, settings };
+  const mobileOrder = sanitizeMobileOrder(raw.mobileOrder, visibleIds, layout);
+
+  return { visibleIds, layout, settings, mobileOrder };
 }
 
 export function toggleVisibility(state: StoredLayoutState, id: string): StoredLayoutState {
@@ -81,7 +118,13 @@ export function toggleVisibility(state: StoredLayoutState, id: string): StoredLa
   const visibleIds = isVisible
     ? state.visibleIds.filter((visibleId) => visibleId !== id)
     : [...state.visibleIds, id];
-  return { ...state, visibleIds };
+  // Keep the mobile stack in sync: drop a hidden card, append a newly shown
+  // one to the end (its position there is a fine default; the user can drag
+  // it wherever once they see it).
+  const mobileOrder = isVisible
+    ? state.mobileOrder.filter((orderId) => orderId !== id)
+    : [...state.mobileOrder, id];
+  return { ...state, visibleIds, mobileOrder };
 }
 
 export function applyLayoutChange(
@@ -92,6 +135,11 @@ export function applyLayoutChange(
     ...state,
     layout: { ...state.layout, ...rects },
   };
+}
+
+/** Persists a new single-column display order (see GridLayout's mobile mode). */
+export function applyMobileOrderChange(state: StoredLayoutState, order: string[]): StoredLayoutState {
+  return { ...state, mobileOrder: order };
 }
 
 export function applySettingsChange(
@@ -124,4 +172,10 @@ export function numberSetting(values: CardSettingValues, id: string, fallback: n
 export function listSetting(values: CardSettingValues, id: string, fallback: string[]): string[] {
   const value = values[id];
   return Array.isArray(value) ? value : fallback;
+}
+
+/** Read a select setting, falling back when absent or the wrong type. */
+export function stringSetting(values: CardSettingValues, id: string, fallback: string): string {
+  const value = values[id];
+  return typeof value === 'string' ? value : fallback;
 }

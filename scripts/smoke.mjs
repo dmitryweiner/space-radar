@@ -15,6 +15,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { chromium } from 'playwright';
+import { countDiffPixels } from './pngDiff.mjs';
 
 const args = process.argv.slice(2);
 const VALUE_FLAGS = new Set(['screenshot']);
@@ -187,6 +188,76 @@ console.log('keyboard zoom ok');
 // let API-backed cards settle (data or a graceful error, no thrown errors)
 await page.waitForTimeout(3000);
 
+// auto-rotate: zooming (keyboard +/- or wheel) must leave it spinning; a
+// rotate/pan press must stop it. Exact-byte screenshot equality is too
+// sensitive to use here — the headless-Chromium software rasterizer leaves
+// a small amount of frame-to-frame dithering noise on these canvases
+// (transparent label sprites + wireframe grid) even when nothing moved, so
+// `Buffer.equals()` never reliably reports "unchanged". countDiffPixels
+// (scripts/pngDiff.mjs) instead measures *how many* pixels moved, which
+// gives a clean, calibrated signal: genuine rotation moves on the order of
+// 10,000+ pixels per 600ms even at this scene's slow idle-spin speed, while
+// that dithering noise is only a handful — nowhere near either threshold
+// below.
+ctxLabel = 'auto-rotate';
+{
+  const SPINNING_DIFF_PX = 3000;
+  const SETTLED_DIFF_PX = 1000;
+  const globeCanvas = page.locator('[data-card-id="aurora-globe"] canvas');
+  await globeCanvas.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  const box = await globeCanvas.boundingBox();
+
+  async function diffOverWindow(ms) {
+    const before = await globeCanvas.screenshot();
+    await page.waitForTimeout(ms);
+    const after = await globeCanvas.screenshot();
+    return countDiffPixels(before, after);
+  }
+
+  const atRestDiff = await diffOverWindow(600);
+  if (atRestDiff < SPINNING_DIFF_PX) errors.push(`[auto-rotate] globe is not auto-rotating at rest (diff=${atRestDiff})`);
+  else console.log('auto-rotate: spinning at rest ok, diff=', atRestDiff);
+
+  await globeCanvas.hover();
+  for (let i = 0; i < 8; i++) await page.keyboard.press('=');
+  const afterKeyboardZoomDiff = await diffOverWindow(600);
+  if (afterKeyboardZoomDiff < SPINNING_DIFF_PX) {
+    errors.push(`[auto-rotate] keyboard zoom stopped auto-rotation (diff=${afterKeyboardZoomDiff})`);
+  } else {
+    console.log('auto-rotate: keyboard zoom does not stop it ok, diff=', afterKeyboardZoomDiff);
+  }
+
+  if (box) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, -300);
+  }
+  const afterWheelZoomDiff = await diffOverWindow(600);
+  if (afterWheelZoomDiff < SPINNING_DIFF_PX) {
+    errors.push(`[auto-rotate] wheel zoom stopped auto-rotation (diff=${afterWheelZoomDiff})`);
+  } else {
+    console.log('auto-rotate: wheel zoom does not stop it ok, diff=', afterWheelZoomDiff);
+  }
+
+  if (!box) {
+    errors.push('[auto-rotate] globe canvas not found for a rotate/pan press');
+  } else {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.up();
+    // OrbitControls' damping keeps easing the camera for a bit after release
+    // even with autoRotate now off — give that "coast" time to decay before
+    // measuring (it's down to single-digit diff pixels by ~2s in practice).
+    await page.waitForTimeout(2000);
+    const afterPressDiff = await diffOverWindow(600);
+    if (afterPressDiff >= SETTLED_DIFF_PX) {
+      errors.push(`[auto-rotate] a rotate/pan press did not stop auto-rotation (diff=${afterPressDiff})`);
+    } else {
+      console.log('auto-rotate: press stops it ok, diff=', afterPressDiff);
+    }
+  }
+}
+
 // drag the Kp-index card by its header to a new position
 ctxLabel = 'drag';
 const beforeTransform = await cardStyle(page, 'kp-index', 'transform');
@@ -283,6 +354,128 @@ if (visibleAfterReset.length !== DEFAULT_VISIBLE.length || DEFAULT_VISIBLE.some(
   errors.push(`[reset] expected default visible set, got ${JSON.stringify(visibleAfterReset)}`);
 } else {
   console.log('reset ok:', visibleAfterReset);
+}
+
+// general settings popup: opens, edits the label-scale coefficient, and the
+// value survives a reload via its own localStorage key.
+ctxLabel = 'global-settings';
+{
+  await page.locator('#generalSettingsBtn').click();
+  await page.waitForTimeout(150);
+  const popup = page.getByTestId('global-settings-popup');
+  if ((await popup.count()) !== 1) {
+    errors.push('[global-settings] popup did not open');
+  } else {
+    const input = popup.locator('#global-setting-label-scale');
+    await input.fill('1.6');
+    await input.blur();
+    await page.waitForTimeout(150);
+    // The backdrop covers the whole viewport (including the header button
+    // underneath) — close via its own "Close settings" button instead.
+    await page.getByRole('button', { name: 'Close settings' }).click();
+    await page.waitForTimeout(150);
+
+    await page.reload();
+    await page.waitForSelector('#app');
+    await page.waitForTimeout(500);
+    await page.locator('#generalSettingsBtn').click();
+    await page.waitForTimeout(150);
+    const reopenedValue = await page.locator('#global-setting-label-scale').inputValue();
+    if (reopenedValue !== '1.6') {
+      errors.push(`[global-settings] label scale did not survive reload: got "${reopenedValue}"`);
+    } else {
+      console.log('global-settings: opens, edits, persists ok');
+    }
+    await page.getByRole('button', { name: 'Close settings' }).click();
+    await page.waitForTimeout(150);
+  }
+}
+
+// per-card "Earth style" select: switching a globe card to the flat map
+// must not throw (iss-globe is back after the reset above).
+ctxLabel = 'earth-style';
+{
+  await page.getByRole('button', { name: 'Settings for ISS & Satellites' }).click();
+  await page.waitForTimeout(150);
+  const mapOption = page.locator('#iss-globe-setting-earthStyle-map');
+  if ((await mapOption.count()) !== 1) {
+    errors.push('[earth-style] map option not found in settings popup');
+  } else {
+    await mapOption.check();
+    await page.waitForTimeout(300);
+    if (!(await mapOption.isChecked())) errors.push('[earth-style] map option did not become checked');
+    else console.log('earth-style: switched to flat map ok');
+  }
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await page.waitForTimeout(150);
+}
+
+// mobile layout: below the #cardMenu breakpoint, cards stack in a single
+// column and stay draggable — reordering persists across reload. Runs on a
+// fresh tab/viewport so it doesn't disturb the desktop-sized page above.
+ctxLabel = 'mobile-layout';
+{
+  const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  attach(mobilePage);
+  await mobilePage.goto(BASE);
+  await mobilePage.waitForSelector('#app');
+  await mobilePage.waitForTimeout(500);
+
+  const readMobileOrder = () =>
+    mobilePage.evaluate(() => {
+      const raw = window.localStorage.getItem('space-radar:layout:v1');
+      return raw ? JSON.parse(raw).mobileOrder : null;
+    });
+
+  const order = await readMobileOrder();
+  if (!Array.isArray(order) || order.length < 2) {
+    errors.push(`[mobile-layout] expected a persisted mobileOrder with 2+ cards, got ${JSON.stringify(order)}`);
+  } else {
+    const firstBox = await mobilePage.locator(`[data-card-id="${order[0]}"]`).boundingBox();
+    const secondBox = await mobilePage.locator(`[data-card-id="${order[1]}"]`).boundingBox();
+    if (!firstBox || !secondBox) {
+      errors.push('[mobile-layout] could not measure card positions');
+    } else if (Math.abs(firstBox.x - secondBox.x) > 4 || secondBox.y <= firstBox.y) {
+      errors.push(`[mobile-layout] cards are not stacked in a single column: ${JSON.stringify({ firstBox, secondBox })}`);
+    } else {
+      console.log('mobile-layout: single column ok:', order);
+    }
+
+    const secondHandle = mobilePage.locator(`[data-card-id="${order[1]}"] .card-drag-handle`);
+    await secondHandle.scrollIntoViewIfNeeded();
+    const handleBox = await secondHandle.boundingBox();
+    if (!handleBox) {
+      errors.push('[mobile-layout] drag handle not found');
+    } else {
+      const startX = handleBox.x + handleBox.width / 2;
+      const startY = handleBox.y + handleBox.height / 2;
+      await mobilePage.mouse.move(startX, startY);
+      await mobilePage.mouse.down();
+      // Must clear more than half the first card's height (~166px here) to
+      // cross react-grid-layout's swap threshold — comfortably overshoot it.
+      await mobilePage.mouse.move(startX, startY - 360, { steps: 15 });
+      await mobilePage.mouse.up();
+      await mobilePage.waitForTimeout(300);
+
+      const reordered = await readMobileOrder();
+      if (!Array.isArray(reordered) || reordered[0] !== order[1]) {
+        errors.push(`[mobile-layout] drag-to-reorder did not move "${order[1]}" to the top: ${JSON.stringify(reordered)}`);
+      } else {
+        console.log('mobile-layout: drag-to-reorder ok:', reordered);
+      }
+
+      await mobilePage.reload();
+      await mobilePage.waitForSelector('#app');
+      await mobilePage.waitForTimeout(500);
+      const afterReload = await readMobileOrder();
+      if (!Array.isArray(afterReload) || afterReload[0] !== order[1]) {
+        errors.push('[mobile-layout] reordered mobile layout did not survive reload');
+      } else {
+        console.log('mobile-layout: order persists across reload ok');
+      }
+    }
+  }
+  await mobilePage.close();
 }
 
 if (flags.has('screenshot')) {

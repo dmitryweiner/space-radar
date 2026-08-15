@@ -5,7 +5,7 @@ import { geodeticToSceneVector } from '../../astro/coords';
 import { createEarthScene, EARTH_RADIUS_UNITS, type EarthSceneHandle, type GlobeMarker } from '../../render/earthScene';
 import type { Quake } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
-import { listSetting, numberSetting } from '../../layout/layoutState';
+import { listSetting, numberSetting, stringSetting } from '../../layout/layoutState';
 
 const TTL_MS = 5 * 60 * 1000;
 const POLL_MS = 5 * 60 * 1000;
@@ -53,9 +53,10 @@ function isQuakes(value: unknown): value is Quake[] {
   );
 }
 
-export function QuakesCard({ settings = {} }: CardComponentProps) {
+export function QuakesCard({ settings = {}, labelScale = 1 }: CardComponentProps) {
   const feeds = listSetting(settings, 'feeds', DEFAULT_FEEDS);
   const maxQuakes = numberSetting(settings, 'maxQuakes', DEFAULT_MAX_QUAKES);
+  const earthStyle = stringSetting(settings, 'earthStyle', 'globe');
   // Cache/poll per feed combination — each URL set is a distinct resource.
   const cacheKey = `space-radar:quakes:${[...feeds].sort().join(',')}`;
 
@@ -88,6 +89,14 @@ export function QuakesCard({ settings = {} }: CardComponentProps) {
       return undefined;
     }
   }, []);
+
+  useEffect(() => {
+    sceneRef.current?.setLabelScale(labelScale);
+  }, [labelScale]);
+
+  useEffect(() => {
+    sceneRef.current?.setEarthStyle(earthStyle);
+  }, [earthStyle]);
 
   // Strongest quakes first so the cap keeps the most significant events.
   const quakes = useMemo(

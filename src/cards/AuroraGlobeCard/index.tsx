@@ -4,6 +4,8 @@ import { fetchAurora } from '../../api/swpc';
 import { geodeticToSceneVector } from '../../astro/coords';
 import { createEarthScene, EARTH_RADIUS_UNITS, type AuroraPoint, type EarthSceneHandle } from '../../render/earthScene';
 import type { AuroraSample } from '../../api/types';
+import type { CardComponentProps } from '../../layout/types';
+import { stringSetting } from '../../layout/layoutState';
 
 const CACHE_KEY = 'space-radar:aurora-globe';
 const TTL_MS = 5 * 60 * 1000;
@@ -29,7 +31,8 @@ function isAuroraSamples(value: unknown): value is AuroraSample[] {
   );
 }
 
-export function AuroraGlobeCard() {
+export function AuroraGlobeCard({ settings = {}, labelScale = 1 }: CardComponentProps) {
+  const earthStyle = stringSetting(settings, 'earthStyle', 'globe');
   const { data, loading, error } = useApiResource<AuroraSample[]>({
     key: CACHE_KEY,
     ttlMs: TTL_MS,
@@ -59,6 +62,14 @@ export function AuroraGlobeCard() {
       return undefined;
     }
   }, []);
+
+  useEffect(() => {
+    sceneRef.current?.setLabelScale(labelScale);
+  }, [labelScale]);
+
+  useEffect(() => {
+    sceneRef.current?.setEarthStyle(earthStyle);
+  }, [earthStyle]);
 
   const points = useMemo<AuroraPoint[]>(
     () =>

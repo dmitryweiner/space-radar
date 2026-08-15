@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   STORAGE_KEY,
   applyLayoutChange,
+  applyMobileOrderChange,
   applySettingsChange,
   defaultState,
   sanitizeState,
@@ -44,13 +45,19 @@ export function useLayoutState(registry: CardDefinition[], storageKey: string = 
     setState((prev) => applySettingsChange(prev, id, values));
   }, []);
 
+  const updateMobileOrder = useCallback((order: string[]) => {
+    setState((prev) => applyMobileOrderChange(prev, order));
+  }, []);
+
   return {
     visibleIds: state.visibleIds,
     layout: state.layout,
     cardSettings: state.settings,
+    mobileOrder: state.mobileOrder,
     toggleVisible,
     updateLayout,
     resetLayout,
     updateCardSettings,
+    updateMobileOrder,
   };
 }

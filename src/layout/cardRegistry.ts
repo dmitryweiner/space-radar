@@ -20,6 +20,14 @@ import { NasaImagesCard } from '../cards/NasaImagesCard';
 import { NASA_IMAGE_TOPICS } from '../api/nasaImages';
 import type { CardDefinition } from './types';
 
+// Shared by every Earth-globe card's per-card "Earth style" setting: the
+// default photo globe (day/night shading) vs. a flat, evenly-lit political
+// map (no shadow hiding markers on the dark side).
+const EARTH_STYLE_OPTIONS = [
+  { value: 'globe', label: 'Globe (photo, day/night)' },
+  { value: 'map', label: 'Flat map (no shadow)' },
+];
+
 export const cardRegistry: CardDefinition[] = [
   {
     id: 'iss-globe',
@@ -36,6 +44,7 @@ export const cardRegistry: CardDefinition[] = [
         defaultValue: ['stations'],
       },
       { kind: 'number', id: 'maxSatellites', label: 'Max satellites', min: 10, max: 300, step: 10, defaultValue: 30 },
+      { kind: 'select', id: 'earthStyle', label: 'Earth style', options: EARTH_STYLE_OPTIONS, defaultValue: 'globe' },
     ],
   },
   {
@@ -51,7 +60,10 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: true,
     defaultLayout: { x: 0, y: 2, w: 2, h: 2, minW: 2, minH: 2 },
     component: NaturalEventsCard,
-    settings: [{ kind: 'number', id: 'maxEvents', label: 'Events shown', min: 5, max: 60, step: 5, defaultValue: 25 }],
+    settings: [
+      { kind: 'number', id: 'maxEvents', label: 'Events shown', min: 5, max: 60, step: 5, defaultValue: 25 },
+      { kind: 'select', id: 'earthStyle', label: 'Earth style', options: EARTH_STYLE_OPTIONS, defaultValue: 'globe' },
+    ],
   },
   {
     id: 'apod',
@@ -116,6 +128,7 @@ export const cardRegistry: CardDefinition[] = [
     settings: [
       { kind: 'number', id: 'dayRange', label: 'Days back', min: 1, max: 7, defaultValue: 1 },
       { kind: 'number', id: 'labelCount', label: 'Labelled fires', min: 0, max: 100, step: 10, defaultValue: 30 },
+      { kind: 'select', id: 'earthStyle', label: 'Earth style', options: EARTH_STYLE_OPTIONS, defaultValue: 'globe' },
     ],
   },
   {
@@ -135,6 +148,7 @@ export const cardRegistry: CardDefinition[] = [
     settings: [
       { kind: 'multiselect', id: 'feeds', label: 'Feeds', options: QUAKE_FEEDS, defaultValue: ['2.5_day'] },
       { kind: 'number', id: 'maxQuakes', label: 'Max quakes', min: 20, max: 200, step: 20, defaultValue: 80 },
+      { kind: 'select', id: 'earthStyle', label: 'Earth style', options: EARTH_STYLE_OPTIONS, defaultValue: 'globe' },
     ],
   },
   {
@@ -174,6 +188,9 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: false,
     defaultLayout: { x: 0, y: 16, w: 2, h: 2, minW: 2, minH: 2 },
     component: AuroraGlobeCard,
+    settings: [
+      { kind: 'select', id: 'earthStyle', label: 'Earth style', options: EARTH_STYLE_OPTIONS, defaultValue: 'globe' },
+    ],
   },
   {
     id: 'nasa-images',

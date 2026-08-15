@@ -25,13 +25,13 @@ const hoveredCanvases = new Set<HTMLCanvasElement>();
 // Keyboard +/- zoom for a 3D card. Keys act on the card the pointer is over
 // (works mid-rotation, no click needed); a click-focused card is the fallback
 // target only when the pointer is over no globe, so two cards never zoom at
-// once. `onInteract` lets the caller treat a zoom as user input (e.g. to stop
-// auto-rotation). Returns a cleanup function.
+// once. Zoom is deliberately not treated as "user interaction" for auto-rotate
+// purposes — only a rotate/pan move stops the spin, see earthScene.ts.
+// Returns a cleanup function.
 export function attachKeyboardZoom(
   controls: OrbitControls,
   camera: PerspectiveCamera,
   canvas: HTMLCanvasElement,
-  onInteract?: () => void,
 ): () => void {
   canvas.tabIndex = 0;
   canvas.style.outline = 'none';
@@ -61,7 +61,6 @@ export function attachKeyboardZoom(
     }
     event.preventDefault();
     dolly(controls, camera, factor);
-    onInteract?.();
   }
 
   canvas.addEventListener('pointerenter', onEnter);

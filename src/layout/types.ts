@@ -36,14 +36,26 @@ export interface MultiSelectCardSetting {
   defaultValue: string[];
 }
 
-export type CardSettingDefinition = NumberCardSetting | MultiSelectCardSetting;
+/** A single-choice (radio) setting whose value is one option's value. */
+export interface SelectCardSetting {
+  kind: 'select';
+  id: string;
+  label: string;
+  options: MultiSelectOption[];
+  defaultValue: string;
+}
 
-export type CardSettingValue = number | string[];
+export type CardSettingDefinition = NumberCardSetting | MultiSelectCardSetting | SelectCardSetting;
+
+export type CardSettingValue = number | string[] | string;
 
 export type CardSettingValues = Record<string, CardSettingValue>;
 
 export interface CardComponentProps {
   settings?: CardSettingValues;
+  /** Global label/marker scale for the Earth-globe cards, set in the header's
+   * general settings popup (defaults to 1 when absent). */
+  labelScale?: number;
 }
 
 export interface CardDefinition {
@@ -59,4 +71,7 @@ export interface StoredLayoutState {
   visibleIds: string[];
   layout: Record<string, CardLayoutRect>;
   settings: Record<string, CardSettingValues>;
+  /** Visible card ids in single-column (mobile) display order. Desktop
+   * dragging never touches this — only the mobile grid reorders it. */
+  mobileOrder: string[];
 }

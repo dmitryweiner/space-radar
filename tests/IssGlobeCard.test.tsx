@@ -13,6 +13,8 @@ const sceneHandle = {
   setSatellites: vi.fn(),
   setMarkers: vi.fn(),
   setFirePoints: vi.fn(),
+  setLabelScale: vi.fn(),
+  setEarthStyle: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),
 };
