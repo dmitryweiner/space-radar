@@ -76,6 +76,20 @@ body {
   background: #232f56;
 }
 
+.tb-btn-label-short {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .tb-btn-label-full {
+    display: none;
+  }
+
+  .tb-btn-label-short {
+    display: inline;
+  }
+}
+
 /* Pressed/recessed look while the Cards sidebar is open. */
 .tb-btn-active,
 .tb-btn-active:hover {
@@ -112,6 +126,14 @@ body {
     border-bottom: 1px solid var(--panel-border);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   }
+}
+
+.card-menu-reset {
+  display: block;
+  width: 100%;
+  margin: 0 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .card-visibility-menu {

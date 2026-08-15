@@ -345,10 +345,14 @@ await page.waitForTimeout(200);
 if ((await page.getByTestId('fullscreen-overlay').count()) !== 0) errors.push('[fullscreen] Escape did not close the overlay');
 else console.log('fullscreen Escape-to-close ok');
 
-// reset layout: back to defaults
+// reset layout: back to defaults (button lives at the top of the Cards panel)
 ctxLabel = 'reset';
+await page.locator('#cardsMenuBtn').click();
+await page.waitForTimeout(150);
 await page.locator('#resetLayoutBtn').click();
 await page.waitForTimeout(300);
+await page.locator('#cardsMenuBtn').click();
+await page.waitForTimeout(200);
 const visibleAfterReset = await visibleCardIds(page);
 if (visibleAfterReset.length !== DEFAULT_VISIBLE.length || DEFAULT_VISIBLE.some((id) => !visibleAfterReset.includes(id))) {
   errors.push(`[reset] expected default visible set, got ${JSON.stringify(visibleAfterReset)}`);

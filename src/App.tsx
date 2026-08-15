@@ -73,6 +73,16 @@ export function App() {
         <span id="brand">Space Radar</span>
         <span className="tb-spacer" />
         <button
+          id="generalSettingsBtn"
+          type="button"
+          className={generalSettingsOpen ? 'tb-btn tb-btn-active' : 'tb-btn'}
+          aria-pressed={generalSettingsOpen}
+          onClick={() => setGeneralSettingsOpen((open) => !open)}
+        >
+          <span className="tb-btn-label-full">Global settings</span>
+          <span className="tb-btn-label-short">Settings</span>
+        </button>
+        <button
           id="cardsMenuBtn"
           type="button"
           className={menuOpen ? 'tb-btn tb-btn-active' : 'tb-btn'}
@@ -81,22 +91,13 @@ export function App() {
         >
           Cards
         </button>
-        <button id="resetLayoutBtn" type="button" className="tb-btn" onClick={resetLayout}>
-          Reset layout
-        </button>
-        <button
-          id="generalSettingsBtn"
-          type="button"
-          className={generalSettingsOpen ? 'tb-btn tb-btn-active' : 'tb-btn'}
-          aria-pressed={generalSettingsOpen}
-          onClick={() => setGeneralSettingsOpen((open) => !open)}
-        >
-          Settings
-        </button>
       </header>
       <div id="content">
         {menuOpen && (
           <aside id="cardMenu">
+            <button id="resetLayoutBtn" type="button" className="tb-btn card-menu-reset" onClick={resetLayout}>
+              Reset layout
+            </button>
             <CardVisibilityMenu registry={cardRegistry} visibleIds={visibleIds} onToggle={toggleVisible} />
           </aside>
         )}
