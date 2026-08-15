@@ -268,9 +268,25 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   }
 
   let frameId = 0;
+  // Real elapsed time between frames, in seconds, fed to controls.update()
+  // below. Without it, OrbitControls' autoRotate falls back to a fixed
+  // angle-per-*call* (assuming a steady 60 calls/sec) rather than a fixed
+  // angle-per-*second* — so any real fluctuation in actual rAF delivery rate
+  // (macOS ProMotion's adaptive refresh backing off during a slow, low-motion
+  // idle spin and then ramping back up, background-tab GPU scheduling, a
+  // compositor hiccup) visibly changes the rotation's on-screen speed:
+  // slower during a lower-rate stretch, then abruptly faster once the rate
+  // recovers — exactly the "stutters, then jerks forward" symptom. Capped at
+  // 100ms so a long stall (e.g. the tab was backgrounded) doesn't make the
+  // globe jump forward to "catch up" once it's visible again.
+  const MAX_DELTA_SECONDS = 0.1;
+  let lastFrameTime = performance.now();
   function animate() {
     frameId = requestAnimationFrame(animate);
-    controls.update();
+    const now = performance.now();
+    const deltaSeconds = Math.min((now - lastFrameTime) / 1000, MAX_DELTA_SECONDS);
+    lastFrameTime = now;
+    controls.update(deltaSeconds);
     rescaleLabel(issLabel);
     if (issMarker.visible) {
       scaleMarker(issMarker, ISS_MARKER_PX, ISS_MARKER_RADIUS);
