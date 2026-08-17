@@ -64,6 +64,10 @@ export interface NaturalEvent {
   magnitude: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** First source's URL (e.g. the InciWeb/IRWIN incident page) — a
+   * human-readable detail page, unlike EONET's own `link` (a JSON endpoint).
+   * Null when the event lists no sources. */
+  sourceUrl: string | null;
 }
 
 export interface FirePoint {
@@ -82,6 +86,9 @@ export interface LaunchInfo {
   net: string;
   provider: string | null;
   location: string | null;
+  /** Human-readable detail page (spacelaunchnow.me, built from the Launch
+   * Library `slug`), or null if the API omitted a slug. */
+  detailUrl: string | null;
 }
 
 export interface ApodInfo {
@@ -134,4 +141,7 @@ export interface Asteroid {
   closeApproachDate: string;
   missDistanceKm: number;
   relativeVelocityKmH: number;
+  /** JPL Small-Body Database lookup page (NeoWs' `nasa_jpl_url`), or null if
+   * the API omitted it. */
+  jplUrl: string | null;
 }

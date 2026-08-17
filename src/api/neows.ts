@@ -69,6 +69,7 @@ function parseAsteroidRecord(item: unknown): Asteroid | null {
     closeApproachDate,
     missDistanceKm,
     relativeVelocityKmH,
+    jplUrl: typeof item.nasa_jpl_url === 'string' ? item.nasa_jpl_url : null,
   };
 }
 

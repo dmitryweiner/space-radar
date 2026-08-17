@@ -7,6 +7,10 @@
 //   node scripts/snap.mjs --out /tmp/x.png --width 1400 --height 900 --wait 2000
 //   node scripts/snap.mjs --out /tmp/x.png --preview   # prod build (vite preview :4173)
 //   node scripts/snap.mjs --out /tmp/x.png --click 'button[aria-label="Settings for Solar Wind"]'
+//   node scripts/snap.mjs --out /tmp/x.png --click-at '[data-card-id="quakes"] canvas:200,150'  # click at an
+//     offset (px) from an element's top-left — for canvas/WebGL content with no clickable DOM node per point
+//   node scripts/snap.mjs --out /tmp/x.png --click '#generalSettingsBtn' --key Escape  # runs after
+//     --show/--hide, --click, and --click-at, in that order (each flag type is its own phase)
 
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -14,7 +18,7 @@ import { dirname } from 'node:path';
 import { chromium } from 'playwright';
 
 const args = process.argv.slice(2);
-const MULTI_FLAGS = new Set(['show', 'hide', 'click']);
+const MULTI_FLAGS = new Set(['show', 'hide', 'click', 'click-at', 'key']);
 const VALUE_FLAGS = new Set(['out', 'width', 'height', 'wait', ...MULTI_FLAGS]);
 const flags = new Map();
 for (let i = 0; i < args.length; i++) {
@@ -36,7 +40,9 @@ for (let i = 0; i < args.length; i++) {
 }
 
 if (!flags.has('out')) {
-  console.error('usage: node scripts/snap.mjs --out <path> [--show <cardId>]... [--hide <cardId>]... [--width n] [--height n] [--wait ms] [--preview]');
+  console.error(
+    'usage: node scripts/snap.mjs --out <path> [--show <cardId>]... [--hide <cardId>]... [--click <selector>]... [--click-at <selector:x,y>]... [--width n] [--height n] [--wait ms] [--preview]',
+  );
   process.exit(1);
 }
 
@@ -134,6 +140,24 @@ if (toShow.length || toHide.length) {
 
 for (const selector of flags.get('click') ?? []) {
   await page.locator(selector).first().click();
+  await page.waitForTimeout(200);
+}
+
+for (const spec of flags.get('click-at') ?? []) {
+  const lastColon = spec.lastIndexOf(':');
+  const selector = spec.slice(0, lastColon);
+  const [x, y] = spec.slice(lastColon + 1).split(',').map(Number);
+  const box = await page.locator(selector).first().boundingBox();
+  if (!box) {
+    console.error(`--click-at: element not found for "${selector}"`);
+    continue;
+  }
+  await page.mouse.click(box.x + x, box.y + y);
+  await page.waitForTimeout(200);
+}
+
+for (const key of flags.get('key') ?? []) {
+  await page.keyboard.press(key);
   await page.waitForTimeout(200);
 }
 

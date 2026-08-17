@@ -24,7 +24,8 @@ function isAsteroids(value: unknown): value is Asteroid[] {
         typeof item.diameterMaxKm === 'number' &&
         typeof item.closeApproachDate === 'string' &&
         typeof item.missDistanceKm === 'number' &&
-        typeof item.relativeVelocityKmH === 'number',
+        typeof item.relativeVelocityKmH === 'number' &&
+        (item.jplUrl === null || typeof item.jplUrl === 'string'),
     )
   );
 }
@@ -102,7 +103,15 @@ export function AsteroidsCard() {
       <tbody>
         {sorted.map((asteroid) => (
           <tr key={asteroid.id} data-testid="asteroid-row">
-            <td data-testid="asteroid-name">{asteroid.name}</td>
+            <td data-testid="asteroid-name">
+              {asteroid.jplUrl ? (
+                <a href={asteroid.jplUrl} target="_blank" rel="noreferrer" className="detail-link">
+                  {asteroid.name}
+                </a>
+              ) : (
+                asteroid.name
+              )}
+            </td>
             <td>{asteroid.closeApproachDate}</td>
             <td>{Math.round(asteroid.missDistanceKm).toLocaleString()} km</td>
             <td>{Math.round(asteroid.relativeVelocityKmH).toLocaleString()} km/h</td>

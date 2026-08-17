@@ -28,18 +28,23 @@ export function App() {
   const [settingsCardId, setSettingsCardId] = useState<string | null>(null);
   const [generalSettingsOpen, setGeneralSettingsOpen] = useState(false);
 
+  // Escape dismisses whichever overlay(s) are currently open — fullscreen, a
+  // card's settings popup, general settings, and the Cards sidebar.
   useEffect(() => {
-    if (!fullscreenId) {
+    if (!fullscreenId && !settingsCardId && !generalSettingsOpen && !menuOpen) {
       return;
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setFullscreenId(null);
+        setSettingsCardId(null);
+        setGeneralSettingsOpen(false);
+        setMenuOpen(false);
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fullscreenId]);
+  }, [fullscreenId, settingsCardId, generalSettingsOpen, menuOpen]);
 
   // Dismiss the Cards sidebar when clicking anywhere outside it (the toggle
   // button is excluded so its own onClick still handles the close).
@@ -95,9 +100,11 @@ export function App() {
       <div id="content">
         {menuOpen && (
           <aside id="cardMenu">
-            <button id="resetLayoutBtn" type="button" className="tb-btn card-menu-reset" onClick={resetLayout}>
-              Reset layout
-            </button>
+            <div className="card-menu-reset">
+              <button id="resetLayoutBtn" type="button" className="tb-btn" onClick={resetLayout}>
+                Reset layout
+              </button>
+            </div>
             <CardVisibilityMenu registry={cardRegistry} visibleIds={visibleIds} onToggle={toggleVisible} />
           </aside>
         )}

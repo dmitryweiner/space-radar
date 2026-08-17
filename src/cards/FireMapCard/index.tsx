@@ -6,6 +6,7 @@ import { createEarthScene, EARTH_RADIUS_UNITS, type EarthSceneHandle, type FireP
 import type { FirePoint } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
 import { numberSetting, stringSetting } from '../../layout/layoutState';
+import { MarkerInfoPopup } from '../MarkerInfoPopup';
 
 const CACHE_KEY = 'space-radar:fire-points';
 // FIRMS updates a few times a day and the world CSV is large — poll slowly.
@@ -46,13 +47,16 @@ function intensity(point: FirePoint): number {
   return Math.min(1, Math.max(0, point.confidence ?? base));
 }
 
-// Label text drawn beside the strongest fire points. acquiredAt is
-// "YYYY-MM-DD HHMM" (UTC); pretty-print the HHMM time and append brightness.
-function fireInfo(point: FirePoint): string {
+// acquiredAt is "YYYY-MM-DD HHMM" (UTC); pretty-print the HHMM time.
+function formatAcquiredAt(point: FirePoint): string {
   const [date, rawTime] = point.acquiredAt.split(' ');
   const digits = (rawTime ?? '').padStart(4, '0');
-  const when = rawTime ? `${date} ${digits.slice(0, 2)}:${digits.slice(2)} UTC` : date;
-  const parts = [when];
+  return rawTime ? `${date} ${digits.slice(0, 2)}:${digits.slice(2)} UTC` : date;
+}
+
+// Label text drawn beside the strongest fire points: time + brightness.
+function fireInfo(point: FirePoint): string {
+  const parts = [formatAcquiredAt(point)];
   if (Number.isFinite(point.brightnessKelvin) && point.brightnessKelvin > 0) {
     parts.push(`${Math.round(point.brightnessKelvin)} K`);
   }
@@ -74,6 +78,7 @@ export function FireMapCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<EarthSceneHandle | null>(null);
   const [sceneError, setSceneError] = useState<string | null>(null);
+  const [selectedFireIndex, setSelectedFireIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -83,6 +88,11 @@ export function FireMapCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: 
     try {
       const scene = createEarthScene(canvas);
       sceneRef.current = scene;
+      scene.setOnMarkerClick((hit) => {
+        if (hit.kind === 'fire') {
+          setSelectedFireIndex(hit.index);
+        }
+      });
       return () => {
         scene.dispose();
         sceneRef.current = null;
@@ -127,6 +137,9 @@ export function FireMapCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: 
     sceneRef.current?.setFirePoints(scenePoints);
   }, [scenePoints]);
 
+  const selectedFire =
+    selectedFireIndex !== null && data ? data[selectedFireIndex] ?? null : null;
+
   return (
     <div className="globe-wrap">
       <canvas ref={canvasRef} className="globe-canvas" />
@@ -138,6 +151,20 @@ export function FireMapCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: 
           {data.length.toLocaleString()} active fire{data.length === 1 ? '' : 's'} · last {dayRange}d (VIIRS)
           {data.length > 0 && labelCount > 0 && ` · top ${Math.min(labelCount, data.length)} labelled`}
         </p>
+      )}
+      {selectedFire && (
+        <MarkerInfoPopup
+          title="Fire detection"
+          fields={[
+            { label: 'Detected', value: formatAcquiredAt(selectedFire) },
+            { label: 'Brightness', value: `${Math.round(selectedFire.brightnessKelvin)} K` },
+            {
+              label: 'Confidence',
+              value: selectedFire.confidence === null ? 'Unknown' : `${Math.round(selectedFire.confidence * 100)}%`,
+            },
+          ]}
+          onClose={() => setSelectedFireIndex(null)}
+        />
       )}
     </div>
   );

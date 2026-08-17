@@ -75,6 +75,16 @@ export interface AuroraPoint {
   probability: number;
 }
 
+// What got clicked — `fire`/`aurora` carry an index into the array most
+// recently passed to setFirePoints/setAuroraPoints (both render as a single
+// THREE.Points cloud, so a raycast hit only yields a buffer index, not an id).
+export type MarkerHit =
+  | { kind: 'iss' }
+  | { kind: 'satellite'; name: string }
+  | { kind: 'marker'; id: string }
+  | { kind: 'fire'; index: number }
+  | { kind: 'aurora'; index: number };
+
 export interface EarthSceneHandle {
   setIssPosition(position: SceneVector3 | null, trail?: SceneVector3[]): void;
   setSatellites(satellites: NamedPosition[]): void;
@@ -92,6 +102,9 @@ export interface EarthSceneHandle {
   /** Multiplies the idle auto-rotate speed (see the global "Auto-rotate
    * speed" setting). 1 = AUTO_ROTATE_SPEED below; 0 stops the spin. */
   setAutoRotateSpeed(multiplier: number): void;
+  /** Fires when the user clicks a marker/satellite/ISS/fire/aurora point.
+   * Pass null to detach. Only one handler at a time — the card owns it. */
+  setOnMarkerClick(handler: ((hit: MarkerHit) => void) | null): void;
   resize(): void;
   dispose(): void;
 }
@@ -217,9 +230,105 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
 
   let firePoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
   // Permanent labels beside the strongest fire points (depth-tested sprites, so
-  // the opaque Earth hides the ones on the far side for free).
-  let fireLabels: LabelSprite[] = [];
+  // the opaque Earth hides the ones on the far side for free). Each carries the
+  // originating index into the array most recently passed to setFirePoints, so
+  // a click on the label can resolve back to the same point a click on the dot
+  // would (see handleCanvasClick).
+  let fireLabels: { index: number; label: LabelSprite }[] = [];
   let auroraPoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
+
+  // Click-to-inspect: one raycaster shared by every marker representation
+  // this scene can hold (individual meshes for ISS/satellites/event markers,
+  // buffer-index hits for the fire/aurora Points clouds). Only one card-level
+  // handler at a time — set via setOnMarkerClick.
+  const raycaster = new THREE.Raycaster();
+  raycaster.params.Points = { threshold: 0.06 };
+  const pointerNdc = new THREE.Vector2();
+  let onMarkerClick: ((hit: MarkerHit) => void) | null = null;
+
+  // Labels get far-side occlusion for free from the GPU depth test (see the
+  // module comment on eventMarkers/fireLabels); the raycaster has no such
+  // test, so a click could otherwise "hit" a marker mathematically on the ray
+  // but actually hidden behind the opaque globe. Compare every candidate hit
+  // against the Earth mesh's own hit distance along the same ray and reject
+  // anything farther. The epsilon covers a marker mesh's own radius (it sits
+  // slightly outside the exact sphere surface) without being anywhere near
+  // the ~2×EARTH_RADIUS gap to a genuinely far-side hit.
+  const OCCLUSION_EPSILON = 0.05;
+  function isOccluded(distance: number, earthDistance: number): boolean {
+    return distance > earthDistance + OCCLUSION_EPSILON;
+  }
+
+  function handleCanvasClick(event: MouseEvent) {
+    if (!onMarkerClick) {
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      return;
+    }
+    pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointerNdc, camera);
+
+    const earthHits = raycaster.intersectObject(earth, false);
+    const earthDistance = earthHits.length > 0 ? earthHits[0].distance : Infinity;
+
+    // Every clickable dot/marker AND its label sprite resolve to the same
+    // MarkerHit, so clicking either one opens the same popup — a label's
+    // rendered text is a much bigger, easier target than a few-pixel dot.
+    const hitByObject = new Map<THREE.Object3D, MarkerHit>();
+    const targets: THREE.Object3D[] = [];
+    function addTarget(object: THREE.Object3D, hit: MarkerHit) {
+      targets.push(object);
+      hitByObject.set(object, hit);
+    }
+
+    if (issMarker.visible) {
+      addTarget(issMarker, { kind: 'iss' });
+      addTarget(issLabel.sprite, { kind: 'iss' });
+    }
+    for (const [name, entry] of satelliteMarkers) {
+      const hit: MarkerHit = { kind: 'satellite', name };
+      addTarget(entry.mesh, hit);
+      addTarget(entry.label.sprite, hit);
+    }
+    for (const [id, entry] of eventMarkers) {
+      const hit: MarkerHit = { kind: 'marker', id };
+      addTarget(entry.mesh, hit);
+      addTarget(entry.label.sprite, hit);
+    }
+    for (const { index, label } of fireLabels) {
+      addTarget(label.sprite, { kind: 'fire', index });
+    }
+
+    const objectHits = targets.length > 0 ? raycaster.intersectObjects(targets, false) : [];
+    const visibleObjectHit = objectHits.find((hit) => !isOccluded(hit.distance, earthDistance));
+    if (visibleObjectHit) {
+      const hit = hitByObject.get(visibleObjectHit.object);
+      if (hit) {
+        onMarkerClick(hit);
+      }
+      return;
+    }
+
+    if (firePoints) {
+      const hits = raycaster.intersectObject(firePoints);
+      const visible = hits.find((hit) => !isOccluded(hit.distance, earthDistance));
+      if (visible && visible.index !== undefined) {
+        onMarkerClick({ kind: 'fire', index: visible.index });
+        return;
+      }
+    }
+    if (auroraPoints) {
+      const hits = raycaster.intersectObject(auroraPoints);
+      const visible = hits.find((hit) => !isOccluded(hit.distance, earthDistance));
+      if (visible && visible.index !== undefined) {
+        onMarkerClick({ kind: 'aurora', index: visible.index });
+      }
+    }
+  }
+  canvas.addEventListener('click', handleCanvasClick);
 
   const scratch = new THREE.Vector3();
 
@@ -245,7 +354,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   }
 
   function clearFireLabels() {
-    for (const label of fireLabels) {
+    for (const { label } of fireLabels) {
       scene.remove(label.sprite);
       label.dispose();
     }
@@ -299,7 +408,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       rescaleLabel(entry.label);
       scaleMarker(entry.mesh, EVENT_MARKER_PX, EVENT_MARKER_RADIUS);
     }
-    for (const label of fireLabels) {
+    for (const { label } of fireLabels) {
       rescaleLabel(label, FIRE_LABEL_PX);
     }
     renderer.render(scene, camera);
@@ -397,7 +506,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
           const label = makeLabelSprite(point.label, '#ffd7a0');
           label.sprite.position.copy(labelPosition(point.position, scratch));
           scene.add(label.sprite);
-          fireLabels.push(label);
+          fireLabels.push({ index: i, label });
         }
       });
       const geometry = new THREE.BufferGeometry();
@@ -472,12 +581,16 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     setAutoRotateSpeed(multiplier) {
       controls.autoRotateSpeed = AUTO_ROTATE_SPEED * multiplier;
     },
+    setOnMarkerClick(handler) {
+      onMarkerClick = handler;
+    },
     resize() {
       applySize();
     },
     dispose() {
       cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
+      canvas.removeEventListener('click', handleCanvasClick);
       clearFireLabels();
       controls.removeEventListener('start', stopAutoRotateOnMove);
       detachKeyboardZoom();

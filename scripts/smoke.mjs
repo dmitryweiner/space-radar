@@ -372,10 +372,17 @@ ctxLabel = 'global-settings';
   if ((await popup.count()) !== 1) {
     errors.push('[global-settings] popup did not open');
   } else {
-    await popup.locator('#global-setting-label-scale').fill('1.6');
-    await popup.locator('#global-setting-label-scale').blur();
-    await popup.locator('#global-setting-rotate-speed').fill('0');
-    await popup.locator('#global-setting-rotate-speed').blur();
+    // Range inputs aren't fill()-able in Playwright — Home/ArrowRight moves
+    // the slider by exact `step` increments, landing on a known value
+    // regardless of where it started (LABEL_SCALE_MIN=0.5, step=0.1: Home + 11
+    // steps of 0.1 = 1.6; ROTATE_SPEED_MIN=0: Home alone is already 0).
+    const labelScaleInput = popup.locator('#global-setting-label-scale');
+    await labelScaleInput.focus();
+    await labelScaleInput.press('Home');
+    for (let i = 0; i < 11; i++) await labelScaleInput.press('ArrowRight');
+    const rotateSpeedInput = popup.locator('#global-setting-rotate-speed');
+    await rotateSpeedInput.focus();
+    await rotateSpeedInput.press('Home');
     await popup.locator('#global-setting-density-compact').check();
     await page.waitForTimeout(150);
     // The backdrop covers the whole viewport (including the header button

@@ -6,6 +6,7 @@ import { createEarthScene, EARTH_RADIUS_UNITS, type AuroraPoint, type EarthScene
 import type { AuroraSample } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
 import { stringSetting } from '../../layout/layoutState';
+import { MarkerInfoPopup } from '../MarkerInfoPopup';
 
 const CACHE_KEY = 'space-radar:aurora-globe';
 const TTL_MS = 5 * 60 * 1000;
@@ -44,6 +45,7 @@ export function AuroraGlobeCard({ settings = {}, labelScale = 1, rotateSpeed = 1
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<EarthSceneHandle | null>(null);
   const [sceneError, setSceneError] = useState<string | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -53,6 +55,11 @@ export function AuroraGlobeCard({ settings = {}, labelScale = 1, rotateSpeed = 1
     try {
       const scene = createEarthScene(canvas);
       sceneRef.current = scene;
+      scene.setOnMarkerClick((hit) => {
+        if (hit.kind === 'aurora') {
+          setSelectedIndex(hit.index);
+        }
+      });
       return () => {
         scene.dispose();
         sceneRef.current = null;
@@ -93,6 +100,8 @@ export function AuroraGlobeCard({ settings = {}, labelScale = 1, rotateSpeed = 1
     [data],
   );
 
+  const selected = selectedIndex !== null && data ? data[selectedIndex] ?? null : null;
+
   return (
     <div className="globe-wrap">
       <canvas ref={canvasRef} className="globe-canvas" />
@@ -109,6 +118,16 @@ export function AuroraGlobeCard({ settings = {}, labelScale = 1, rotateSpeed = 1
             OVATION aurora · peak {Math.round(peak * 100)}%
           </span>
         </div>
+      )}
+      {selected && (
+        <MarkerInfoPopup
+          title="Aurora probability"
+          fields={[
+            { label: 'Probability', value: `${Math.round(selected.probability * 100)}%` },
+            { label: 'Location', value: `${selected.latitude.toFixed(1)}°, ${selected.longitude.toFixed(1)}°` },
+          ]}
+          onClose={() => setSelectedIndex(null)}
+        />
       )}
     </div>
   );

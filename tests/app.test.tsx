@@ -12,6 +12,7 @@ vi.mock('../src/render/earthScene', () => ({
     setLabelScale: vi.fn(),
     setEarthStyle: vi.fn(),
     setAutoRotateSpeed: vi.fn(),
+    setOnMarkerClick: vi.fn(),
     resize: vi.fn(),
     dispose: vi.fn(),
   })),

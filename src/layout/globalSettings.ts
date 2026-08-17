@@ -8,17 +8,20 @@ export const ROTATE_SPEED_MIN = 0;
 export const ROTATE_SPEED_MAX = 3;
 export const ROTATE_SPEED_STEP = 0.1;
 
-export type CardDensity = 'comfortable' | 'compact';
+export type CardDensity = 'comfortable' | 'compact' | 'large';
 
 /** Grid row height in pixels for each density — see GridLayout's `rowHeight`. */
 export const DENSITY_ROW_HEIGHT: Record<CardDensity, number> = {
   comfortable: 160,
   compact: 120,
+  large: 220,
 };
 
+// Ordered by increasing row height (see DENSITY_ROW_HEIGHT), not alphabetically.
 export const DENSITY_OPTIONS: { value: CardDensity; label: string }[] = [
-  { value: 'comfortable', label: 'Comfortable' },
   { value: 'compact', label: 'Compact' },
+  { value: 'comfortable', label: 'Comfortable' },
+  { value: 'large', label: 'Large' },
 ];
 
 export interface GlobalSettings {
@@ -43,7 +46,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isCardDensity(value: unknown): value is CardDensity {
-  return value === 'comfortable' || value === 'compact';
+  return value === 'comfortable' || value === 'compact' || value === 'large';
 }
 
 export function sanitizeGlobalSettings(raw: unknown): GlobalSettings {

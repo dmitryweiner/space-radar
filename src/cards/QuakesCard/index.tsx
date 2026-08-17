@@ -6,6 +6,8 @@ import { createEarthScene, EARTH_RADIUS_UNITS, type EarthSceneHandle, type Globe
 import type { Quake } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
 import { listSetting, numberSetting, stringSetting } from '../../layout/layoutState';
+import { MarkerInfoPopup } from '../MarkerInfoPopup';
+import { formatUtcTimestamp } from '../formatTimestamp';
 
 const TTL_MS = 5 * 60 * 1000;
 const POLL_MS = 5 * 60 * 1000;
@@ -71,6 +73,7 @@ export function QuakesCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: C
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<EarthSceneHandle | null>(null);
   const [sceneError, setSceneError] = useState<string | null>(null);
+  const [selectedQuakeId, setSelectedQuakeId] = useState<string | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -80,6 +83,11 @@ export function QuakesCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: C
     try {
       const scene = createEarthScene(canvas);
       sceneRef.current = scene;
+      scene.setOnMarkerClick((hit) => {
+        if (hit.kind === 'marker') {
+          setSelectedQuakeId(hit.id);
+        }
+      });
       return () => {
         scene.dispose();
         sceneRef.current = null;
@@ -133,6 +141,7 @@ export function QuakesCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: C
   }, [quakes]);
 
   const feedLabel = QUAKE_FEEDS.filter((feed) => feeds.includes(feed.value)).map((feed) => feed.label).join(' · ');
+  const selectedQuake = selectedQuakeId ? quakes.find((quake) => quake.id === selectedQuakeId) ?? null : null;
 
   return (
     <div className="globe-wrap">
@@ -152,6 +161,17 @@ export function QuakesCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }: C
             </span>
           ))}
         </div>
+      )}
+      {selectedQuake && (
+        <MarkerInfoPopup
+          title={`M${selectedQuake.magnitude.toFixed(1)} — ${selectedQuake.place}`}
+          fields={[
+            { label: 'Time', value: formatUtcTimestamp(new Date(selectedQuake.time).toISOString()) },
+            { label: 'Depth', value: `${selectedQuake.depthKm.toFixed(1)} km` },
+          ]}
+          detailUrl={selectedQuake.url || null}
+          onClose={() => setSelectedQuakeId(null)}
+        />
       )}
     </div>
   );

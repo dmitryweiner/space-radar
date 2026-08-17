@@ -6,6 +6,7 @@ import type { TleRecord } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
 import { listSetting, numberSetting, stringSetting } from '../../layout/layoutState';
 import { useTleSatellites } from './useTleSatellites';
+import { MarkerInfoPopup } from '../MarkerInfoPopup';
 
 const POSITION_UPDATE_MS = 1000;
 // The fading orbit trail behind each satellite: a ~40-minute arc (≈0.4 of a LEO
@@ -34,6 +35,29 @@ export const SATELLITE_CATEGORIES: { value: string; label: string }[] = [
 function findIss(records: TleRecord[]): TleRecord | null {
   return records.find((record) => /zarya|\biss\b/i.test(record.name)) ?? null;
 }
+
+// TLE line 1 format: "1 NNNNNU ..." — the NORAD catalog number is the 5-digit
+// field right after the line number.
+function noradCatalogNumber(line1: string): string | null {
+  return line1.match(/^1\s+(\d+)/)?.[1] ?? null;
+}
+
+interface SatelliteDetails {
+  title: string;
+  fields: { label: string; value: string }[];
+  detailUrl: string | null;
+}
+
+function satelliteDetails(record: TleRecord): SatelliteDetails {
+  const noradId = noradCatalogNumber(record.line1);
+  return {
+    title: record.name,
+    fields: noradId ? [{ label: 'NORAD ID', value: noradId }] : [],
+    detailUrl: noradId ? `https://www.n2yo.com/satellite/?s=${noradId}` : null,
+  };
+}
+
+type Selection = { kind: 'iss' } | { kind: 'satellite'; name: string } | null;
 
 // Positions from now backward over TRAIL_SPAN_MS, ordered tail → head so the
 // last point is the satellite's current location (the bright end of the trail).
@@ -75,6 +99,7 @@ export function IssGlobeCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }:
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<EarthSceneHandle | null>(null);
   const [sceneError, setSceneError] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -84,6 +109,13 @@ export function IssGlobeCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }:
     try {
       const scene = createEarthScene(canvas);
       sceneRef.current = scene;
+      scene.setOnMarkerClick((hit) => {
+        if (hit.kind === 'iss') {
+          setSelection({ kind: 'iss' });
+        } else if (hit.kind === 'satellite') {
+          setSelection({ kind: 'satellite', name: hit.name });
+        }
+      });
       return () => {
         scene.dispose();
         sceneRef.current = null;
@@ -142,6 +174,10 @@ export function IssGlobeCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }:
 
   const satelliteCount = otherSatellites.length + (iss ? 1 : 0);
 
+  const selectedRecord: TleRecord | null =
+    selection?.kind === 'iss' ? iss : selection?.kind === 'satellite' ? data?.find((record) => record.name === selection.name) ?? null : null;
+  const selectedDetails = selectedRecord ? satelliteDetails(selectedRecord) : null;
+
   return (
     <div className="globe-wrap">
       <canvas ref={canvasRef} className="globe-canvas" />
@@ -151,8 +187,15 @@ export function IssGlobeCard({ settings = {}, labelScale = 1, rotateSpeed = 1 }:
       {!sceneError && !loading && !error && data && (
         <p className="card-status globe-overlay">
           {satelliteCount} satellite{satelliteCount === 1 ? '' : 's'}
-          {!iss && ' · ISS not in selection'}
         </p>
+      )}
+      {selectedDetails && (
+        <MarkerInfoPopup
+          title={selectedDetails.title}
+          fields={selectedDetails.fields}
+          detailUrl={selectedDetails.detailUrl}
+          onClose={() => setSelection(null)}
+        />
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { IssGlobeCard } from '../src/cards/IssGlobeCard';
 import { fetchTleGroup } from '../src/api/celestrak';
 import { createEarthScene } from '../src/render/earthScene';
@@ -16,6 +17,7 @@ const sceneHandle = {
   setLabelScale: vi.fn(),
   setEarthStyle: vi.fn(),
   setAutoRotateSpeed: vi.fn(),
+  setOnMarkerClick: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),
 };
@@ -44,6 +46,7 @@ beforeEach(() => {
   sceneHandle.setIssPosition.mockClear();
   sceneHandle.setOrbitPath.mockClear();
   sceneHandle.setSatellites.mockClear();
+  sceneHandle.setOnMarkerClick.mockClear();
   sceneHandle.dispose.mockClear();
 });
 
@@ -84,10 +87,10 @@ describe('IssGlobeCard', () => {
     expect(positions).toHaveLength(1);
   });
 
-  it('shows a message when the ISS is not in the selected groups', async () => {
+  it('still counts satellites when the ISS is not in the selected groups', async () => {
     vi.mocked(fetchTleGroup).mockResolvedValue([{ name: 'NOAA 15', line1: 'a', line2: 'b' }]);
     render(<IssGlobeCard />);
-    expect(await screen.findByText(/iss not in selection/i)).toBeInTheDocument();
+    expect(await screen.findByText('1 satellite')).toBeInTheDocument();
   });
 
   it('disposes the scene on unmount', async () => {
@@ -96,6 +99,34 @@ describe('IssGlobeCard', () => {
     await vi.waitFor(() => expect(createEarthScene).toHaveBeenCalledOnce());
     unmount();
     expect(sceneHandle.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('shows the ISS details popup (with an n2yo.com link) when the ISS marker is clicked', async () => {
+    vi.mocked(fetchTleGroup).mockResolvedValue([ISS_TLE]);
+    render(<IssGlobeCard />);
+    await vi.waitFor(() => expect(sceneHandle.setOnMarkerClick).toHaveBeenCalled());
+
+    const onMarkerClick = sceneHandle.setOnMarkerClick.mock.calls[0][0];
+    onMarkerClick({ kind: 'iss' });
+
+    expect(await screen.findByText('ISS (ZARYA)')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /details/i });
+    expect(link).toHaveAttribute('href', 'https://www.n2yo.com/satellite/?s=25544');
+
+    await userEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(screen.queryByText('ISS (ZARYA)')).not.toBeInTheDocument();
+  });
+
+  it('shows a satellite details popup when a satellite marker is clicked', async () => {
+    vi.mocked(fetchTleGroup).mockResolvedValue([ISS_TLE, POISK_TLE]);
+    render(<IssGlobeCard />);
+    await vi.waitFor(() => expect(sceneHandle.setOnMarkerClick).toHaveBeenCalled());
+
+    const onMarkerClick = sceneHandle.setOnMarkerClick.mock.calls[0][0];
+    onMarkerClick({ kind: 'satellite', name: 'POISK' });
+
+    expect(await screen.findByText('POISK')).toBeInTheDocument();
+    expect(screen.getByText('35110')).toBeInTheDocument();
   });
 
   it('fetches each group once and reuses the cache when the selection grows', async () => {

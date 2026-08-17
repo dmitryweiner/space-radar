@@ -17,6 +17,7 @@ const SAMPLE = [
     closeApproachDate: '2026-Jul-30 08:00',
     missDistanceKm: 5_000_000,
     relativeVelocityKmH: 40000,
+    jplUrl: 'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=1',
   },
   {
     id: '2',
@@ -27,6 +28,7 @@ const SAMPLE = [
     closeApproachDate: '2026-Jul-29 12:00',
     missDistanceKm: 1_000_000,
     relativeVelocityKmH: 20000,
+    jplUrl: null,
   },
 ];
 

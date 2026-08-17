@@ -129,11 +129,14 @@ body {
 }
 
 .card-menu-reset {
-  display: block;
-  width: 100%;
   margin: 0 0 14px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--panel-border);
+}
+
+.card-menu-reset .tb-btn {
+  display: block;
+  width: 100%;
 }
 
 .card-visibility-menu {
@@ -192,6 +195,9 @@ body {
 }
 
 .card-shell-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: var(--text-dim);
@@ -266,7 +272,7 @@ body {
   color: var(--text-dim);
 }
 
-.settings-field input {
+.settings-field input:not([type='range']) {
   width: 72px;
   background: #1a2340;
   color: var(--text);
@@ -276,10 +282,68 @@ body {
   font-size: 13px;
 }
 
-.settings-field-multiselect {
+.settings-field-multiselect,
+.settings-field-slider {
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
+}
+
+.settings-field-slider-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.settings-field-value {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-slider-row input[type='range'] {
+  flex: 1;
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.adj-btn {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a2340;
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.adj-btn:hover {
+  background: #232f56;
+}
+
+.adj-btn:active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.adj-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .settings-checkbox-list {
@@ -473,6 +537,15 @@ body {
   flex: 1;
   min-height: 0;
   display: flex;
+}
+
+.detail-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.detail-link:hover {
+  text-decoration: underline;
 }
 
 .apod-image {
@@ -822,4 +895,60 @@ body {
   height: 9px;
   border-radius: 2px;
   flex-shrink: 0;
+}
+
+.marker-info-popup {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  width: 220px;
+  max-width: calc(100% - 16px);
+  padding: 8px 10px;
+  background: rgba(13, 18, 32, 0.92);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.marker-info-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.marker-info-popup-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.marker-info-popup-fields {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.marker-info-popup-field {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.marker-info-popup-field dt {
+  color: var(--text-dim);
+}
+
+.marker-info-popup-field dd {
+  margin: 0;
+  color: var(--text);
+  text-align: right;
+}
+
+.marker-info-popup .detail-link {
+  display: inline-block;
+  margin-top: 6px;
 }

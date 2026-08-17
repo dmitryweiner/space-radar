@@ -5,6 +5,13 @@ import { describeHttpError } from './httpError';
 // free tier is rate-limited to 15 requests/hour, so poll sparingly.
 const API_URL = 'https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=20&mode=list';
 
+// The API's own `url` field is the JSON detail endpoint, not a page for
+// people — spacelaunchnow.me is The Space Devs' companion site for this same
+// data and resolves human-readable pages at this path (verified via curl).
+function detailUrl(slug: string | null): string | null {
+  return slug ? `https://spacelaunchnow.me/launch/${slug}` : null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -36,6 +43,7 @@ export function parseLaunches(raw: unknown): LaunchInfo[] {
       net,
       provider: toNullableString(item.lsp_name),
       location: toNullableString(item.location),
+      detailUrl: detailUrl(toNullableString(item.slug)),
     });
   }
   return launches;

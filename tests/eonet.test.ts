@@ -7,6 +7,7 @@ const SAMPLE = {
       id: 'EONET_1',
       title: 'Some Wildfire, Georgia',
       categories: [{ id: 'wildfires', title: 'Wildfires' }],
+      sources: [{ id: 'IRWIN', url: 'https://irwin.doi.gov/observer/incidents/example' }],
       geometry: [
         { date: '2026-07-28T12:00:00Z', magnitudeValue: 100, magnitudeUnit: 'acres', coordinates: [-81.0, 30.0] },
         { date: '2026-07-30T12:00:00Z', magnitudeValue: 600, magnitudeUnit: 'acres', coordinates: [-81.5, 31.2] },
@@ -32,6 +33,7 @@ describe('parseNaturalEvents', () => {
         magnitude: null,
         latitude: 20,
         longitude: 10,
+        sourceUrl: null,
       },
       {
         id: 'EONET_1',
@@ -41,6 +43,7 @@ describe('parseNaturalEvents', () => {
         magnitude: '600 acres',
         latitude: 31.2,
         longitude: -81.5,
+        sourceUrl: 'https://irwin.doi.gov/observer/incidents/example',
       },
     ]);
   });

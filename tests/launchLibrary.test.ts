@@ -10,6 +10,7 @@ const SAMPLE = {
       net: '2026-08-01T02:00:00Z',
       lsp_name: 'SpaceX',
       location: 'Vandenberg SFB, CA, USA',
+      slug: 'falcon-9-block-5-starlink-group-17-52',
     },
     {
       id: 'launch-2',
@@ -32,6 +33,7 @@ describe('parseLaunches', () => {
         net: '2026-08-01T02:00:00Z',
         provider: 'SpaceX',
         location: 'Vandenberg SFB, CA, USA',
+        detailUrl: 'https://spacelaunchnow.me/launch/falcon-9-block-5-starlink-group-17-52',
       },
       {
         id: 'launch-2',
@@ -40,6 +42,7 @@ describe('parseLaunches', () => {
         net: '2026-08-02T00:00:00Z',
         provider: null,
         location: null,
+        detailUrl: null,
       },
     ]);
   });

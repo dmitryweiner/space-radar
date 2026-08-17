@@ -9,8 +9,12 @@ import {
   type CardDensity,
   type GlobalSettings,
 } from './globalSettings';
-import { NumberField } from './NumberField';
+
+function isCardDensity(value: string): value is CardDensity {
+  return DENSITY_OPTIONS.some((option) => option.value === value);
+}
 import { SelectField } from './SelectField';
+import { SliderField } from './SliderField';
 
 interface GlobalSettingsPopupProps {
   settings: GlobalSettings;
@@ -41,7 +45,7 @@ export function GlobalSettingsPopup({
             ×
           </button>
         </div>
-        <NumberField
+        <SliderField
           id="global-setting-label-scale"
           label="Globe label size"
           value={settings.labelScale}
@@ -50,7 +54,7 @@ export function GlobalSettingsPopup({
           step={LABEL_SCALE_STEP}
           onChange={onChangeLabelScale}
         />
-        <NumberField
+        <SliderField
           id="global-setting-rotate-speed"
           label="Auto-rotate speed (0 = off)"
           value={settings.rotateSpeed}
@@ -64,7 +68,7 @@ export function GlobalSettingsPopup({
           label="Card density"
           options={DENSITY_OPTIONS}
           value={settings.density}
-          onChange={(value) => onChangeDensity(value === 'compact' ? 'compact' : 'comfortable')}
+          onChange={(value) => onChangeDensity(isCardDensity(value) ? value : 'comfortable')}
         />
       </div>
     </div>

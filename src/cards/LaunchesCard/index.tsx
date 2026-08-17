@@ -30,7 +30,8 @@ function isLaunches(value: unknown): value is LaunchInfo[] {
         typeof item.status === 'string' &&
         typeof item.net === 'string' &&
         isNullableString(item.provider) &&
-        isNullableString(item.location),
+        isNullableString(item.location) &&
+        isNullableString(item.detailUrl),
     )
   );
 }
@@ -80,6 +81,11 @@ export function LaunchesCard({ settings = {} }: CardComponentProps) {
             <span className="event-time">{formatUtcTimestamp(launch.net)}</span>
             {launch.provider && <span>{launch.provider}</span>}
             {launch.location && <span>{launch.location}</span>}
+            {launch.detailUrl && (
+              <a href={launch.detailUrl} target="_blank" rel="noreferrer" className="detail-link">
+                Details ↗
+              </a>
+            )}
           </div>
         </li>
       ))}

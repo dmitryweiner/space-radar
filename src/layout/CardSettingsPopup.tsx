@@ -8,6 +8,7 @@ import type {
 import { GRID_COLS } from './GridLayout';
 import { NumberField } from './NumberField';
 import { SelectField } from './SelectField';
+import { SliderField } from './SliderField';
 
 const MAX_ROWS = 8;
 
@@ -93,7 +94,7 @@ function SettingField({
     );
   }
   return (
-    <NumberField
+    <SliderField
       id={`${card.id}-setting-${definition.id}`}
       label={definition.label}
       value={typeof stored === 'number' ? stored : definition.defaultValue}

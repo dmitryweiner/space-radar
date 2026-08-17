@@ -114,6 +114,19 @@ function firstCategory(categories: unknown): string {
   return 'Other';
 }
 
+// The event's own `link` is a JSON API endpoint, not a page for people —
+// `sources[0].url` points at the original reporting source (e.g. an
+// InciWeb/IRWIN incident page), which is what a "Details" link should open.
+function firstSourceUrl(sources: unknown): string | null {
+  if (Array.isArray(sources) && sources.length > 0) {
+    const first = sources[0];
+    if (isRecord(first) && typeof first.url === 'string') {
+      return first.url;
+    }
+  }
+  return null;
+}
+
 export function parseNaturalEvents(raw: unknown): NaturalEvent[] {
   if (!isRecord(raw) || !Array.isArray(raw.events)) {
     return [];
@@ -129,7 +142,16 @@ export function parseNaturalEvents(raw: unknown): NaturalEvent[] {
       continue;
     }
     const { time, magnitude, latitude, longitude } = latestGeometry(item.geometry);
-    events.push({ id, title, category: firstCategory(item.categories), time, magnitude, latitude, longitude });
+    events.push({
+      id,
+      title,
+      category: firstCategory(item.categories),
+      time,
+      magnitude,
+      latitude,
+      longitude,
+      sourceUrl: firstSourceUrl(item.sources),
+    });
   }
   return events.sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''));
 }

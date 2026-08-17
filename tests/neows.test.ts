@@ -7,6 +7,7 @@ const FEED_SAMPLE = {
         id: '3542519',
         name: '(2010 XC15)',
         is_potentially_hazardous_asteroid: true,
+        nasa_jpl_url: 'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=3542519',
         estimated_diameter: {
           kilometers: { estimated_diameter_min: 0.123, estimated_diameter_max: 0.276 },
         },
@@ -52,6 +53,7 @@ describe('parseAsteroids', () => {
       closeApproachDate: '2026-Jul-30 08:00',
       missDistanceKm: 1234567.8,
       relativeVelocityKmH: 45000.5,
+      jplUrl: 'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=3542519',
     });
   });
 
