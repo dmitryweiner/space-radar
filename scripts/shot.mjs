@@ -4,12 +4,10 @@
 //
 //   node scripts/shot.mjs
 
-import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { ensureServer } from './devServer.mjs';
 
-const PORT = 5173;
-const BASE = `http://localhost:${PORT}`;
 
 const CARD_TITLES = {
   'iss-globe': 'ISS & Satellites',
@@ -26,26 +24,8 @@ const CARD_TITLES = {
 };
 const DEFAULT_VISIBLE = ['iss-globe', 'kp-index', 'solar-wind'];
 
-async function serverUp() {
-  try {
-    return (await fetch(BASE)).ok;
-  } catch {
-    return false;
-  }
-}
 
-let devProc = null;
-async function ensureServer() {
-  if (await serverUp()) return;
-  devProc = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
-  for (let i = 0; i < 30 && !(await serverUp()); i++) await new Promise((r) => setTimeout(r, 1000));
-  if (!(await serverUp())) {
-    console.error(`server did not start on :${PORT}`);
-    process.exit(1);
-  }
-}
-
-await ensureServer();
+const { base: BASE, stop: stopServer } = await ensureServer({});
 mkdirSync('shots', { recursive: true });
 
 const browser = await chromium.launch();
@@ -74,4 +54,4 @@ for (const [id, title] of Object.entries(CARD_TITLES)) {
 }
 
 await browser.close();
-devProc?.kill();
+stopServer();

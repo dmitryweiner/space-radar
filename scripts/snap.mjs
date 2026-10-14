@@ -12,10 +12,10 @@
 //   node scripts/snap.mjs --out /tmp/x.png --click '#generalSettingsBtn' --key Escape  # runs after
 //     --show/--hide, --click, and --click-at, in that order (each flag type is its own phase)
 
-import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { chromium } from 'playwright';
+import { ensureServer } from './devServer.mjs';
 
 const args = process.argv.slice(2);
 const MULTI_FLAGS = new Set(['show', 'hide', 'click', 'click-at', 'key']);
@@ -68,33 +68,10 @@ const CARD_TITLES = {
 };
 
 const preview = flags.has('preview');
-const PORT = preview ? 4173 : 5173;
-const BASE = `http://localhost:${PORT}`;
 const width = Number(flags.get('width') ?? 1400);
 const height = Number(flags.get('height') ?? 900);
 const wait = Number(flags.get('wait') ?? 800);
 
-async function serverUp() {
-  try {
-    return (await fetch(BASE)).ok;
-  } catch {
-    return false;
-  }
-}
-
-let devProc = null;
-async function ensureServer() {
-  if (await serverUp()) return;
-  const cmd = preview
-    ? ['vite', 'preview', '--port', String(PORT), '--strictPort']
-    : ['vite', '--port', String(PORT), '--strictPort'];
-  devProc = spawn('npx', cmd, { stdio: 'ignore' });
-  for (let i = 0; i < 30 && !(await serverUp()); i++) await new Promise((r) => setTimeout(r, 1000));
-  if (!(await serverUp())) {
-    console.error(`server did not start on :${PORT}`);
-    process.exit(1);
-  }
-}
 
 const errors = [];
 function attach(page) {
@@ -104,7 +81,7 @@ function attach(page) {
   });
 }
 
-await ensureServer();
+const { base: BASE, stop: stopServer } = await ensureServer({ preview });
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width, height } });
 attach(page);
@@ -170,5 +147,5 @@ console.log(outPath);
 
 console.log('console/page errors:', errors.length ? errors : 'none');
 await browser.close();
-devProc?.kill();
+stopServer();
 process.exit(errors.some((e) => !/Failed to load resource/.test(e)) ? 2 : 0);

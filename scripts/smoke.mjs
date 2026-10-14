@@ -11,10 +11,10 @@
 //
 // Any console/page error -> non-zero exit code (CI-friendly).
 
-import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { chromium } from 'playwright';
+import { ensureServer } from './devServer.mjs';
 import { countDiffPixels } from './pngDiff.mjs';
 
 const args = process.argv.slice(2);
@@ -29,8 +29,6 @@ for (let i = 0; i < args.length; i++) {
 }
 
 const preview = flags.has('preview');
-const PORT = preview ? 4173 : 5173;
-const BASE = `http://localhost:${PORT}`;
 
 const DEFAULT_VISIBLE = ['iss-globe', 'solar-system', 'natural-events', 'apod', 'launches', 'asteroids'];
 const HIDDEN_BY_DEFAULT = [
@@ -71,27 +69,6 @@ const CARD_TITLES = {
   'nasa-images': 'NASA Image Library',
 };
 
-async function serverUp() {
-  try {
-    return (await fetch(BASE)).ok;
-  } catch {
-    return false;
-  }
-}
-
-let devProc = null;
-async function ensureServer() {
-  if (await serverUp()) return;
-  const cmd = preview
-    ? ['vite', 'preview', '--port', String(PORT), '--strictPort']
-    : ['vite', '--port', String(PORT), '--strictPort'];
-  devProc = spawn('npx', cmd, { stdio: 'ignore' });
-  for (let i = 0; i < 30 && !(await serverUp()); i++) await new Promise((r) => setTimeout(r, 1000));
-  if (!(await serverUp())) {
-    console.error(`server did not start on :${PORT}`);
-    process.exit(1);
-  }
-}
 
 const errors = [];
 let ctxLabel = 'app';
@@ -117,7 +94,24 @@ async function cardStyle(page, id, prop) {
   return page.$eval(`[data-card-id="${id}"]`, (el, p) => el.style[p] ?? null, prop);
 }
 
-await ensureServer();
+// Poll a canvas until two screenshots `windowMs` apart differ by fewer than
+// `threshold` pixels, or `maxMs` runs out; returns the last diff. OrbitControls'
+// damping decays *per frame*, and with several WebGL cards sharing headless
+// Chromium's software rasterizer the frame rate drops a lot — so a fixed
+// "wait 2s" settle that's plenty with one card open isn't with six.
+async function settledDiff(locator, threshold, { windowMs = 600, maxMs = 10000 } = {}) {
+  const deadline = Date.now() + maxMs;
+  let diff = Infinity;
+  while (Date.now() < deadline) {
+    const before = await locator.screenshot();
+    await locator.page().waitForTimeout(windowMs);
+    diff = countDiffPixels(before, await locator.screenshot());
+    if (diff < threshold) break;
+  }
+  return diff;
+}
+
+const { base: BASE, stop: stopServer } = await ensureServer({ preview });
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 attach(page);
@@ -220,7 +214,10 @@ ctxLabel = 'auto-rotate';
   else console.log('auto-rotate: spinning at rest ok, diff=', atRestDiff);
 
   await globeCanvas.hover();
-  for (let i = 0; i < 8; i++) await page.keyboard.press('=');
+  // Only a few presses: zoomed all the way in (MIN_CAMERA_DISTANCE), the view
+  // can be filled by the unlit night side, where a spinning globe is a black
+  // screen and reads as "stopped".
+  for (let i = 0; i < 4; i++) await page.keyboard.press('=');
   const afterKeyboardZoomDiff = await diffOverWindow(600);
   if (afterKeyboardZoomDiff < SPINNING_DIFF_PX) {
     errors.push(`[auto-rotate] keyboard zoom stopped auto-rotation (diff=${afterKeyboardZoomDiff})`);
@@ -246,10 +243,9 @@ ctxLabel = 'auto-rotate';
     await page.mouse.down();
     await page.mouse.up();
     // OrbitControls' damping keeps easing the camera for a bit after release
-    // even with autoRotate now off — give that "coast" time to decay before
-    // measuring (it's down to single-digit diff pixels by ~2s in practice).
-    await page.waitForTimeout(2000);
-    const afterPressDiff = await diffOverWindow(600);
+    // even with autoRotate now off — wait for that "coast" to decay (see
+    // settledDiff); a still-spinning globe never gets under the threshold.
+    const afterPressDiff = await settledDiff(globeCanvas, SETTLED_DIFF_PX);
     if (afterPressDiff >= SETTLED_DIFF_PX) {
       errors.push(`[auto-rotate] a rotate/pan press did not stop auto-rotation (diff=${afterPressDiff})`);
     } else {
@@ -392,11 +388,10 @@ ctxLabel = 'global-settings';
 
     // rotate speed 0 should actually stop the idle spin (not just clamp to a
     // very slow speed) — reuse the pixel-diff approach from 'auto-rotate'.
-    const globeCanvas = page.locator('[data-card-id="iss-globe"] canvas');
-    const before = await globeCanvas.screenshot();
-    await page.waitForTimeout(600);
-    const after = await globeCanvas.screenshot();
-    const stoppedDiff = countDiffPixels(before, after);
+    // natural-events, not iss-globe: satellites move every second there, so
+    // that globe never looks static even with the spin stopped.
+    const globeCanvas = page.locator('[data-card-id="natural-events"] canvas');
+    const stoppedDiff = await settledDiff(globeCanvas, 500);
     if (stoppedDiff >= 500) errors.push(`[global-settings] rotate speed 0 did not stop the spin (diff=${stoppedDiff})`);
     else console.log('global-settings: rotate speed 0 stops the spin ok, diff=', stoppedDiff);
 
@@ -480,7 +475,9 @@ ctxLabel = 'mobile-layout';
       console.log('mobile-layout: single column ok:', order);
     }
 
-    const secondHandle = mobilePage.locator(`[data-card-id="${order[1]}"] .card-drag-handle`);
+    // In the single column only the ≡ grip drags (the rest of the header
+    // scrolls the page on touch devices).
+    const secondHandle = mobilePage.locator(`[data-card-id="${order[1]}"] .card-drag-grip`);
     await secondHandle.scrollIntoViewIfNeeded();
     const handleBox = await secondHandle.boundingBox();
     if (!handleBox) {
@@ -517,6 +514,91 @@ ctxLabel = 'mobile-layout';
   await mobilePage.close();
 }
 
+// touch gestures on a phone: one finger over a 3D card scrolls the page and
+// leaves the scene alone; two fingers rotate the scene and don't scroll.
+// Playwright's `touchscreen` only taps, so swipes go through CDP
+// Input.dispatchTouchEvent (real input pipeline → real native scrolling).
+ctxLabel = 'touch-gestures';
+{
+  const touchContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  const touchPage = await touchContext.newPage();
+  attach(touchPage);
+  await touchPage.goto(BASE);
+  await touchPage.waitForSelector('#app');
+  await touchPage.waitForTimeout(800);
+  const cdp = await touchContext.newCDPSession(touchPage);
+
+  async function swipe(points, dx, dy) {
+    const at = (t) => points.map((p, id) => ({ x: p.x + dx * t, y: p.y + dy * t, id }));
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(0) });
+    for (let i = 1; i <= 12; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(i / 12) });
+      await touchPage.waitForTimeout(16);
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await touchPage.waitForTimeout(600);
+  }
+  // The phone layout scrolls the document itself (#viewWrap grows to fit).
+  const scrollTop = () => touchPage.evaluate(() => (document.scrollingElement?.scrollTop ?? 0) + (document.querySelector('#viewWrap')?.scrollTop ?? 0));
+
+  const coarse = await touchPage.evaluate(() => window.matchMedia('(pointer: coarse)').matches);
+  if (!coarse) errors.push('[touch-gestures] emulated phone does not report (pointer: coarse)');
+
+  // solar-system has no auto-rotate, so any canvas change is the gesture.
+  const canvas = touchPage.locator('[data-card-id="solar-system"] canvas');
+  await canvas.scrollIntoViewIfNeeded();
+  await touchPage.waitForTimeout(500);
+  let box = await canvas.boundingBox();
+  if (!box) {
+    errors.push('[touch-gestures] solar-system canvas not found');
+  } else {
+    const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const scrollBefore = await scrollTop();
+    const shotBefore = await canvas.screenshot();
+    await swipe([center], 0, -150);
+    const scrollAfter = await scrollTop();
+    const hintShown = await touchPage.locator('[data-card-id="solar-system"] .gesture-hint-visible').count();
+    if (hintShown !== 1) errors.push('[touch-gestures] "two fingers" hint was not shown after a one-finger swipe');
+    // Let the hint (an overlay over the canvas) fade before the screenshot.
+    await touchPage.waitForTimeout(1800);
+    const oneFingerDiff = countDiffPixels(shotBefore, await canvas.screenshot());
+    if (scrollAfter <= scrollBefore) errors.push(`[touch-gestures] one-finger swipe did not scroll the page (${scrollBefore} -> ${scrollAfter})`);
+    if (oneFingerDiff >= 1000) errors.push(`[touch-gestures] one-finger swipe rotated the scene (diff=${oneFingerDiff})`);
+    if (scrollAfter > scrollBefore && oneFingerDiff < 1000) console.log('touch: one finger scrolls, scene untouched ok', scrollBefore, '->', scrollAfter, 'diff=', oneFingerDiff);
+
+    box = await canvas.boundingBox();
+    const c2 = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const scrollBefore2 = await scrollTop();
+    const shotBefore2 = await canvas.screenshot();
+    await swipe([{ x: c2.x - 40, y: c2.y }, { x: c2.x + 40, y: c2.y }], 120, 0);
+    await touchPage.waitForTimeout(1500);
+    const scrollAfter2 = await scrollTop();
+    const twoFingerDiff = countDiffPixels(shotBefore2, await canvas.screenshot());
+    if (scrollAfter2 !== scrollBefore2) errors.push(`[touch-gestures] two-finger drag scrolled the page (${scrollBefore2} -> ${scrollAfter2})`);
+    if (twoFingerDiff < 1000) errors.push(`[touch-gestures] two-finger drag did not rotate the scene (diff=${twoFingerDiff})`);
+    if (scrollAfter2 === scrollBefore2 && twoFingerDiff >= 1000) console.log('touch: two fingers rotate, no scroll ok, diff=', twoFingerDiff);
+
+    // one-finger swipe over a card header scrolls instead of dragging the card
+    const header = touchPage.locator('[data-card-id="solar-system"] .card-shell-title');
+    const hb = await header.boundingBox();
+    if (hb) {
+      const orderBefore = await touchPage.evaluate(() => localStorage.getItem('space-radar:layout:v1'));
+      const s0 = await scrollTop();
+      await swipe([{ x: hb.x + hb.width / 2, y: hb.y + hb.height / 2 }], 0, -120);
+      const s1 = await scrollTop();
+      const orderAfter = await touchPage.evaluate(() => localStorage.getItem('space-radar:layout:v1'));
+      if (s1 === s0) errors.push('[touch-gestures] swipe over a card header did not scroll the page');
+      if (orderAfter !== orderBefore) errors.push('[touch-gestures] swipe over a card header moved the card');
+      if (s1 !== s0 && orderAfter === orderBefore) console.log('touch: header swipe scrolls, no drag ok');
+    }
+  }
+  await touchContext.close();
+}
+
 if (flags.has('screenshot')) {
   const path = flags.get('screenshot');
   mkdirSync(dirname(path), { recursive: true });
@@ -526,5 +608,5 @@ if (flags.has('screenshot')) {
 
 console.log('console/page errors:', errors.length ? errors : 'none');
 await browser.close();
-devProc?.kill();
+stopServer();
 process.exit(errors.length ? 2 : 0);

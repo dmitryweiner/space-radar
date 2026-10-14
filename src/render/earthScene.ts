@@ -6,7 +6,7 @@ import earthMapTextureUrl from '../assets/earth-map.jpg';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
 import { makeTrail, type TrailLine } from './trailLine';
-import { attachKeyboardZoom } from './orbitControlsExtras';
+import { attachCooperativeGestures, attachKeyboardZoom } from './orbitControlsExtras';
 
 export const EARTH_RADIUS_UNITS = 2;
 
@@ -168,6 +168,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   };
   controls.addEventListener('start', stopAutoRotateOnMove);
   const detachKeyboardZoom = attachKeyboardZoom(controls, camera, canvas);
+  const detachCooperativeGestures = attachCooperativeGestures(controls, canvas);
 
   const starfield = createStarfield(100);
   scene.add(starfield.mesh);
@@ -594,6 +595,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       clearFireLabels();
       controls.removeEventListener('start', stopAutoRotateOnMove);
       detachKeyboardZoom();
+      detachCooperativeGestures();
       controls.dispose();
       for (const entry of satelliteMarkers.values()) {
         disposeSatellite(entry);

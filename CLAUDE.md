@@ -16,9 +16,21 @@ Existing helpers:
   stop-only-on-move (see the OrbitControls `state` note below), the general
   settings popup (label scale / auto-rotate speed / card density, live-update
   + persistence), a per-card `earthStyle` select, full-screen, and the mobile
-  single-column layout (stacking + drag-to-reorder + persistence, on a
-  separate narrow-viewport page). `--screenshot <path>`, `--preview` (prod
-  build on :4173). Any console/page error → exit code 2.
+  single-column layout (stacking + drag-to-reorder via the `≡` grip +
+  persistence, on a separate narrow-viewport page), and touch gestures on an
+  emulated phone (`hasTouch`/`isMobile` context, swipes sent through CDP
+  `Input.dispatchTouchEvent` since Playwright's `touchscreen` can only tap):
+  one finger over a 3D card scrolls the page and leaves the scene alone, two
+  fingers rotate and don't scroll, a header swipe scrolls instead of dragging.
+  `--screenshot <path>`, `--preview` (prod build on :4173). Any console/page
+  error → exit code 2. "Did the globe stop" checks use `settledDiff` (poll
+  until still, up to 10s), not a fixed wait: OrbitControls' damping decays
+  *per frame* and with six WebGL cards on the software rasterizer the frame
+  rate is low, so a fixed 2s settle that's plenty with one card isn't enough.
+- `scripts/devServer.mjs` — `ensureServer({ preview })` shared by smoke/snap/
+  shot: reuses a running Space Radar dev server, **skips ports held by other
+  projects' Vite servers** (checks the page `<title>`, not just HTTP 200 —
+  another project often sits on :5173) and spawns one on the first free port.
 - `scripts/snap.mjs` — single debug screenshot. Flags: `--out <path>`
   (required), `--show <cardId>` / `--hide <cardId>` / `--click <selector>`
   (repeatable), `--width`, `--height`, `--wait <ms>`, `--preview`.
@@ -137,6 +149,21 @@ npm run build       # production build → ./docs (GitHub Pages)
   eager-load pattern for `earth-diffuse.jpg`); `setEarthStyle` just swaps
   `earth.material`, so markers/labels/occlusion are unaffected either way (same
   sphere geometry).
+- **Touch: cooperative gestures (`orbitControlsExtras.attachCooperativeGestures`,
+  all six 3D scenes).** On `(pointer: coarse)` devices one finger scrolls the
+  page and two fingers rotate+pinch-zoom (`touches.TWO = DOLLY_ROTATE`); a
+  one-finger swipe flashes a "Use two fingers to rotate" hint. Inside any
+  `[data-free-gestures]` ancestor (the full-screen overlay, the Scene view)
+  one finger rotates as usual — decided per touch in a capture-phase
+  `pointerdown` that sets `controls.touches.ONE` before OrbitControls reads
+  it. The page-scroll half is CSS (`.coop-gestures { touch-action: pan-y }`)
+  because the browser reads `touch-action` before any JS runs; OrbitControls'
+  inline `touch-action: none` is cleared for that. **Don't put
+  `overscroll-behavior: contain` on `.card-shell-body` for touch** — on a body
+  with nothing to scroll (every globe card) it swallows the swipe and the page
+  never scrolls; it's `(pointer: fine)`-only. On the mobile single column only
+  the `≡` grip (`.card-drag-grip`, shown by `.grid-mobile`) starts a card drag;
+  the rest of the header has `touch-action: pan-y`.
 - **All six 3D scenes share `orbitControlsExtras.attachKeyboardZoom`** — it binds
   `+`/`-` (and `=`/`_`) to dolly the camera along its view direction (clamped to
   the controls' min/max distance). **The keys are routed by *hover*, not DOM

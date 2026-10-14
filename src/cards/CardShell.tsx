@@ -13,6 +13,14 @@ export function CardShell({ title, onHide, onToggleFullscreen, onOpenSettings, i
   return (
     <div className={isFullscreen ? 'card-shell card-shell-fullscreen' : 'card-shell'}>
       <div className="card-shell-header card-drag-handle">
+        {/* Mobile-only drag grip (shown by .grid-mobile CSS): in the single
+            column the whole header is not a drag handle, so a swipe over it
+            scrolls the page instead of picking up the card. */}
+        {!isFullscreen && (
+          <span className="card-drag-grip" aria-hidden="true" title="Drag to reorder">
+            ≡
+          </span>
+        )}
         <span className="card-shell-title">{title}</span>
         <div className="card-shell-actions">
           {onOpenSettings && (

@@ -952,3 +952,84 @@ body {
   display: inline-block;
   margin-top: 6px;
 }
+
+/* --- Touch gestures (see attachCooperativeGestures) --- */
+
+/* Desktop / fine pointers: the scene owns every gesture. */
+.coop-gestures {
+  touch-action: none;
+}
+
+@media (pointer: coarse) {
+  /* One finger scrolls the page vertically; two fingers rotate/zoom. */
+  .coop-gestures {
+    touch-action: pan-y;
+  }
+  /* Full-screen card / Scene view: nothing to scroll, one finger rotates. */
+  [data-free-gestures] .coop-gestures {
+    touch-action: none;
+  }
+}
+
+.gesture-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 7, 13, 0.55);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.gesture-hint-visible {
+  opacity: 1;
+}
+
+/* Mobile drag grip: hidden on the desktop grid (whole header drags there). */
+.card-drag-grip {
+  display: none;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 16px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.grid-mobile .card-drag-grip {
+  display: inline-flex;
+}
+
+.grid-mobile .card-shell-header {
+  cursor: default;
+  justify-content: flex-start;
+  touch-action: pan-y;
+}
+
+.grid-mobile .card-shell-title {
+  flex: 1;
+}
+
+/* Wheel-scrolling to the end of a list inside a card must not chain into the
+   page. Mouse/trackpad only: on touch, `contain` on a card body that has
+   nothing to scroll (e.g. a globe card) swallows the swipe and the page never
+   scrolls; chaining out of a finished list is what a finger expects anyway. */
+@media (pointer: fine) {
+  .card-shell-body {
+    overscroll-behavior: contain;
+  }
+}
+
+.solar-imagery-grid,
+.settings-checkbox-list,
+#cardMenu {
+  overscroll-behavior: contain;
+}

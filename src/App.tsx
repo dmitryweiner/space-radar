@@ -128,7 +128,7 @@ export function App() {
         </main>
       </div>
       {fullscreenCard && FullscreenCardComponent && (
-        <div className="fullscreen-overlay" data-testid="fullscreen-overlay">
+        <div className="fullscreen-overlay" data-testid="fullscreen-overlay" data-free-gestures>
           <CardShell
             title={fullscreenCard.title}
             isFullscreen

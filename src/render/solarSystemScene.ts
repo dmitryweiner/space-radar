@@ -5,7 +5,7 @@ import type { MoonPosition } from '../astro/moonPositions';
 import { heliocentricToSceneVector } from '../astro/coords';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
-import { attachKeyboardZoom } from './orbitControlsExtras';
+import { attachCooperativeGestures, attachKeyboardZoom } from './orbitControlsExtras';
 
 const UNITS_PER_AU = 6;
 
@@ -142,6 +142,7 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   controls.minDistance = 10;
   controls.maxDistance = 300;
   const detachKeyboardZoom = attachKeyboardZoom(controls, camera, canvas);
+  const detachCooperativeGestures = attachCooperativeGestures(controls, canvas);
 
   const starfield = createStarfield(400);
   scene.add(starfield.mesh);
@@ -283,6 +284,7 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
       cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
       detachKeyboardZoom();
+      detachCooperativeGestures();
       controls.dispose();
       clearMoons();
       for (const label of planetLabels.values()) {

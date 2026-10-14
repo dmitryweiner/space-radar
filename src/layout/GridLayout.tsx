@@ -146,7 +146,7 @@ export function GridLayout({
   };
 
   return (
-    <div ref={containerRef} className="grid-layout-container">
+    <div ref={containerRef} className={isMobile ? 'grid-layout-container grid-mobile' : 'grid-layout-container'}>
       {mounted && (
         <ReactGridLayout
           layout={rglLayout}
@@ -154,8 +154,13 @@ export function GridLayout({
           gridConfig={{ cols, rowHeight, margin: [12, 12] }}
           // The header action buttons live inside the drag handle; `cancel`
           // keeps a tap on them from starting a drag, which on touch devices
-          // otherwise swallowed the tap so the buttons never fired.
-          dragConfig={{ enabled: true, handle: '.card-drag-handle', cancel: '.card-shell-actions' }}
+          // otherwise swallowed the tap so the buttons never fired. On mobile
+          // only the ≡ grip drags — the rest of the header must scroll the page.
+          dragConfig={{
+            enabled: true,
+            handle: isMobile ? '.card-drag-grip' : '.card-drag-handle',
+            cancel: '.card-shell-actions',
+          }}
           resizeConfig={{ enabled: true }}
           onLayoutChange={handleLayoutChange}
         >
