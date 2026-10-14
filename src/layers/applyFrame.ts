@@ -20,4 +20,10 @@ export function applyFrame(target: EarthLayerHandle, frame: LayerFrame): void {
   if (frame.auroraPoints) {
     target.setAuroraPoints(frame.auroraPoints);
   }
+  if (frame.nightLights !== undefined) {
+    target.setNightLights(frame.nightLights);
+  }
+  if (frame.tracks) {
+    target.setTracks(frame.tracks);
+  }
 }

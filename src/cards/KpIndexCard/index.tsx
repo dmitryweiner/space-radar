@@ -1,27 +1,11 @@
-import { useApiResource } from '../../hooks/useApiResource';
-import { fetchKpIndex } from '../../api/swpc';
-import type { KpIndexPoint } from '../../api/types';
+import { useKpIndex } from '../../hooks/sharedResources';
 import type { CardComponentProps } from '../../layout/types';
 import { numberSetting } from '../../layout/layoutState';
 import { formatUtcTimestamp } from '../formatTimestamp';
 import { TimeAxis } from '../TimeAxis';
 
-const CACHE_KEY = 'space-radar:kp-index';
-const TTL_MS = 5 * 60 * 1000;
-const POLL_MS = 5 * 60 * 1000;
 const MAX_KP = 9;
 const CHART_HEIGHT = 80;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isKpIndexPoints(value: unknown): value is KpIndexPoint[] {
-  return (
-    Array.isArray(value) &&
-    value.every((item) => isRecord(item) && typeof item.time === 'string' && typeof item.kp === 'number')
-  );
-}
 
 interface KpStatus {
   label: string;
@@ -44,13 +28,7 @@ function kpStatus(kp: number): KpStatus {
 const DEFAULT_BAR_COUNT = 8;
 
 export function KpIndexCard({ settings = {} }: CardComponentProps) {
-  const { data, loading, error } = useApiResource<KpIndexPoint[]>({
-    key: CACHE_KEY,
-    ttlMs: TTL_MS,
-    pollMs: POLL_MS,
-    fetcher: () => fetchKpIndex(),
-    isValue: isKpIndexPoints,
-  });
+  const { data, loading, error } = useKpIndex();
 
   if (loading) {
     return <p className="card-status">Loading…</p>;

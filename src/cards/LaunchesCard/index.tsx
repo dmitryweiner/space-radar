@@ -1,40 +1,9 @@
-import { useApiResource } from '../../hooks/useApiResource';
-import { fetchUpcomingLaunches } from '../../api/launchLibrary';
-import type { LaunchInfo } from '../../api/types';
+import { useLaunches } from '../../hooks/sharedResources';
 import type { CardComponentProps } from '../../layout/types';
 import { numberSetting } from '../../layout/layoutState';
 import { formatUtcTimestamp } from '../formatTimestamp';
 
-const CACHE_KEY = 'space-radar:launches';
-// Launch Library's free tier allows only 15 requests/hour — poll slowly.
-const TTL_MS = 60 * 60 * 1000;
-const POLL_MS = 60 * 60 * 1000;
 const DEFAULT_COUNT = 8;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isNullableString(value: unknown): value is string | null {
-  return value === null || typeof value === 'string';
-}
-
-function isLaunches(value: unknown): value is LaunchInfo[] {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (item) =>
-        isRecord(item) &&
-        typeof item.id === 'string' &&
-        typeof item.name === 'string' &&
-        typeof item.status === 'string' &&
-        typeof item.net === 'string' &&
-        isNullableString(item.provider) &&
-        isNullableString(item.location) &&
-        isNullableString(item.detailUrl),
-    )
-  );
-}
 
 function statusColor(status: string): string {
   switch (status.toLowerCase()) {
@@ -49,13 +18,7 @@ function statusColor(status: string): string {
 }
 
 export function LaunchesCard({ settings = {} }: CardComponentProps) {
-  const { data, loading, error } = useApiResource<LaunchInfo[]>({
-    key: CACHE_KEY,
-    ttlMs: TTL_MS,
-    pollMs: POLL_MS,
-    fetcher: () => fetchUpcomingLaunches(),
-    isValue: isLaunches,
-  });
+  const { data, loading, error } = useLaunches();
 
   if (loading) {
     return <p className="card-status">Loading…</p>;

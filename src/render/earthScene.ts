@@ -70,6 +70,15 @@ export interface FirePoint {
   label?: string;
 }
 
+/** A static polyline (flyby path, Moon orbit…), in scene units. */
+export interface GlobeTrack {
+  id: string;
+  points: SceneVector3[];
+  color: number;
+  /** 0..1, default 0.55. */
+  opacity?: number;
+}
+
 export interface AuroraPoint {
   position: SceneVector3;
   /** 0..1 probability; brightens the additive green glow. */
@@ -93,6 +102,12 @@ export interface EarthLayerHandle {
   setMarkers(markers: GlobeMarker[]): void;
   setFirePoints(points: FirePoint[]): void;
   setAuroraPoints(points: AuroraPoint[]): void;
+  /** Replaces the layer's polylines. Passing the same array again is a no-op,
+   * so a layer can re-send an unchanged (memoized) track list every tick. */
+  setTracks(tracks: GlobeTrack[]): void;
+  /** City-lights image (equirectangular) glowing on the night side only;
+   * null removes it. One overlay per globe, owned by whichever layer set it. */
+  setNightLights(url: string | null): void;
   setVisible(visible: boolean): void;
 }
 
@@ -129,6 +144,9 @@ export interface EarthSceneHandle extends EarthLayerHandle {
   /** Multiplies the idle auto-rotate speed (see the global "Auto-rotate
    * speed" setting). 1 = AUTO_ROTATE_SPEED below; 0 stops the spin. */
   setAutoRotateSpeed(multiplier: number): void;
+  /** Dolly the camera to `distance` from the centre (clamped to the zoom
+   * limits) — e.g. to take in the asteroid-flyby scale. Ends aspect fitting. */
+  setViewDistance(distance: number): void;
   /** Fires when the user clicks a marker/satellite/ISS/fire/aurora point,
    * with the id of the layer it belongs to. Pass null to detach. */
   setOnMarkerClick(handler: ((hit: MarkerHit, layerId: string) => void) | null): void;
@@ -155,12 +173,32 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+  // The FOV is vertical, so on a tall, narrow canvas (a phone in portrait) a
+  // globe framed for a landscape card overflows the sides. Until the user
+  // zooms, keep the distance fitted to the aspect ratio; once the distance no
+  // longer matches the last fit (wheel, pinch, +/- keys), leave it alone.
+  const BASE_DISTANCE = camera.position.length();
+  let fittedDistance: number | null = BASE_DISTANCE;
+  function fitDistance() {
+    if (fittedDistance === null) {
+      return;
+    }
+    const current = camera.position.length();
+    if (Math.abs(current - fittedDistance) > fittedDistance * 0.01) {
+      fittedDistance = null;
+      return;
+    }
+    fittedDistance = BASE_DISTANCE / Math.min(1, camera.aspect * 1.25);
+    camera.position.setLength(fittedDistance);
+  }
+
   function applySize() {
     const width = canvas.clientWidth || 1;
     const height = canvas.clientHeight || 1;
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
+    fitDistance();
   }
   applySize();
   const resizeObserver = new ResizeObserver(() => applySize());
@@ -169,7 +207,9 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.minDistance = MIN_CAMERA_DISTANCE;
-  controls.maxDistance = 20;
+  // Far enough to take in the asteroid-flyby layer's compressed distance
+  // scale (out to ~14 units) — see src/astro/flyby.ts.
+  controls.maxDistance = 32;
 
   // Gently auto-rotate until the user actually moves the globe (drag-rotate
   // or drag-pan); zooming (wheel, trackpad pinch, keyboard +/-, or a
@@ -216,7 +256,9 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     const v = geodeticToSceneVector(latitudeDeg, longitudeDeg, 0, SUN_LIGHT_DISTANCE);
     sunLight.position.set(v.x, v.y, v.z);
     fillLight.position.set(-v.x, -v.y, -v.z);
+    sunDirection.set(v.x, v.y, v.z).normalize();
   }
+  const sunDirection = new THREE.Vector3(1, 0, 0);
   const initialSun = subsolarPoint(new Date());
   placeSun(initialSun);
   // Open over the sunlit hemisphere: with a real terminator a fixed starting
@@ -252,6 +294,78 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     new THREE.LineBasicMaterial({ color: 0x2f5a99, transparent: true, opacity: 0.15 }),
   );
   scene.add(grid);
+
+  // Night-lights overlay: a sphere just above the surface, additive, whose
+  // brightness is masked to the night side by the sun direction (the globe
+  // never rotates — the camera orbits — so object normals are world normals).
+  // Only bright pixels pass, so Black Marble's faint bluish land doesn't wash
+  // over the photo texture.
+  const nightUniforms = {
+    lights: { value: new THREE.Texture() },
+    sunDirection: { value: sunDirection },
+    strength: { value: 1.6 },
+  };
+  const nightLights = new THREE.Mesh(
+    new THREE.SphereGeometry(EARTH_RADIUS_UNITS * 1.002, 64, 64),
+    new THREE.ShaderMaterial({
+      uniforms: nightUniforms,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        void main() {
+          vUv = uv;
+          vNormal = normalize(normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        uniform sampler2D lights;
+        uniform vec3 sunDirection;
+        uniform float strength;
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        void main() {
+          float night = smoothstep(0.08, -0.12, dot(vNormal, sunDirection));
+          vec3 c = texture2D(lights, vUv).rgb;
+          float lum = dot(c, vec3(0.299, 0.587, 0.114));
+          float glow = clamp((lum - 0.22) * 2.5, 0.0, 1.0);
+          gl_FragColor = vec4(c * glow * night * strength, 1.0);
+        }`,
+    }),
+  );
+  nightLights.visible = false;
+  scene.add(nightLights);
+  let nightLightsTexture: THREE.Texture | null = null;
+  let nightLightsUrl: string | null = null;
+  let nightLightsOwner: object | null = null;
+
+  function setNightLightsFor(owner: object, url: string | null) {
+    if (!url) {
+      if (nightLightsOwner === owner) {
+        nightLightsOwner = null;
+        nightLights.visible = false;
+      }
+      return;
+    }
+    nightLightsOwner = owner;
+    if (url !== nightLightsUrl) {
+      nightLightsUrl = url;
+      textureLoader.load(url, (texture) => {
+        if (nightLightsUrl !== url) {
+          texture.dispose();
+          return;
+        }
+        nightLightsTexture?.dispose();
+        nightLightsTexture = texture;
+        nightUniforms.lights.value = texture;
+        nightLights.visible = nightLightsOwner !== null;
+      });
+    } else if (nightLightsTexture) {
+      nightLights.visible = true;
+    }
+  }
 
   // Shared by every layer's markers.
   const SATELLITE_COLOR = 0x9fd8ff;
@@ -326,6 +440,18 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     // click on the dot would.
     let fireLabels: { index: number; label: LabelSprite }[] = [];
     let auroraPoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
+    let tracks: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>[] = [];
+    let lastTracks: GlobeTrack[] | null = null;
+    let ownNightLights: string | null = null;
+
+    function clearTracks() {
+      for (const line of tracks) {
+        group.remove(line);
+        line.geometry.dispose();
+        line.material.dispose();
+      }
+      tracks = [];
+    }
 
     function disposeSatellite(entry: { mesh: THREE.Mesh; label: LabelSprite; trail: TrailLine }) {
       group.remove(entry.mesh, entry.label.sprite, entry.trail.line);
@@ -506,8 +632,38 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
         );
         group.add(auroraPoints);
       },
+      setTracks(next) {
+        if (next === lastTracks) {
+          return;
+        }
+        lastTracks = next;
+        clearTracks();
+        for (const track of next) {
+          if (track.points.length < 2) {
+            continue;
+          }
+          const geometry = new THREE.BufferGeometry().setFromPoints(
+            track.points.map((p) => new THREE.Vector3(p.x, p.y, p.z)),
+          );
+          const material = new THREE.LineBasicMaterial({
+            color: track.color,
+            transparent: true,
+            opacity: track.opacity ?? 0.55,
+          });
+          const line = new THREE.Line(geometry, material);
+          tracks.push(line);
+          group.add(line);
+        }
+      },
+      setNightLights(url) {
+        ownNightLights = url;
+        setNightLightsFor(group, group.visible ? url : null);
+      },
       setVisible(visible) {
         group.visible = visible;
+        if (ownNightLights) {
+          setNightLightsFor(group, visible ? ownNightLights : null);
+        }
       },
     };
 
@@ -576,6 +732,8 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       dispose() {
         clearFirePoints();
         clearAuroraPoints();
+        clearTracks();
+        setNightLightsFor(group, null);
         for (const entry of satelliteMarkers.values()) {
           disposeSatellite(entry);
         }
@@ -720,6 +878,8 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     setMarkers: (markers) => defaultLayer.setMarkers(markers),
     setFirePoints: (points) => defaultLayer.setFirePoints(points),
     setAuroraPoints: (points) => defaultLayer.setAuroraPoints(points),
+    setTracks: (next) => defaultLayer.setTracks(next),
+    setNightLights: (url) => defaultLayer.setNightLights(url),
     setVisible: (visible) => defaultLayer.setVisible(visible),
     layer(id) {
       return layerContent(id).handle;
@@ -777,6 +937,11 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     setAutoRotateSpeed(multiplier) {
       controls.autoRotateSpeed = AUTO_ROTATE_SPEED * multiplier;
     },
+    setViewDistance(distance) {
+      fittedDistance = null;
+      camera.position.setLength(Math.min(controls.maxDistance, Math.max(controls.minDistance, distance)));
+      controls.update();
+    },
     setOnMarkerClick(handler) {
       onMarkerClick = handler;
     },
@@ -808,6 +973,10 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       satelliteTexture?.dispose();
       earthPhotoTexture.dispose();
       earthMapTexture.dispose();
+      nightLightsUrl = null;
+      nightLightsTexture?.dispose();
+      nightLights.geometry.dispose();
+      nightLights.material.dispose();
       starfield.dispose();
     },
   };

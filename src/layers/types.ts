@@ -1,5 +1,5 @@
 import type { SceneVector3 } from '../astro/coords';
-import type { AuroraPoint, FirePoint, GlobeMarker, MarkerHit, NamedPosition } from '../render/earthScene';
+import type { AuroraPoint, FirePoint, GlobeMarker, GlobeTrack, MarkerHit, NamedPosition } from '../render/earthScene';
 import type { CardSettingDefinition, CardSettingValues } from '../layout/types';
 
 // A "layer" is one geographic data source drawn on the Earth globe — the data
@@ -14,6 +14,9 @@ export interface LayerFrame {
   markers?: GlobeMarker[];
   firePoints?: FirePoint[];
   auroraPoints?: AuroraPoint[];
+  tracks?: GlobeTrack[];
+  /** City-lights texture URL for the night side; null clears it. */
+  nightLights?: string | null;
 }
 
 export interface LegendItem {

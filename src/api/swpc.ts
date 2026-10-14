@@ -1,6 +1,7 @@
 import type {
   AuroraSample,
   KpIndexPoint,
+  NoaaScales,
   SolarCycleData,
   SolarCyclePoint,
   SolarCyclePrediction,
@@ -15,6 +16,7 @@ const AURORA_IMAGE_URL = 'https://services.swpc.noaa.gov/images/animations/ovati
 const GOES_FLARES_URL = 'https://services.swpc.noaa.gov/json/goes/primary/xray-flares-7-day.json';
 const OBSERVED_CYCLE_URL = 'https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json';
 const PREDICTED_CYCLE_URL = 'https://services.swpc.noaa.gov/json/solar-cycle/predicted-solar-cycle.json';
+const NOAA_SCALES_URL = 'https://services.swpc.noaa.gov/products/noaa-scales.json';
 const OVATION_AURORA_URL = 'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json';
 
 // The observed series runs back to 1749; keep only the recent tail so the cache
@@ -182,6 +184,33 @@ export function parseAurora(raw: unknown): AuroraSample[] {
   return samples;
 }
 
+function scaleValue(entry: unknown): number | null {
+  if (!isRecord(entry)) {
+    return null;
+  }
+  const value = toNumber(entry.Scale);
+  return value === null ? null : Math.min(5, Math.max(0, Math.round(value)));
+}
+
+// noaa-scales.json is an object keyed by strings: "0" = current observed,
+// "1".."3" = forecast days (Scale null there, only probabilities), "-1" = the
+// previous day. Only the current ("0") R/S/G levels are used.
+export function parseNoaaScales(raw: unknown): NoaaScales | null {
+  if (!isRecord(raw) || !isRecord(raw['0'])) {
+    return null;
+  }
+  const current = raw['0'];
+  const r = scaleValue(current.R);
+  const s = scaleValue(current.S);
+  const g = scaleValue(current.G);
+  if (r === null || s === null || g === null) {
+    return null;
+  }
+  const date = typeof current.DateStamp === 'string' ? current.DateStamp : '';
+  const time = typeof current.TimeStamp === 'string' ? current.TimeStamp : '';
+  return { r, s, g, observedAt: `${date} ${time}`.trim() };
+}
+
 interface FetchResponse {
   ok: boolean;
   status?: number;
@@ -246,4 +275,16 @@ export async function fetchAurora(fetchFn: FetchFn = fetch): Promise<AuroraSampl
 
 export function auroraForecastImageUrl(): string {
   return AURORA_IMAGE_URL;
+}
+
+export async function fetchNoaaScales(fetchFn: FetchFn = fetch): Promise<NoaaScales> {
+  const response = await fetchViaProxy(fetchFn, NOAA_SCALES_URL);
+  if (!response.ok) {
+    throw new Error(`NOAA SWPC scales request failed with status ${response.status ?? 'unknown'}`);
+  }
+  const scales = parseNoaaScales(await response.json());
+  if (!scales) {
+    throw new Error('NOAA SWPC scales returned an unexpected response shape.');
+  }
+  return scales;
 }

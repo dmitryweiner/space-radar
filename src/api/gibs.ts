@@ -65,3 +65,17 @@ export async function fetchGibsSnapshot(
   }
   return null;
 }
+
+// VIIRS "Black Marble" night lights — a static composite (no TIME), ~110 kB.
+export const GIBS_NIGHT_LIGHTS_URL = `${WMS_BASE}?${new URLSearchParams({
+  SERVICE: 'WMS',
+  REQUEST: 'GetMap',
+  VERSION: '1.3.0',
+  LAYERS: 'VIIRS_Black_Marble',
+  STYLES: '',
+  FORMAT: 'image/jpeg',
+  WIDTH: '2048',
+  HEIGHT: '1024',
+  CRS: 'EPSG:4326',
+  BBOX: '-90,-180,90,180',
+}).toString()}`;

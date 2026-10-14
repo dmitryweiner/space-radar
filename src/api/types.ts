@@ -144,4 +144,39 @@ export interface Asteroid {
   /** JPL Small-Body Database lookup page (NeoWs' `nasa_jpl_url`), or null if
    * the API omitted it. */
   jplUrl: string | null;
+  /** Close-approach instant (ms, `epoch_date_close_approach`). */
+  closeApproachMs?: number;
+  /** Only with `detailed=true`: JPL orbit uncertainty 0 (good) … 9 (poor). */
+  orbitUncertainty?: number | null;
+  /** Only with `detailed=true`: e.g. "Apollo", "Aten". */
+  orbitClass?: string | null;
+}
+
+/** NOAA space-weather scales, 0 (none) … 5 (extreme). */
+export interface NoaaScales {
+  /** Radio blackouts (X-ray flares). */
+  r: number;
+  /** Solar radiation storms (protons). */
+  s: number;
+  /** Geomagnetic storms. */
+  g: number;
+  /** "YYYY-MM-DD HH:MM:SS" UTC of the observation. */
+  observedAt: string;
+}
+
+export interface PeopleInSpace {
+  count: number;
+  people: { name: string; agency: string | null }[];
+}
+
+/** A bolide reported to JPL's fireball database (US government sensors). */
+export interface Fireball {
+  /** "YYYY-MM-DD HH:MM:SS" UTC. */
+  date: string;
+  latitude: number;
+  longitude: number;
+  /** Estimated total impact energy, kilotons TNT. */
+  impactEnergyKt: number;
+  altitudeKm: number | null;
+  velocityKmS: number | null;
 }

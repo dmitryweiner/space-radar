@@ -60,6 +60,9 @@ export interface CardComponentProps {
    * the header's general settings popup (defaults to 1 when absent; 0 stops
    * the spin). */
   rotateSpeed?: number;
+  /** The Scene view's shared time cursor (ms), or null/absent for live. Only
+   * time-aware components (e.g. the Solar System) read it. */
+  time?: number | null;
 }
 
 export interface CardDefinition {

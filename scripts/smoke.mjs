@@ -113,7 +113,86 @@ async function settledDiff(locator, threshold, { windowMs = 600, maxMs = 10000 }
 
 const { base: BASE, stop: stopServer } = await ensureServer({ preview });
 const browser = await chromium.launch();
+// The Scene view is the default UI; the dashboard sections below run on pages
+// pre-switched to it (first load only — the app's own writes win afterwards).
+async function useDashboard(target) {
+  await target.addInitScript(() => {
+    if (!localStorage.getItem('space-radar:ui-mode:v1')) localStorage.setItem('space-radar:ui-mode:v1', '"dashboard"');
+  });
+}
+
+// ---------------------------------------------------------------- Scene view
+ctxLabel = 'scene';
+{
+  const scenePage = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  attach(scenePage);
+  await scenePage.goto(BASE);
+  await scenePage.waitForSelector('[data-testid="scene-view"]');
+  await scenePage.waitForTimeout(1500);
+
+  const canvases = await scenePage.locator('canvas').count();
+  if (canvases !== 1) errors.push(`[scene] expected exactly one WebGL canvas (one shared globe), got ${canvases}`);
+  for (const name of ['ISS & satellites', 'Aurora oval', 'Earthquakes', 'Natural events']) {
+    if (!(await scenePage.getByRole('checkbox', { name }).isChecked())) errors.push(`[scene] layer "${name}" should be on by default`);
+  }
+  if ((await scenePage.getByTestId('status-bar').locator('.status-chip').count()) < 5) errors.push('[scene] status bar has too few chips');
+
+  // a layer toggle persists across reload
+  await scenePage.getByRole('checkbox', { name: 'Active fires' }).click();
+  await scenePage.reload();
+  await scenePage.waitForSelector('[data-testid="scene-view"]');
+  if (!(await scenePage.getByRole('checkbox', { name: 'Active fires' }).isChecked())) errors.push('[scene] layer toggle did not persist');
+  else console.log('scene: one globe, default layers, toggle persists ok');
+
+  // the globe really renders: something on the canvas changes while it spins
+  const sceneCanvas = scenePage.getByTestId('scene-canvas');
+  const spinBefore = await sceneCanvas.screenshot();
+  await scenePage.waitForTimeout(800);
+  const spinDiff = countDiffPixels(spinBefore, await sceneCanvas.screenshot());
+  if (spinDiff < 1000) errors.push(`[scene] globe does not appear to render/spin (diff=${spinDiff})`);
+
+  // status chip → inspector panel
+  await scenePage.getByRole('button', { name: /^Kp/ }).click();
+  if ((await scenePage.locator('.inspector-title').textContent()) !== 'Geomagnetic activity (Kp)') errors.push('[scene] Kp chip did not open its panel');
+  await scenePage.getByRole('button', { name: 'Close panel' }).click();
+
+  // time scrubber: moving off "Live" and back
+  const range = scenePage.getByRole('slider', { name: 'Time offset from now' });
+  await range.focus();
+  for (let i = 0; i < 40; i++) await range.press('ArrowRight');
+  const liveBtn = scenePage.getByRole('button', { name: 'Live' });
+  if ((await liveBtn.getAttribute('aria-pressed')) !== 'false') errors.push('[scene] scrubbing did not leave Live mode');
+  const offsetText = await scenePage.locator('.time-offset').textContent().catch(() => null);
+  if (!offsetText || !offsetText.includes('+')) errors.push(`[scene] scrubbed time shows no +offset: ${offsetText}`);
+  await liveBtn.click();
+  if ((await liveBtn.getAttribute('aria-pressed')) !== 'true') errors.push('[scene] Live button did not return to live');
+  else console.log('scene: scrubber leaves/returns to live ok, offset', offsetText);
+
+  // the other scenes mount; back to Earth remounts the globe
+  await scenePage.getByRole('tab', { name: 'Solar System' }).click();
+  await scenePage.waitForTimeout(500);
+  if ((await scenePage.locator('.solar-system-canvas').count()) !== 1) errors.push('[scene] Solar System scene has no canvas');
+  await scenePage.getByRole('tab', { name: 'Sun' }).click();
+  await scenePage.waitForTimeout(300);
+  if ((await scenePage.locator('.sun-stage img').count()) < 1) errors.push('[scene] Sun scene shows no image');
+  await scenePage.getByRole('tab', { name: 'Earth' }).click();
+  await scenePage.waitForTimeout(500);
+  if ((await scenePage.getByTestId('scene-canvas').count()) !== 1) errors.push('[scene] Earth globe did not come back');
+  else console.log('scene: Earth / Sun / Solar System tabs ok');
+
+  // header toggle → dashboard, and it sticks
+  await scenePage.locator('#dashboardModeBtn').click();
+  await scenePage.waitForSelector('.grid-layout-container');
+  await scenePage.reload();
+  await scenePage.waitForSelector('#app');
+  await scenePage.waitForTimeout(300);
+  if ((await scenePage.locator('.grid-layout-container').count()) !== 1) errors.push('[scene] dashboard mode did not persist');
+  else console.log('scene: mode toggle to dashboard persists ok');
+  await scenePage.close();
+}
+
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+await useDashboard(page);
 attach(page);
 
 await page.goto(BASE);
@@ -450,6 +529,7 @@ ctxLabel = 'earth-style';
 ctxLabel = 'mobile-layout';
 {
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await useDashboard(mobilePage);
   attach(mobilePage);
   await mobilePage.goto(BASE);
   await mobilePage.waitForSelector('#app');
@@ -526,6 +606,7 @@ ctxLabel = 'touch-gestures';
     isMobile: true,
   });
   const touchPage = await touchContext.newPage();
+  await useDashboard(touchPage);
   attach(touchPage);
   await touchPage.goto(BASE);
   await touchPage.waitForSelector('#app');
@@ -597,6 +678,45 @@ ctxLabel = 'touch-gestures';
     }
   }
   await touchContext.close();
+}
+
+// Scene view on a phone: the page itself never scrolls, so one finger rotates
+// the globe (data-free-gestures); layers live in a bottom sheet.
+ctxLabel = 'scene-phone';
+{
+  const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const phone = await phoneContext.newPage();
+  attach(phone);
+  await phone.goto(BASE);
+  await phone.waitForSelector('[data-testid="scene-view"]');
+  await phone.waitForTimeout(1500);
+  const cdp = await phoneContext.newCDPSession(phone);
+  const globe = phone.getByTestId('scene-canvas');
+  const box = await globe.boundingBox();
+  if (!box) {
+    errors.push('[scene-phone] globe canvas not found');
+  } else {
+    const docScroll = () => phone.evaluate(() => document.scrollingElement?.scrollTop ?? 0);
+    const before = await globe.screenshot();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx, y: cy, id: 0 }] });
+    for (let i = 1; i <= 12; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx + i * 10, y: cy, id: 0 }] });
+      await phone.waitForTimeout(16);
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await phone.waitForTimeout(400);
+    const diff = countDiffPixels(before, await globe.screenshot());
+    if (diff < 3000) errors.push(`[scene-phone] one-finger drag did not rotate the full-screen globe (diff=${diff})`);
+    if ((await docScroll()) !== 0) errors.push('[scene-phone] the page scrolled in Scene view');
+    if ((await phone.locator('.gesture-hint-visible').count()) !== 0) errors.push('[scene-phone] "two fingers" hint shown in Scene view');
+    if (diff >= 3000) console.log('scene-phone: one finger rotates the globe, page static ok, diff=', diff);
+  }
+  await phone.locator('.scene-sheet-tabs').getByRole('button', { name: 'Layers' }).click();
+  if (!(await phone.getByRole('checkbox', { name: 'Earthquakes' }).isVisible())) errors.push('[scene-phone] Layers sheet did not open');
+  else console.log('scene-phone: layers bottom sheet ok');
+  await phoneContext.close();
 }
 
 if (flags.has('screenshot')) {

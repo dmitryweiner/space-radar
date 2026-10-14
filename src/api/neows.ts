@@ -61,6 +61,10 @@ function parseAsteroidRecord(item: unknown): Asteroid | null {
     return null;
   }
 
+  const epoch = toNumber(approach.epoch_date_close_approach);
+  const orbital = isRecord(item.orbital_data) ? item.orbital_data : null;
+  const orbitClass = orbital && isRecord(orbital.orbit_class) ? orbital.orbit_class.orbit_class_type : null;
+
   return {
     id,
     name,
@@ -71,6 +75,13 @@ function parseAsteroidRecord(item: unknown): Asteroid | null {
     missDistanceKm,
     relativeVelocityKmH,
     jplUrl: typeof item.nasa_jpl_url === 'string' ? item.nasa_jpl_url : null,
+    ...(epoch !== null ? { closeApproachMs: epoch } : {}),
+    ...(orbital
+      ? {
+          orbitUncertainty: toNumber(orbital.orbit_uncertainty),
+          orbitClass: typeof orbitClass === 'string' ? orbitClass : null,
+        }
+      : {}),
   };
 }
 
@@ -113,4 +124,48 @@ export async function fetchAsteroids(fetchFn: FetchFn = fetch, now: Date = new D
     throw new Error(describeHttpError('NASA NeoWs', response.status, url));
   }
   return parseAsteroids(await response.json());
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// NeoWs' feed accepts at most 7 days per request.
+const FEED_MAX_DAYS = 7;
+
+/**
+ * Every Earth close approach within ±windowDays of `now`, with orbital
+ * details (`detailed=true`). Split into ≤7-day feed requests; one failing
+ * chunk is tolerated, only an all-chunks failure throws.
+ */
+export async function fetchFlybys(windowDays: number, fetchFn: FetchFn = fetch, now: Date = new Date()): Promise<Asteroid[]> {
+  const start = now.getTime() - windowDays * DAY_MS;
+  const totalDays = windowDays * 2 + 1;
+  const urls: string[] = [];
+  for (let offset = 0; offset < totalDays; offset += FEED_MAX_DAYS) {
+    const chunkStart = formatDate(new Date(start + offset * DAY_MS));
+    const chunkEnd = formatDate(new Date(start + Math.min(totalDays - 1, offset + FEED_MAX_DAYS - 1) * DAY_MS));
+    urls.push(`${API_BASE}?start_date=${chunkStart}&end_date=${chunkEnd}&detailed=true&api_key=${NASA_API_KEY}`);
+  }
+  const results = await Promise.allSettled(
+    urls.map(async (url) => {
+      const response = await fetchViaProxy(fetchFn, url);
+      if (!response.ok) {
+        throw new Error(describeHttpError('NASA NeoWs', response.status, url));
+      }
+      return parseAsteroids(await response.json());
+    }),
+  );
+  const byId = new Map<string, Asteroid>();
+  let firstError: unknown = null;
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      firstError ??= result.reason;
+      continue;
+    }
+    for (const asteroid of result.value) {
+      byId.set(`${asteroid.id}:${asteroid.closeApproachDate}`, asteroid);
+    }
+  }
+  if (byId.size === 0 && firstError) {
+    throw firstError instanceof Error ? firstError : new Error(String(firstError));
+  }
+  return [...byId.values()];
 }

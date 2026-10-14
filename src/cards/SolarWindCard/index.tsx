@@ -1,38 +1,12 @@
-import { useApiResource } from '../../hooks/useApiResource';
-import { fetchSolarWind } from '../../api/swpc';
+import { useSolarWind } from '../../hooks/sharedResources';
 import type { SolarWindPoint } from '../../api/types';
 import type { CardComponentProps } from '../../layout/types';
 import { numberSetting } from '../../layout/layoutState';
 import { formatUtcTimestamp } from '../formatTimestamp';
 import { TimeAxis } from '../TimeAxis';
 
-const CACHE_KEY = 'space-radar:solar-wind';
-const TTL_MS = 5 * 60 * 1000;
-const POLL_MS = 5 * 60 * 1000;
 const CHART_WIDTH = 100;
 const CHART_HEIGHT = 32;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isNullableNumber(value: unknown): value is number | null {
-  return value === null || typeof value === 'number';
-}
-
-function isSolarWindPoints(value: unknown): value is SolarWindPoint[] {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (item) =>
-        isRecord(item) &&
-        typeof item.time === 'string' &&
-        isNullableNumber(item.density) &&
-        isNullableNumber(item.speed) &&
-        isNullableNumber(item.temperature),
-    )
-  );
-}
 
 function polylinePoints(points: SolarWindPoint[], accessor: (point: SolarWindPoint) => number | null): string {
   const values = points.map(accessor).filter((value): value is number => value !== null);
@@ -94,13 +68,7 @@ function SubChart({ testId, label, points }: SubChartProps) {
 const DEFAULT_POINTS = 48;
 
 export function SolarWindCard({ settings = {} }: CardComponentProps) {
-  const { data, loading, error } = useApiResource<SolarWindPoint[]>({
-    key: CACHE_KEY,
-    ttlMs: TTL_MS,
-    pollMs: POLL_MS,
-    fetcher: () => fetchSolarWind(),
-    isValue: isSolarWindPoints,
-  });
+  const { data, loading, error } = useSolarWind();
 
   if (loading) {
     return <p className="card-status">Loading…</p>;
