@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { fetchTleGroup } from '../../api/celestrak';
-import { readCache, writeCache } from '../../api/cache';
-import type { TleRecord } from '../../api/types';
+import { fetchTleGroup } from '../api/celestrak';
+import { readCache, writeCache } from '../api/cache';
+import type { TleRecord } from '../api/types';
 
 const GROUP_TTL_MS = 6 * 60 * 60 * 1000;
 

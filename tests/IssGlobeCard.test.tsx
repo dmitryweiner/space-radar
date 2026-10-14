@@ -18,6 +18,12 @@ const sceneHandle = {
   setEarthStyle: vi.fn(),
   setAutoRotateSpeed: vi.fn(),
   setOnMarkerClick: vi.fn(),
+  setSatelliteTexture: vi.fn(),
+  setSunPosition: vi.fn(),
+  setAuroraPoints: vi.fn(),
+  setVisible: vi.fn(),
+  layer: vi.fn(),
+  removeLayer: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),
 };

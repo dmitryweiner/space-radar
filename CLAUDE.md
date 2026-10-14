@@ -32,7 +32,8 @@ Existing helpers:
   projects' Vite servers** (checks the page `<title>`, not just HTTP 200 —
   another project often sits on :5173) and spawns one on the first free port.
 - `scripts/snap.mjs` — single debug screenshot. Flags: `--out <path>`
-  (required), `--show <cardId>` / `--hide <cardId>` / `--click <selector>`
+  (required), `--show <cardId>` / `--hide <cardId>` / `--click <selector>` /
+  `--storage 'key=<json>'` (seed localStorage before boot, e.g. card settings)
   (repeatable), `--width`, `--height`, `--wait <ms>`, `--preview`.
 - `scripts/shot.mjs` — one screenshot per card into `./shots`.
 - `scripts/pngDiff.mjs` — `countDiffPixels(pngBufferA, pngBufferB, tolerance?)`:
@@ -230,6 +231,36 @@ npm run build       # production build → ./docs (GitHub Pages)
   `MIN_CAMERA_DISTANCE` (`EARTH_RADIUS_UNITS + 0.3`) sets how close the five
   globes can zoom in — a flat `3` (1 full unit of clearance) was too far to
   make out detail.
+- **Layers (`src/layers/`).** The data half of each geographic source is a
+  `LayerDefinition` (`issLayer`, `quakesLayer`, `firesLayer`, `auroraLayer`,
+  `eonetLayer`, …): its own `settings` plus a `useLayer(settings, time)` *hook*
+  returning `{ frame, loading, error, summary, legend, describe(hit) }`. The
+  five dashboard globe cards are all `GlobeLayerCard` with a different layer
+  (thin wrappers in `src/cards/*Card/index.tsx`); the registry builds their
+  settings as `globeSettings(layer)` = layer settings + the card-level
+  `earthStyle`. `applyFrame` only touches the fields a frame carries, so `{}`
+  (still loading) draws nothing. `time` is `null` for live (layers tick on
+  their own via `useClock`) or a fixed ms instant from the Scene scrubber.
+  Since `useLayer` is a hook, a host must call it unconditionally — the Scene
+  view mounts one tiny host component per enabled layer rather than calling
+  hooks in a loop.
+- **`earthScene` is layered.** `scene.layer(id)` returns an independent
+  `EarthLayerHandle` (own THREE.Group: ISS, satellites, markers, fire/aurora
+  Points; `setVisible`, `removeLayer`); the flat `setIssPosition`/`setMarkers`/…
+  methods act on the built-in `'default'` layer, which is what single-layer
+  cards use. Click hits report `(hit, layerId)`. **The "sun" light sits over
+  the real sub-solar point** (`src/astro/subsolar.ts`, `setSunPosition`,
+  refreshed each minute by `GlobeLayerCard`) and **the initial camera opens
+  over the sunlit hemisphere** — with a real terminator a fixed start view is
+  a black night side half the day. Ambient was raised so night continents
+  stay faintly readable.
+- **`earthStyle: 'satellite'`** = NASA GIBS VIIRS true-colour daily mosaic
+  (`src/api/gibs.ts`, WMS GetMap 2048×1024, CORS `*`, no key). Starts at
+  today−2 and steps back while a day 4xx's or is under 150 kB (the newest day
+  is still filling in, mostly black). Even complete days have black no-data
+  wedges between swaths, so `useGibsTexture` composites the mosaic over the
+  static photo texture (black pixels → base) in a canvas; one download per
+  page load, shared by every globe.
 - **Five of the cards (`iss-globe`, `natural-events`, `fire-map`, `quakes`,
   `aurora-globe`) share `createEarthScene`.** The globe exposes `setSatellites`
   (named markers with labels), `setMarkers` (generic id/colour/label markers),

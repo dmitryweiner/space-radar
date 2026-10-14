@@ -1,4 +1,10 @@
-import { IssGlobeCard, SATELLITE_CATEGORIES } from '../cards/IssGlobeCard';
+import { IssGlobeCard } from '../cards/IssGlobeCard';
+import { issLayer } from '../layers/issLayer';
+import { eonetLayer } from '../layers/eonetLayer';
+import { firesLayer } from '../layers/firesLayer';
+import { quakesLayer } from '../layers/quakesLayer';
+import { auroraLayer } from '../layers/auroraLayer';
+import type { LayerDefinition } from '../layers/types';
 import { SolarSystemCard } from '../cards/SolarSystemCard';
 import { KpIndexCard } from '../cards/KpIndexCard';
 import { SolarWindCard } from '../cards/SolarWindCard';
@@ -11,14 +17,13 @@ import { ApodCard } from '../cards/ApodCard';
 import { FireMapCard } from '../cards/FireMapCard';
 import { EpicCard } from '../cards/EpicCard';
 import { QuakesCard } from '../cards/QuakesCard';
-import { QUAKE_FEEDS } from '../api/usgsQuakes';
 import { SolarImageryCard, SOLAR_IMAGERY_LAYERS } from '../cards/SolarImageryCard';
 import { SolarCycleCard } from '../cards/SolarCycleCard';
 import { MoonCard } from '../cards/MoonCard';
 import { AuroraGlobeCard } from '../cards/AuroraGlobeCard';
 import { NasaImagesCard } from '../cards/NasaImagesCard';
 import { NASA_IMAGE_TOPICS } from '../api/nasaImages';
-import type { CardDefinition } from './types';
+import type { CardDefinition, CardSettingDefinition } from './types';
 
 // Shared by every Earth-globe card's per-card "Earth style" setting: the
 // default photo globe (day/night shading) vs. a flat, evenly-lit political
@@ -26,7 +31,22 @@ import type { CardDefinition } from './types';
 const EARTH_STYLE_OPTIONS = [
   { value: 'globe', label: 'Globe (photo, day/night)' },
   { value: 'map', label: 'Flat map (no shadow)' },
+  { value: 'satellite', label: 'Satellite (NASA GIBS, ~2 days old)' },
 ];
+
+const EARTH_STYLE_SETTING: CardSettingDefinition = {
+  kind: 'select',
+  id: 'earthStyle',
+  label: 'Earth style',
+  options: EARTH_STYLE_OPTIONS,
+  defaultValue: 'globe',
+};
+
+// A globe card's settings = its layer's own settings + the card-level Earth
+// style (in the Scene view Earth style is one global choice instead).
+function globeSettings(layer: LayerDefinition): CardSettingDefinition[] {
+  return [...(layer.settings ?? []), EARTH_STYLE_SETTING];
+}
 
 export const cardRegistry: CardDefinition[] = [
   {
@@ -35,17 +55,7 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: true,
     defaultLayout: { x: 0, y: 0, w: 2, h: 2, minW: 2, minH: 2 },
     component: IssGlobeCard,
-    settings: [
-      {
-        kind: 'multiselect',
-        id: 'categories',
-        label: 'Satellite groups',
-        options: SATELLITE_CATEGORIES,
-        defaultValue: ['stations'],
-      },
-      { kind: 'number', id: 'maxSatellites', label: 'Max satellites', min: 10, max: 300, step: 10, defaultValue: 30 },
-      { kind: 'select', id: 'earthStyle', label: 'Earth style', options: EARTH_STYLE_OPTIONS, defaultValue: 'globe' },
-    ],
+    settings: globeSettings(issLayer),
   },
   {
     id: 'solar-system',
@@ -60,10 +70,7 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: true,
     defaultLayout: { x: 0, y: 2, w: 2, h: 2, minW: 2, minH: 2 },
     component: NaturalEventsCard,
-    settings: [
-      { kind: 'number', id: 'maxEvents', label: 'Events shown', min: 5, max: 60, step: 5, defaultValue: 25 },
-      { kind: 'select', id: 'earthStyle', label: 'Earth style', options: EARTH_STYLE_OPTIONS, defaultValue: 'globe' },
-    ],
+    settings: globeSettings(eonetLayer),
   },
   {
     id: 'apod',
@@ -125,11 +132,7 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: false,
     defaultLayout: { x: 0, y: 10, w: 2, h: 2, minW: 2, minH: 2 },
     component: FireMapCard,
-    settings: [
-      { kind: 'number', id: 'dayRange', label: 'Days back', min: 1, max: 7, defaultValue: 1 },
-      { kind: 'number', id: 'labelCount', label: 'Labelled fires', min: 0, max: 100, step: 10, defaultValue: 30 },
-      { kind: 'select', id: 'earthStyle', label: 'Earth style', options: EARTH_STYLE_OPTIONS, defaultValue: 'globe' },
-    ],
+    settings: globeSettings(firesLayer),
   },
   {
     id: 'epic',
@@ -145,11 +148,7 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: false,
     defaultLayout: { x: 0, y: 12, w: 2, h: 2, minW: 2, minH: 2 },
     component: QuakesCard,
-    settings: [
-      { kind: 'multiselect', id: 'feeds', label: 'Feeds', options: QUAKE_FEEDS, defaultValue: ['2.5_day'] },
-      { kind: 'number', id: 'maxQuakes', label: 'Max quakes', min: 20, max: 200, step: 20, defaultValue: 80 },
-      { kind: 'select', id: 'earthStyle', label: 'Earth style', options: EARTH_STYLE_OPTIONS, defaultValue: 'globe' },
-    ],
+    settings: globeSettings(quakesLayer),
   },
   {
     id: 'solar-imagery',
@@ -188,9 +187,7 @@ export const cardRegistry: CardDefinition[] = [
     defaultVisible: false,
     defaultLayout: { x: 0, y: 16, w: 2, h: 2, minW: 2, minH: 2 },
     component: AuroraGlobeCard,
-    settings: [
-      { kind: 'select', id: 'earthStyle', label: 'Earth style', options: EARTH_STYLE_OPTIONS, defaultValue: 'globe' },
-    ],
+    settings: globeSettings(auroraLayer),
   },
   {
     id: 'nasa-images',

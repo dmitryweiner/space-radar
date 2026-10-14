@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { SceneVector3 } from '../astro/coords';
+import { geodeticToSceneVector, type SceneVector3 } from '../astro/coords';
+import { subsolarPoint } from '../astro/subsolar';
 import earthTextureUrl from '../assets/earth-diffuse.jpg';
 import earthMapTextureUrl from '../assets/earth-map.jpg';
 import { createStarfield } from './starfield';
@@ -85,29 +86,57 @@ export type MarkerHit =
   | { kind: 'fire'; index: number }
   | { kind: 'aurora'; index: number };
 
-export interface EarthSceneHandle {
+/** One independently toggleable set of markers/points on the globe. */
+export interface EarthLayerHandle {
   setIssPosition(position: SceneVector3 | null, trail?: SceneVector3[]): void;
   setSatellites(satellites: NamedPosition[]): void;
   setMarkers(markers: GlobeMarker[]): void;
   setFirePoints(points: FirePoint[]): void;
   setAuroraPoints(points: AuroraPoint[]): void;
+  setVisible(visible: boolean): void;
+}
+
+/** Where the Sun is overhead (see src/astro/subsolar.ts). */
+export interface SunPosition {
+  latitudeDeg: number;
+  longitudeDeg: number;
+}
+
+/**
+ * The flat EarthLayerHandle methods act on a built-in "default" layer — what
+ * a single-source dashboard card uses. The Scene view instead draws several
+ * sources on one globe via `layer(id)`, one group per source, so each can be
+ * toggled and cleared without touching the others.
+ */
+export interface EarthSceneHandle extends EarthLayerHandle {
+  layer(id: string): EarthLayerHandle;
+  removeLayer(id: string): void;
   /** Multiplies every label/marker's on-screen pixel size (see the global
    * "Globe label size" setting). 1 = the base sizes below. */
   setLabelScale(scale: number): void;
   /** 'globe' (default): photo texture lit by a directional "sun" light, so
    * there's a day/night terminator. 'map': flat, evenly-lit political map —
-   * no shadow hiding markers on the dark side. Any other string falls back to
-   * 'globe'. */
+   * no shadow hiding markers on the dark side. 'satellite': a recent NASA
+   * GIBS true-colour mosaic (see setSatelliteTexture), lit like 'globe'. Any
+   * other string falls back to 'globe'. */
   setEarthStyle(style: string): void;
+  /** Image URL for the 'satellite' Earth style; null = not loaded (falls back
+   * to the photo texture until it arrives). */
+  setSatelliteTexture(url: string | null): void;
+  /** Points the "sun" light from the real sub-solar point, so the terminator
+   * is where it actually is right now (or at the scrubbed time). */
+  setSunPosition(sun: SunPosition): void;
   /** Multiplies the idle auto-rotate speed (see the global "Auto-rotate
    * speed" setting). 1 = AUTO_ROTATE_SPEED below; 0 stops the spin. */
   setAutoRotateSpeed(multiplier: number): void;
-  /** Fires when the user clicks a marker/satellite/ISS/fire/aurora point.
-   * Pass null to detach. Only one handler at a time — the card owns it. */
-  setOnMarkerClick(handler: ((hit: MarkerHit) => void) | null): void;
+  /** Fires when the user clicks a marker/satellite/ISS/fire/aurora point,
+   * with the id of the layer it belongs to. Pass null to detach. */
+  setOnMarkerClick(handler: ((hit: MarkerHit, layerId: string) => void) | null): void;
   resize(): void;
   dispose(): void;
 }
+
+export const DEFAULT_LAYER_ID = 'default';
 
 const LABEL_RADIAL_OFFSET = 0.22;
 
@@ -174,27 +203,46 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   scene.add(starfield.mesh);
 
   // Low ambient + a single strong "sun" light gives a visible day/night
-  // terminator instead of flat, uniformly lit shading.
-  scene.add(new THREE.AmbientLight(0x223355, 0.55));
+  // terminator instead of flat, uniformly lit shading. The light sits over the
+  // real sub-solar point (setSunPosition); the fill light faces it.
+  // Enough ambient that continents stay faintly readable on the night side.
+  scene.add(new THREE.AmbientLight(0x2a3a60, 0.8));
   const sunLight = new THREE.DirectionalLight(0xffffff, 2.4);
-  sunLight.position.set(5, 2, 4);
   scene.add(sunLight);
   const fillLight = new THREE.DirectionalLight(0x334466, 0.18);
-  fillLight.position.set(-5, -2, -4);
   scene.add(fillLight);
+  const SUN_LIGHT_DISTANCE = 10;
+  function placeSun({ latitudeDeg, longitudeDeg }: SunPosition) {
+    const v = geodeticToSceneVector(latitudeDeg, longitudeDeg, 0, SUN_LIGHT_DISTANCE);
+    sunLight.position.set(v.x, v.y, v.z);
+    fillLight.position.set(-v.x, -v.y, -v.z);
+  }
+  const initialSun = subsolarPoint(new Date());
+  placeSun(initialSun);
+  // Open over the sunlit hemisphere: with a real terminator a fixed starting
+  // view would show a black night side for half of every day.
+  const initialView = geodeticToSceneVector(20, initialSun.longitudeDeg, 0, camera.position.length());
+  camera.position.set(initialView.x, initialView.y, initialView.z);
+  controls.update();
 
-  const earthPhotoTexture = new THREE.TextureLoader().load(earthTextureUrl);
+  const textureLoader = new THREE.TextureLoader();
+  const earthPhotoTexture = textureLoader.load(earthTextureUrl);
   earthPhotoTexture.colorSpace = THREE.SRGBColorSpace;
-  const earthMapTexture = new THREE.TextureLoader().load(earthMapTextureUrl);
+  const earthMapTexture = textureLoader.load(earthMapTextureUrl);
   earthMapTexture.colorSpace = THREE.SRGBColorSpace;
 
   const globeMaterial = new THREE.MeshPhongMaterial({ map: earthPhotoTexture, shininess: 6 });
   // Unlit: ignores the directional "sun" light entirely, so the flat map has
   // no day/night terminator hiding markers on what would be the dark side.
   const mapMaterial = new THREE.MeshBasicMaterial({ map: earthMapTexture });
+  // 'satellite' style: a recent GIBS mosaic, lit like the photo globe. Starts
+  // on the photo texture and swaps once the (large) image has loaded.
+  const satelliteImageMaterial = new THREE.MeshPhongMaterial({ map: earthPhotoTexture, shininess: 4 });
+  let satelliteTexture: THREE.Texture | null = null;
+  let satelliteTextureUrl: string | null = null;
 
   const earth: THREE.Mesh<THREE.SphereGeometry, THREE.MeshPhongMaterial | THREE.MeshBasicMaterial> = new THREE.Mesh(
-    new THREE.SphereGeometry(EARTH_RADIUS_UNITS, 48, 48),
+    new THREE.SphereGeometry(EARTH_RADIUS_UNITS, 64, 64),
     globeMaterial,
   );
   scene.add(earth);
@@ -205,134 +253,15 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   );
   scene.add(grid);
 
-  const issMarker = new THREE.Mesh(
-    new THREE.SphereGeometry(ISS_MARKER_RADIUS, 16, 16),
-    new THREE.MeshBasicMaterial({ color: 0xfab219 }),
-  );
-  issMarker.visible = false;
-  scene.add(issMarker);
-  const issLabel = makeLabelSprite('ISS', '#fab219');
-  issLabel.sprite.visible = false;
-  scene.add(issLabel.sprite);
-  const issTrail = makeTrail(0xfab219);
-  scene.add(issTrail.line);
-
+  // Shared by every layer's markers.
   const SATELLITE_COLOR = 0x9fd8ff;
+  const issGeometry = new THREE.SphereGeometry(ISS_MARKER_RADIUS, 16, 16);
+  const issMaterial = new THREE.MeshBasicMaterial({ color: 0xfab219 });
   const satelliteGeometry = new THREE.SphereGeometry(SATELLITE_MARKER_RADIUS, 8, 8);
   const satelliteMaterial = new THREE.MeshBasicMaterial({ color: SATELLITE_COLOR });
-  const satelliteGroup = new THREE.Group();
-  scene.add(satelliteGroup);
-  const satelliteMarkers = new Map<string, { mesh: THREE.Mesh; label: LabelSprite; trail: TrailLine }>();
-
   const markerGeometry = new THREE.SphereGeometry(EVENT_MARKER_RADIUS, 12, 12);
-  const markerGroup = new THREE.Group();
-  scene.add(markerGroup);
-  const eventMarkers = new Map<string, { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; label: LabelSprite }>();
-
-  let firePoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
-  // Permanent labels beside the strongest fire points (depth-tested sprites, so
-  // the opaque Earth hides the ones on the far side for free). Each carries the
-  // originating index into the array most recently passed to setFirePoints, so
-  // a click on the label can resolve back to the same point a click on the dot
-  // would (see handleCanvasClick).
-  let fireLabels: { index: number; label: LabelSprite }[] = [];
-  let auroraPoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
-
-  // Click-to-inspect: one raycaster shared by every marker representation
-  // this scene can hold (individual meshes for ISS/satellites/event markers,
-  // buffer-index hits for the fire/aurora Points clouds). Only one card-level
-  // handler at a time — set via setOnMarkerClick.
-  const raycaster = new THREE.Raycaster();
-  raycaster.params.Points = { threshold: 0.06 };
-  const pointerNdc = new THREE.Vector2();
-  let onMarkerClick: ((hit: MarkerHit) => void) | null = null;
-
-  // Labels get far-side occlusion for free from the GPU depth test (see the
-  // module comment on eventMarkers/fireLabels); the raycaster has no such
-  // test, so a click could otherwise "hit" a marker mathematically on the ray
-  // but actually hidden behind the opaque globe. Compare every candidate hit
-  // against the Earth mesh's own hit distance along the same ray and reject
-  // anything farther. The epsilon covers a marker mesh's own radius (it sits
-  // slightly outside the exact sphere surface) without being anywhere near
-  // the ~2×EARTH_RADIUS gap to a genuinely far-side hit.
-  const OCCLUSION_EPSILON = 0.05;
-  function isOccluded(distance: number, earthDistance: number): boolean {
-    return distance > earthDistance + OCCLUSION_EPSILON;
-  }
-
-  function handleCanvasClick(event: MouseEvent) {
-    if (!onMarkerClick) {
-      return;
-    }
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) {
-      return;
-    }
-    pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(pointerNdc, camera);
-
-    const earthHits = raycaster.intersectObject(earth, false);
-    const earthDistance = earthHits.length > 0 ? earthHits[0].distance : Infinity;
-
-    // Every clickable dot/marker AND its label sprite resolve to the same
-    // MarkerHit, so clicking either one opens the same popup — a label's
-    // rendered text is a much bigger, easier target than a few-pixel dot.
-    const hitByObject = new Map<THREE.Object3D, MarkerHit>();
-    const targets: THREE.Object3D[] = [];
-    function addTarget(object: THREE.Object3D, hit: MarkerHit) {
-      targets.push(object);
-      hitByObject.set(object, hit);
-    }
-
-    if (issMarker.visible) {
-      addTarget(issMarker, { kind: 'iss' });
-      addTarget(issLabel.sprite, { kind: 'iss' });
-    }
-    for (const [name, entry] of satelliteMarkers) {
-      const hit: MarkerHit = { kind: 'satellite', name };
-      addTarget(entry.mesh, hit);
-      addTarget(entry.label.sprite, hit);
-    }
-    for (const [id, entry] of eventMarkers) {
-      const hit: MarkerHit = { kind: 'marker', id };
-      addTarget(entry.mesh, hit);
-      addTarget(entry.label.sprite, hit);
-    }
-    for (const { index, label } of fireLabels) {
-      addTarget(label.sprite, { kind: 'fire', index });
-    }
-
-    const objectHits = targets.length > 0 ? raycaster.intersectObjects(targets, false) : [];
-    const visibleObjectHit = objectHits.find((hit) => !isOccluded(hit.distance, earthDistance));
-    if (visibleObjectHit) {
-      const hit = hitByObject.get(visibleObjectHit.object);
-      if (hit) {
-        onMarkerClick(hit);
-      }
-      return;
-    }
-
-    if (firePoints) {
-      const hits = raycaster.intersectObject(firePoints);
-      const visible = hits.find((hit) => !isOccluded(hit.distance, earthDistance));
-      if (visible && visible.index !== undefined) {
-        onMarkerClick({ kind: 'fire', index: visible.index });
-        return;
-      }
-    }
-    if (auroraPoints) {
-      const hits = raycaster.intersectObject(auroraPoints);
-      const visible = hits.find((hit) => !isOccluded(hit.distance, earthDistance));
-      if (visible && visible.index !== undefined) {
-        onMarkerClick({ kind: 'aurora', index: visible.index });
-      }
-    }
-  }
-  canvas.addEventListener('click', handleCanvasClick);
 
   const scratch = new THREE.Vector3();
-
   const FOV_TAN = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
 
   // User-controlled multiplier (the global "Globe label size" setting) on top
@@ -354,28 +283,396 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     mesh.scale.set(s, s, s);
   }
 
-  function clearFireLabels() {
-    for (const { label } of fireLabels) {
-      scene.remove(label.sprite);
-      label.dispose();
+  // sizeAttenuation:false Points take a size in framebuffer pixels, so scale
+  // by the pixel ratio to land on the intended CSS-pixel size.
+  function pointSize(px: number): number {
+    return px * labelScale * renderer.getPixelRatio();
+  }
+
+  type HitCollector = (object: THREE.Object3D, hit: MarkerHit) => void;
+
+  interface LayerContent {
+    handle: EarthLayerHandle;
+    group: THREE.Group;
+    collectTargets(add: HitCollector): void;
+    /** Buffer-index hits on this layer's Points clouds (fires, aurora). */
+    pickPoints(isVisible: (distance: number) => boolean): MarkerHit | null;
+    rescale(): void;
+    applyLabelScale(): void;
+    dispose(): void;
+  }
+
+  function createLayerContent(): LayerContent {
+    const group = new THREE.Group();
+    scene.add(group);
+
+    const issMarker = new THREE.Mesh(issGeometry, issMaterial);
+    issMarker.visible = false;
+    group.add(issMarker);
+    const issLabel = makeLabelSprite('ISS', '#fab219');
+    issLabel.sprite.visible = false;
+    group.add(issLabel.sprite);
+    const issTrail = makeTrail(0xfab219);
+    group.add(issTrail.line);
+
+    const satelliteMarkers = new Map<string, { mesh: THREE.Mesh; label: LabelSprite; trail: TrailLine }>();
+    const eventMarkers = new Map<string, { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; label: LabelSprite }>();
+
+    let firePoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
+    // Permanent labels beside the strongest fire points (depth-tested sprites,
+    // so the opaque Earth hides the ones on the far side for free). Each
+    // carries the originating index into the array most recently passed to
+    // setFirePoints, so a click on the label resolves to the same point a
+    // click on the dot would.
+    let fireLabels: { index: number; label: LabelSprite }[] = [];
+    let auroraPoints: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
+
+    function disposeSatellite(entry: { mesh: THREE.Mesh; label: LabelSprite; trail: TrailLine }) {
+      group.remove(entry.mesh, entry.label.sprite, entry.trail.line);
+      entry.label.dispose();
+      entry.trail.dispose();
     }
-    fireLabels = [];
+
+    function disposeEventMarker(entry: { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; label: LabelSprite }) {
+      group.remove(entry.mesh, entry.label.sprite);
+      entry.material.dispose();
+      entry.label.dispose();
+    }
+
+    function clearFirePoints() {
+      if (firePoints) {
+        group.remove(firePoints);
+        firePoints.geometry.dispose();
+        firePoints.material.dispose();
+        firePoints = null;
+      }
+      for (const { label } of fireLabels) {
+        group.remove(label.sprite);
+        label.dispose();
+      }
+      fireLabels = [];
+    }
+
+    function clearAuroraPoints() {
+      if (auroraPoints) {
+        group.remove(auroraPoints);
+        auroraPoints.geometry.dispose();
+        auroraPoints.material.dispose();
+        auroraPoints = null;
+      }
+    }
+
+    function pointsCloud(
+      count: number,
+      fill: (i: number, positions: Float32Array, colors: Float32Array) => void,
+      material: THREE.PointsMaterial,
+    ): THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> {
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      for (let i = 0; i < count; i += 1) {
+        fill(i, positions, colors);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      return new THREE.Points(geometry, material);
+    }
+
+    const handle: EarthLayerHandle = {
+      setIssPosition(position, trail = []) {
+        if (!position) {
+          issMarker.visible = false;
+          issLabel.sprite.visible = false;
+          issTrail.setPoints([]);
+          return;
+        }
+        issMarker.visible = true;
+        issMarker.position.set(position.x, position.y, position.z);
+        issLabel.sprite.visible = true;
+        issLabel.sprite.position.copy(labelPosition(position, scratch));
+        issTrail.setPoints(trail);
+      },
+      setSatellites(satellites) {
+        const incoming = new Set(satellites.map((sat) => sat.name));
+        for (const [name, entry] of satelliteMarkers) {
+          if (!incoming.has(name)) {
+            disposeSatellite(entry);
+            satelliteMarkers.delete(name);
+          }
+        }
+        for (const { name, position, trail } of satellites) {
+          let entry = satelliteMarkers.get(name);
+          if (!entry) {
+            const mesh = new THREE.Mesh(satelliteGeometry, satelliteMaterial);
+            const label = makeLabelSprite(name, '#9fd8ff');
+            const trailLine = makeTrail(SATELLITE_COLOR);
+            group.add(mesh, label.sprite, trailLine.line);
+            entry = { mesh, label, trail: trailLine };
+            satelliteMarkers.set(name, entry);
+          }
+          entry.mesh.position.set(position.x, position.y, position.z);
+          entry.label.sprite.position.copy(labelPosition(position, scratch));
+          entry.trail.setPoints(trail);
+        }
+      },
+      setMarkers(markers) {
+        const incoming = new Set(markers.map((marker) => marker.id));
+        for (const [id, entry] of eventMarkers) {
+          if (!incoming.has(id)) {
+            disposeEventMarker(entry);
+            eventMarkers.delete(id);
+          }
+        }
+        for (const marker of markers) {
+          let entry = eventMarkers.get(marker.id);
+          if (!entry) {
+            const material = new THREE.MeshBasicMaterial({ color: marker.color });
+            const mesh = new THREE.Mesh(markerGeometry, material);
+            const label = makeLabelSprite(marker.label ?? '', '#e6ecff');
+            label.sprite.visible = Boolean(marker.label);
+            group.add(mesh, label.sprite);
+            entry = { mesh, material, label };
+            eventMarkers.set(marker.id, entry);
+          } else {
+            entry.material.color.set(marker.color);
+          }
+          entry.mesh.position.set(marker.position.x, marker.position.y, marker.position.z);
+          entry.label.sprite.position.copy(labelPosition(marker.position, scratch));
+        }
+      },
+      setFirePoints(points) {
+        clearFirePoints();
+        if (points.length === 0) {
+          return;
+        }
+        firePoints = pointsCloud(
+          points.length,
+          (i, positions, colors) => {
+            const point = points[i];
+            positions[i * 3] = point.position.x;
+            positions[i * 3 + 1] = point.position.y;
+            positions[i * 3 + 2] = point.position.z;
+            const t = Math.min(1, Math.max(0, point.intensity));
+            colors[i * 3] = 1;
+            colors[i * 3 + 1] = 0.85 - 0.75 * t;
+            colors[i * 3 + 2] = 0.2 - 0.18 * t;
+            // Points flagged with a label get a permanent sprite beside them.
+            if (point.label) {
+              const label = makeLabelSprite(point.label, '#ffd7a0');
+              label.sprite.position.copy(labelPosition(point.position, scratch));
+              group.add(label.sprite);
+              fireLabels.push({ index: i, label });
+            }
+          },
+          // sizeAttenuation:false keeps every fire point a constant on-screen
+          // size when zooming.
+          new THREE.PointsMaterial({
+            size: pointSize(FIRE_POINT_PX),
+            vertexColors: true,
+            sizeAttenuation: false,
+            transparent: true,
+            opacity: 0.9,
+          }),
+        );
+        group.add(firePoints);
+      },
+      setAuroraPoints(points) {
+        clearAuroraPoints();
+        if (points.length === 0) {
+          return;
+        }
+        auroraPoints = pointsCloud(
+          points.length,
+          (i, positions, colors) => {
+            const point = points[i];
+            positions[i * 3] = point.position.x;
+            positions[i * 3 + 1] = point.position.y;
+            positions[i * 3 + 2] = point.position.z;
+            // Additive green glow: brighter where the probability is higher,
+            // so faint edges of the oval fade out instead of a hard mask.
+            const p = Math.min(1, Math.max(0, point.probability));
+            colors[i * 3] = 0.2 * p;
+            colors[i * 3 + 1] = 1.0 * p;
+            colors[i * 3 + 2] = 0.5 * p;
+          },
+          new THREE.PointsMaterial({
+            size: pointSize(AURORA_POINT_PX),
+            vertexColors: true,
+            sizeAttenuation: false,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+          }),
+        );
+        group.add(auroraPoints);
+      },
+      setVisible(visible) {
+        group.visible = visible;
+      },
+    };
+
+    return {
+      handle,
+      group,
+      collectTargets(add) {
+        if (issMarker.visible) {
+          add(issMarker, { kind: 'iss' });
+          add(issLabel.sprite, { kind: 'iss' });
+        }
+        for (const [name, entry] of satelliteMarkers) {
+          add(entry.mesh, { kind: 'satellite', name });
+          add(entry.label.sprite, { kind: 'satellite', name });
+        }
+        for (const [id, entry] of eventMarkers) {
+          add(entry.mesh, { kind: 'marker', id });
+          add(entry.label.sprite, { kind: 'marker', id });
+        }
+        for (const { index, label } of fireLabels) {
+          add(label.sprite, { kind: 'fire', index });
+        }
+      },
+      pickPoints(isVisible) {
+        if (firePoints) {
+          const hit = raycaster.intersectObject(firePoints).find((h) => isVisible(h.distance));
+          if (hit && hit.index !== undefined) {
+            return { kind: 'fire', index: hit.index };
+          }
+        }
+        if (auroraPoints) {
+          const hit = raycaster.intersectObject(auroraPoints).find((h) => isVisible(h.distance));
+          if (hit && hit.index !== undefined) {
+            return { kind: 'aurora', index: hit.index };
+          }
+        }
+        return null;
+      },
+      rescale() {
+        rescaleLabel(issLabel);
+        if (issMarker.visible) {
+          scaleMarker(issMarker, ISS_MARKER_PX, ISS_MARKER_RADIUS);
+        }
+        for (const entry of satelliteMarkers.values()) {
+          rescaleLabel(entry.label);
+          scaleMarker(entry.mesh, SATELLITE_MARKER_PX, SATELLITE_MARKER_RADIUS);
+        }
+        for (const entry of eventMarkers.values()) {
+          rescaleLabel(entry.label);
+          scaleMarker(entry.mesh, EVENT_MARKER_PX, EVENT_MARKER_RADIUS);
+        }
+        for (const { label } of fireLabels) {
+          rescaleLabel(label, FIRE_LABEL_PX);
+        }
+      },
+      applyLabelScale() {
+        // Labels/markers are rescaled every frame, but the Points materials
+        // bake their size in at creation — patch any existing cloud.
+        if (firePoints) {
+          firePoints.material.size = pointSize(FIRE_POINT_PX);
+        }
+        if (auroraPoints) {
+          auroraPoints.material.size = pointSize(AURORA_POINT_PX);
+        }
+      },
+      dispose() {
+        clearFirePoints();
+        clearAuroraPoints();
+        for (const entry of satelliteMarkers.values()) {
+          disposeSatellite(entry);
+        }
+        satelliteMarkers.clear();
+        for (const entry of eventMarkers.values()) {
+          disposeEventMarker(entry);
+        }
+        eventMarkers.clear();
+        issLabel.dispose();
+        issTrail.dispose();
+        scene.remove(group);
+      },
+    };
   }
 
-  function disposeSatellite(entry: { mesh: THREE.Mesh; label: LabelSprite; trail: TrailLine }) {
-    satelliteGroup.remove(entry.mesh);
-    scene.remove(entry.label.sprite);
-    scene.remove(entry.trail.line);
-    entry.label.dispose();
-    entry.trail.dispose();
+  const layers = new Map<string, LayerContent>();
+  function layerContent(id: string): LayerContent {
+    let content = layers.get(id);
+    if (!content) {
+      content = createLayerContent();
+      layers.set(id, content);
+    }
+    return content;
   }
+  const defaultLayer = layerContent(DEFAULT_LAYER_ID).handle;
 
-  function disposeEventMarker(entry: { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; label: LabelSprite }) {
-    markerGroup.remove(entry.mesh);
-    scene.remove(entry.label.sprite);
-    entry.material.dispose();
-    entry.label.dispose();
+  // Click-to-inspect: one raycaster shared by every marker representation
+  // this scene can hold (individual meshes for ISS/satellites/event markers,
+  // buffer-index hits for the fire/aurora Points clouds), across all layers.
+  const raycaster = new THREE.Raycaster();
+  raycaster.params.Points = { threshold: 0.06 };
+  const pointerNdc = new THREE.Vector2();
+  let onMarkerClick: ((hit: MarkerHit, layerId: string) => void) | null = null;
+
+  // Labels get far-side occlusion for free from the GPU depth test; the
+  // raycaster has no such test, so a click could otherwise "hit" a marker
+  // mathematically on the ray but actually hidden behind the opaque globe.
+  // Compare every candidate hit against the Earth mesh's own hit distance
+  // along the same ray and reject anything farther. The epsilon covers a
+  // marker mesh's own radius (it sits slightly outside the exact sphere
+  // surface) without being anywhere near the ~2×EARTH_RADIUS gap to a
+  // genuinely far-side hit.
+  const OCCLUSION_EPSILON = 0.05;
+
+  function handleCanvasClick(event: MouseEvent) {
+    if (!onMarkerClick) {
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      return;
+    }
+    pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointerNdc, camera);
+
+    const earthHits = raycaster.intersectObject(earth, false);
+    const earthDistance = earthHits.length > 0 ? earthHits[0].distance : Infinity;
+    const isVisible = (distance: number) => distance <= earthDistance + OCCLUSION_EPSILON;
+
+    // Every clickable dot/marker AND its label sprite resolve to the same
+    // MarkerHit, so clicking either one opens the same popup — a label's
+    // rendered text is a much bigger, easier target than a few-pixel dot.
+    const hitByObject = new Map<THREE.Object3D, { hit: MarkerHit; layerId: string }>();
+    const targets: THREE.Object3D[] = [];
+    for (const [layerId, content] of layers) {
+      if (!content.group.visible) {
+        continue;
+      }
+      content.collectTargets((object, hit) => {
+        targets.push(object);
+        hitByObject.set(object, { hit, layerId });
+      });
+    }
+
+    const objectHits = targets.length > 0 ? raycaster.intersectObjects(targets, false) : [];
+    const visibleObjectHit = objectHits.find((hit) => isVisible(hit.distance));
+    if (visibleObjectHit) {
+      const found = hitByObject.get(visibleObjectHit.object);
+      if (found) {
+        onMarkerClick(found.hit, found.layerId);
+      }
+      return;
+    }
+
+    for (const [layerId, content] of layers) {
+      if (!content.group.visible) {
+        continue;
+      }
+      const hit = content.pickPoints(isVisible);
+      if (hit) {
+        onMarkerClick(hit, layerId);
+        return;
+      }
+    }
   }
+  canvas.addEventListener('click', handleCanvasClick);
 
   let frameId = 0;
   // Real elapsed time between frames, in seconds, fed to controls.update()
@@ -397,187 +694,85 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     const deltaSeconds = Math.min((now - lastFrameTime) / 1000, MAX_DELTA_SECONDS);
     lastFrameTime = now;
     controls.update(deltaSeconds);
-    rescaleLabel(issLabel);
-    if (issMarker.visible) {
-      scaleMarker(issMarker, ISS_MARKER_PX, ISS_MARKER_RADIUS);
-    }
-    for (const entry of satelliteMarkers.values()) {
-      rescaleLabel(entry.label);
-      scaleMarker(entry.mesh, SATELLITE_MARKER_PX, SATELLITE_MARKER_RADIUS);
-    }
-    for (const entry of eventMarkers.values()) {
-      rescaleLabel(entry.label);
-      scaleMarker(entry.mesh, EVENT_MARKER_PX, EVENT_MARKER_RADIUS);
-    }
-    for (const { label } of fireLabels) {
-      rescaleLabel(label, FIRE_LABEL_PX);
+    for (const content of layers.values()) {
+      if (content.group.visible) {
+        content.rescale();
+      }
     }
     renderer.render(scene, camera);
   }
   animate();
 
+  let earthStyle = 'globe';
+  function applyEarthStyle() {
+    if (earthStyle === 'map') {
+      earth.material = mapMaterial;
+    } else if (earthStyle === 'satellite') {
+      earth.material = satelliteImageMaterial;
+    } else {
+      earth.material = globeMaterial;
+    }
+  }
+
   return {
-    setIssPosition(position, trail = []) {
-      if (!position) {
-        issMarker.visible = false;
-        issLabel.sprite.visible = false;
-        issTrail.setPoints([]);
-        return;
-      }
-      issMarker.visible = true;
-      issMarker.position.set(position.x, position.y, position.z);
-      issLabel.sprite.visible = true;
-      issLabel.sprite.position.copy(labelPosition(position, scratch));
-      issTrail.setPoints(trail);
+    setIssPosition: (position, trail) => defaultLayer.setIssPosition(position, trail),
+    setSatellites: (satellites) => defaultLayer.setSatellites(satellites),
+    setMarkers: (markers) => defaultLayer.setMarkers(markers),
+    setFirePoints: (points) => defaultLayer.setFirePoints(points),
+    setAuroraPoints: (points) => defaultLayer.setAuroraPoints(points),
+    setVisible: (visible) => defaultLayer.setVisible(visible),
+    layer(id) {
+      return layerContent(id).handle;
     },
-    setSatellites(satellites) {
-      const incoming = new Set(satellites.map((sat) => sat.name));
-      for (const [name, entry] of satelliteMarkers) {
-        if (!incoming.has(name)) {
-          disposeSatellite(entry);
-          satelliteMarkers.delete(name);
-        }
+    removeLayer(id) {
+      const content = layers.get(id);
+      if (content && id !== DEFAULT_LAYER_ID) {
+        content.dispose();
+        layers.delete(id);
       }
-      for (const { name, position, trail } of satellites) {
-        let entry = satelliteMarkers.get(name);
-        if (!entry) {
-          const mesh = new THREE.Mesh(satelliteGeometry, satelliteMaterial);
-          satelliteGroup.add(mesh);
-          const label = makeLabelSprite(name, '#9fd8ff');
-          scene.add(label.sprite);
-          const trailLine = makeTrail(SATELLITE_COLOR);
-          scene.add(trailLine.line);
-          entry = { mesh, label, trail: trailLine };
-          satelliteMarkers.set(name, entry);
-        }
-        entry.mesh.position.set(position.x, position.y, position.z);
-        entry.label.sprite.position.copy(labelPosition(position, scratch));
-        entry.trail.setPoints(trail);
-      }
-    },
-    setMarkers(markers) {
-      const incoming = new Set(markers.map((marker) => marker.id));
-      for (const [id, entry] of eventMarkers) {
-        if (!incoming.has(id)) {
-          disposeEventMarker(entry);
-          eventMarkers.delete(id);
-        }
-      }
-      for (const marker of markers) {
-        let entry = eventMarkers.get(marker.id);
-        if (!entry) {
-          const material = new THREE.MeshBasicMaterial({ color: marker.color });
-          const mesh = new THREE.Mesh(markerGeometry, material);
-          markerGroup.add(mesh);
-          const label = makeLabelSprite(marker.label ?? '', '#e6ecff');
-          label.sprite.visible = Boolean(marker.label);
-          scene.add(label.sprite);
-          entry = { mesh, material, label };
-          eventMarkers.set(marker.id, entry);
-        } else {
-          entry.material.color.set(marker.color);
-        }
-        entry.mesh.position.set(marker.position.x, marker.position.y, marker.position.z);
-        entry.label.sprite.position.copy(labelPosition(marker.position, scratch));
-      }
-    },
-    setFirePoints(points) {
-      if (firePoints) {
-        scene.remove(firePoints);
-        firePoints.geometry.dispose();
-        firePoints.material.dispose();
-        firePoints = null;
-      }
-      clearFireLabels();
-      if (points.length === 0) {
-        return;
-      }
-      const positions = new Float32Array(points.length * 3);
-      const colors = new Float32Array(points.length * 3);
-      points.forEach((point, i) => {
-        positions[i * 3] = point.position.x;
-        positions[i * 3 + 1] = point.position.y;
-        positions[i * 3 + 2] = point.position.z;
-        const t = Math.min(1, Math.max(0, point.intensity));
-        colors[i * 3] = 1;
-        colors[i * 3 + 1] = 0.85 - 0.75 * t;
-        colors[i * 3 + 2] = 0.2 - 0.18 * t;
-        // Points flagged with a label get a permanent sprite beside them.
-        if (point.label) {
-          const label = makeLabelSprite(point.label, '#ffd7a0');
-          label.sprite.position.copy(labelPosition(point.position, scratch));
-          scene.add(label.sprite);
-          fireLabels.push({ index: i, label });
-        }
-      });
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      // sizeAttenuation:false keeps every fire point a constant on-screen size
-      // when zooming; size is in framebuffer pixels, so scale by the pixel ratio
-      // to land on the intended CSS-pixel size.
-      const material = new THREE.PointsMaterial({
-        size: FIRE_POINT_PX * labelScale * renderer.getPixelRatio(),
-        vertexColors: true,
-        sizeAttenuation: false,
-        transparent: true,
-        opacity: 0.9,
-      });
-      firePoints = new THREE.Points(geometry, material);
-      scene.add(firePoints);
-    },
-    setAuroraPoints(points) {
-      if (auroraPoints) {
-        scene.remove(auroraPoints);
-        auroraPoints.geometry.dispose();
-        auroraPoints.material.dispose();
-        auroraPoints = null;
-      }
-      if (points.length === 0) {
-        return;
-      }
-      const positions = new Float32Array(points.length * 3);
-      const colors = new Float32Array(points.length * 3);
-      points.forEach((point, i) => {
-        positions[i * 3] = point.position.x;
-        positions[i * 3 + 1] = point.position.y;
-        positions[i * 3 + 2] = point.position.z;
-        // Additive green glow: brighter where the probability is higher, so
-        // faint edges of the oval fade out instead of showing a hard mask.
-        const p = Math.min(1, Math.max(0, point.probability));
-        colors[i * 3] = 0.2 * p;
-        colors[i * 3 + 1] = 1.0 * p;
-        colors[i * 3 + 2] = 0.5 * p;
-      });
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      const material = new THREE.PointsMaterial({
-        size: AURORA_POINT_PX * labelScale * renderer.getPixelRatio(),
-        vertexColors: true,
-        sizeAttenuation: false,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      auroraPoints = new THREE.Points(geometry, material);
-      scene.add(auroraPoints);
     },
     setLabelScale(scale) {
       labelScale = scale;
-      // Label/marker sizes above are recomputed every frame in animate(), but
-      // the two Points materials bake their size in at creation time — patch
-      // any already-created cloud so a mid-session setting change is visible
-      // immediately instead of only on the next setFirePoints/setAuroraPoints.
-      if (firePoints) {
-        firePoints.material.size = FIRE_POINT_PX * labelScale * renderer.getPixelRatio();
-      }
-      if (auroraPoints) {
-        auroraPoints.material.size = AURORA_POINT_PX * labelScale * renderer.getPixelRatio();
+      for (const content of layers.values()) {
+        content.applyLabelScale();
       }
     },
     setEarthStyle(style) {
-      earth.material = style === 'map' ? mapMaterial : globeMaterial;
+      earthStyle = style;
+      applyEarthStyle();
+    },
+    setSatelliteTexture(url) {
+      if (url === satelliteTextureUrl) {
+        return;
+      }
+      satelliteTextureUrl = url;
+      if (!url) {
+        satelliteImageMaterial.map = earthPhotoTexture;
+        satelliteImageMaterial.needsUpdate = true;
+        return;
+      }
+      textureLoader.load(
+        url,
+        (texture) => {
+          // A newer URL (or dispose) may have superseded this load.
+          if (satelliteTextureUrl !== url) {
+            texture.dispose();
+            return;
+          }
+          texture.colorSpace = THREE.SRGBColorSpace;
+          satelliteTexture?.dispose();
+          satelliteTexture = texture;
+          satelliteImageMaterial.map = texture;
+          satelliteImageMaterial.needsUpdate = true;
+        },
+        undefined,
+        () => {
+          // Load failed — stay on the photo texture.
+        },
+      );
+    },
+    setSunPosition(sun) {
+      placeSun(sun);
     },
     setAutoRotateSpeed(multiplier) {
       controls.autoRotateSpeed = AUTO_ROTATE_SPEED * multiplier;
@@ -592,35 +787,25 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
       canvas.removeEventListener('click', handleCanvasClick);
-      clearFireLabels();
       controls.removeEventListener('start', stopAutoRotateOnMove);
       detachKeyboardZoom();
       detachCooperativeGestures();
       controls.dispose();
-      for (const entry of satelliteMarkers.values()) {
-        disposeSatellite(entry);
+      for (const content of layers.values()) {
+        content.dispose();
       }
-      satelliteMarkers.clear();
-      for (const entry of eventMarkers.values()) {
-        disposeEventMarker(entry);
-      }
-      eventMarkers.clear();
-      if (firePoints) {
-        firePoints.geometry.dispose();
-        firePoints.material.dispose();
-      }
-      if (auroraPoints) {
-        auroraPoints.geometry.dispose();
-        auroraPoints.material.dispose();
-      }
+      layers.clear();
+      issGeometry.dispose();
+      issMaterial.dispose();
       satelliteGeometry.dispose();
       satelliteMaterial.dispose();
       markerGeometry.dispose();
-      issLabel.dispose();
-      issTrail.dispose();
       renderer.dispose();
       globeMaterial.dispose();
       mapMaterial.dispose();
+      satelliteImageMaterial.dispose();
+      satelliteTextureUrl = null;
+      satelliteTexture?.dispose();
       earthPhotoTexture.dispose();
       earthMapTexture.dispose();
       starfield.dispose();
