@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { act } from '@testing-library/react';
 import { App } from '../src/App';
+import { createEarthScene } from '../src/render/earthScene';
 
 vi.mock('../src/render/earthScene', () => ({
   createEarthScene: vi.fn(() => ({
@@ -95,6 +97,40 @@ describe('App', () => {
     expect(document.querySelector('.inspector-title')?.textContent).toBe('Geomagnetic activity (Kp)');
     await userEvent.click(screen.getByRole('button', { name: 'Close panel' }));
     expect(screen.queryByRole('button', { name: 'Close panel' })).not.toBeInTheDocument();
+  });
+
+  it('shows a clicked globe marker\'s details in the inspector, with the layer it came from', async () => {
+    const quakeFeed = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          id: 'q1',
+          properties: { mag: 5.6, place: '20 km S of Testville', time: 1785733280034, url: 'https://usgs.test/q1' },
+          geometry: { type: 'Point', coordinates: [140, -6, 33] },
+        },
+      ],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url.includes('usgs') ? { ok: true, status: 200, json: async () => quakeFeed } : Promise.reject(new Error('offline')),
+      ),
+    );
+    render(<App />);
+    await vi.waitFor(() => expect(vi.mocked(createEarthScene)).toHaveBeenCalled());
+    const results = vi.mocked(createEarthScene).mock.results;
+    const handle = results[results.length - 1].value;
+    const clickCalls = vi.mocked(handle.setOnMarkerClick).mock.calls;
+    const onClick = clickCalls[clickCalls.length - 1][0];
+    // wait until the quakes layer has its data
+    await screen.findByText('M4.5–6 (1)');
+    await act(async () => {
+      onClick?.({ kind: 'marker', id: 'q1' }, 'quakes');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(await screen.findByText('M5.6 — 20 km S of Testville')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Details/ })).toHaveAttribute('href', 'https://usgs.test/q1');
   });
 
   it('shows a full-screen overlay for a card, and exits it again', async () => {

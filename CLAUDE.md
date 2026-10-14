@@ -27,6 +27,14 @@ Existing helpers:
   until still, up to 10s), not a fixed wait: OrbitControls' damping decays
   *per frame* and with six WebGL cards on the software rasterizer the frame
   rate is low, so a fixed 2s settle that's plenty with one card isn't enough.
+- **smoke also covers the Scene view** (the default UI): exactly one WebGL
+  canvas, default layers on, a layer toggle persisting, the globe rendering,
+  a status chip opening its inspector panel, the scrubber leaving/returning to
+  Live, the Earth/Sun/Solar System tabs, the header mode toggle persisting, and
+  on an emulated phone a one-finger drag rotating the full-screen globe
+  without scrolling the page plus the Layers bottom sheet. **All dashboard
+  sections run on pages pre-switched to the dashboard** via `useDashboard(page)`
+  (an init script that seeds `space-radar:ui-mode:v1` on first load only).
 - `scripts/devServer.mjs` — `ensureServer({ preview })` shared by smoke/snap/
   shot: reuses a running Space Radar dev server, **skips ports held by other
   projects' Vite servers** (checks the page `<title>`, not just HTTP 200 —
@@ -332,6 +340,53 @@ npm run build       # production build → ./docs (GitHub Pages)
   buckets (region via the exported `regionOf`), so both geography and type are
   spread — Europe/Asia/etc. show alongside the far more numerous US wildfires
   instead of being crowded out of the `maxEvents` slice.
+- **The Scene view (`src/scene/`) is the default UI**; the card grid is the
+  "Dashboard", behind the header toggle (`space-radar:ui-mode:v1`, anything but
+  `"dashboard"` → scene). Scene state (`space-radar:scene:v1`: scene tab,
+  enabled layers, per-layer settings, Earth style) is sanitized field by field
+  (`sceneState.ts`). `EarthStage` owns one `createEarthScene` and mounts one
+  render-less `LayerHost` per enabled layer (from `layers/registry.ts`), which
+  runs the layer hook, `applyFrame`s into `scene.layer(id)` and on unmount
+  `removeLayer`s. Hosts report `{loading,error,summary,legend}` upward **only
+  when that changes** (keyed effect) — reporting every render would re-render
+  the whole view on the ISS layer's per-second tick (and loop). The latest
+  full layer state (for `describe()`) lives in a ref written **in an effect**:
+  react-hooks v7's `react-hooks/refs` rule rejects ref reads/writes during
+  render, so the inspector polls it from an effect too. The inspector's detail
+  panels (`scene/panels.tsx`) are mostly the dashboard's own card components.
+  The Scene container carries `data-free-gestures` (one finger rotates; the
+  page never scrolls — `#app.app-scene` is exactly `100dvh`). Phones (<700px,
+  `matchMedia`, guarded for jsdom) get a bottom sheet instead of side panels.
+- **Time cursor**: `TimeScrubber` (±7 d, playback speeds) sets `time` (null =
+  live). Layers get it via `useLayer(settings, time)` + `useClock`; the globe's
+  sun position and `SolarSystemCard` (new optional `time` prop on
+  `CardComponentProps`) follow it. Snapshot feeds (quakes, EONET, fires…)
+  ignore it. EPIC frames are *not* time-linked yet.
+- **Asteroid flybys (`layers/neoFlybyLayer.ts`, `astro/flyby.ts`) are "level
+  A" — schematic.** NeoWs gives only time, miss distance and speed per pass,
+  so each pass is a straight line missing Earth by exactly the miss distance,
+  in a direction hashed from the object id; distance is log-compressed
+  (`compressDistance`: 1 R⊕ → globe surface, 0.2 AU → 14 units). The Moon is
+  placed at its real sub-lunar direction on that scale with a ring for
+  reference. Turning the layer on dollies the camera out (`setViewDistance`).
+  NeoWs lists some objects twice (provisional "(2018 EH4)" + numbered
+  "678976 (2018 EH4)", different ids) — `dedupeFlybys` keeps the numbered
+  one. Level B (real geometry from `orbital_data`, which `fetchFlybys` already
+  requests with `detailed=true`) is the post-release step.
+- **`earthScene` auto-fits the camera distance to the canvas aspect** (the FOV
+  is vertical, so a portrait phone canvas cut the globe off at the sides) until
+  the distance no longer matches the last fit — i.e. until the user zooms.
+- **Night lights** = a separate additive sphere just above the surface with a
+  tiny ShaderMaterial (GIBS VIIRS Black Marble, loaded only when the layer is
+  on), masked to the night side by the sun direction and thresholded on
+  luminance so Black Marble's faint bluish land doesn't wash over the photo.
+- **`useApiResource` dedups across components**: one in-flight request per
+  key (dropped once settled or when its last waiter unmounts — else a hung
+  request blocks the next mount, which broke tests), and a poll is skipped if
+  another instance refreshed the cache within the last half poll interval.
+  Resources shown in more than one place live in `hooks/sharedResources.ts`
+  (Kp, solar wind, launches, people in space, NOAA scales) — **don't
+  redefine their cache key/TTL in a card**.
 - **Default layout is six cards in two columns** (`w:2`), reading order
   ISS · Solar System / Natural Events · APOD / Launches / Asteroids. The
   registry lists these first (all `defaultVisible:true`); the rest are hidden and

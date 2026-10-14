@@ -5,12 +5,38 @@
 **A space situational awareness dashboard.** A web app that pulls live data
 from public space agencies — satellite orbits, planetary positions, space
 weather, solar flares/CMEs, the solar cycle, near-Earth asteroids, earthquakes,
-natural events, rocket launches, active fires, the Moon and eclipses, and
-full-disk Earth and Sun imagery — into a grid of cards you can show, hide, drag
-and resize. Your layout is saved locally, so the dashboard looks the same next
-time you open it.
+natural events, rocket launches, active fires, fireballs, the Moon and
+eclipses, and full-disk Earth and Sun imagery — into one interactive **Scene**,
+or into a classic grid of cards (the **Dashboard**). Your choices are saved
+locally.
 
-## Features
+## Scene (default view)
+
+- **One globe, many layers.** Satellites & the ISS, the aurora oval,
+  earthquakes, natural events, active fires, asteroid flybys, fireballs and
+  night lights are toggleable **layers on a single Earth**, so you can see how
+  they relate (where is the ISS relative to the aurora?). Each layer has its own
+  ⚙ settings; the Earth surface can be the photo globe, a ~2-day-old **NASA
+  GIBS satellite mosaic**, or a flat map. The day/night terminator is the
+  **real one**, computed for the current (or scrubbed) time.
+- **Time scrubber** (±7 days, with playback at 1 min/s … 1 day/s): satellites,
+  the terminator, night lights, the Moon, asteroid flybys and the Solar System
+  all follow it. "Live" returns to now.
+- **Asteroid flybys** — every close approach within ±N days (NASA NeoWs) drawn
+  as a pass by Earth at its real miss distance and timing, on a compressed
+  distance scale with the Moon's orbit for reference. Directions are schematic
+  (NeoWs gives no geometry), and the layer says so.
+- **Inspector** (right): click any marker for details; otherwise legends, the
+  Moon, the Sun right now, and detail panels (Kp, solar wind, flares, aurora
+  forecast, launches, EPIC, APOD, …).
+- **Status bar**: NOAA R/S/G space-weather scales, Kp, solar-wind speed, people
+  in space, next launch — click a chip for details.
+- Scenes: **Earth**, **Sun** (SDO) and **Solar System**.
+- On phones the globe is full screen (one finger rotates it — the page doesn't
+  scroll), layers and details live in a bottom sheet, and the status chips
+  scroll sideways.
+
+## Dashboard
 
 - **ISS & Satellites** — 3D Earth (Three.js) showing the ISS plus satellites
   from selectable CelesTrak groups (stations, Starlink, GPS, weather, …), each
@@ -66,8 +92,9 @@ time you open it.
   the grid, opened full-screen, or tuned via its **⚙ settings** popup (size in
   rows/columns plus card-specific options). Layout and settings are saved to
   `localStorage` and restored on reload; **Reset layout** returns the
-  defaults. On narrow screens, cards stack in a single column and stay
-  draggable for reordering.
+  defaults. On narrow screens, cards stack in a single column; reorder them by
+  the ≡ grip. On touch screens one finger over a globe scrolls the page and
+  two fingers rotate/zoom it (like web maps); full screen rotates with one.
 
 ## Development
 
@@ -81,6 +108,8 @@ npm run snap      # flexible single debug screenshot, e.g.
                    #   npm run snap -- --out /tmp/x.png --show solar-system
 npm run shot      # one screenshot per card → ./shots
 npm run build     # production build → ./docs (GitHub Pages)
+npm run worker:deploy   # deploy the caching proxy (worker/) to Cloudflare
+npm run worker:tail     # live proxy logs
 ```
 
 ## Architecture
@@ -96,10 +125,24 @@ src/astro/     pure orbital/astronomical math: TLE -> geodetic position
 src/render/    thin Three.js layer: Earth globe + solar-system scenes, plus
                starfield / label-sprite / orbit-trail helpers
 src/hooks/     useApiResource — generic polling + localStorage TTL cache
+               (requests deduped across components); sharedResources
+src/layers/    one LayerDefinition per geographic source: settings + a
+               useLayer(settings, time) hook returning what to draw
+src/scene/     the Scene view: globe stage, layer panel, inspector, status
+               bar, time scrubber, persisted scene state
 src/layout/    card registry, grid/visibility/settings state, react-grid-layout
                wiring, per-card and general settings popups
-src/cards/     one React component per card
+src/cards/     one React component per card (globe cards = GlobeLayerCard +
+               a layer)
+worker/        Cloudflare Worker: caching proxy over an allowlist of the
+               upstream APIs (see backend-plan.md)
 ```
+
+All API traffic goes through the **caching proxy** first (one shared cache
+for every visitor: stale-while-revalidate, last good copy on upstream errors,
+API keys kept as worker secrets) and falls back to calling the upstream
+directly if the proxy is unavailable. JPL data (fireballs) has no CORS, so it
+works only through the proxy.
 
 `src/astro/` never imports Three.js and `src/api/` never imports React — the
 same core/UI separation used in the sibling `mathsculpt` project. Three.js
@@ -127,6 +170,10 @@ rather than by `vitest`.
 | [NOAA SWPC OVATION](https://www.swpc.noaa.gov/products/aurora-30-minute-forecast) | aurora probability grid | none |
 | `astronomy-engine` (offline) | Moon phase, apsides, eclipses | none |
 | [NASA Images](https://images.nasa.gov/) | NASA image & video library search | none |
+| [NASA GIBS](https://nasa-gibs.github.io/gibs-api-docs/) | daily VIIRS true-colour mosaic, Black Marble night lights | none |
+| [NOAA SWPC scales](https://www.swpc.noaa.gov/noaa-scales-explanation) | R/S/G space-weather scales | none |
+| [Launch Library 2 astronauts](https://thespacedevs.com/llapi) | people in space | none |
+| [JPL Fireball API](https://ssd-api.jpl.nasa.gov/doc/fireball.html) | bolides with location and energy (via the proxy) | none |
 
 The starfield background in the 3D cards is the Milky Way panorama texture
 from [Solar System Scope](https://www.solarsystemscope.com/textures/)
