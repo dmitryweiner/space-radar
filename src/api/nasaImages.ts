@@ -1,4 +1,5 @@
 import type { NasaImage } from './types';
+import { fetchViaProxy } from './proxy';
 
 // NASA Image and Video Library — no key, CORS `*`. Each topic maps to a search
 // query; the card picks random images from the merged pool of selected topics.
@@ -77,7 +78,7 @@ interface FetchResponse {
 type FetchFn = (url: string) => Promise<FetchResponse>;
 
 export async function fetchNasaImages(query: string, fetchFn: FetchFn = fetch): Promise<NasaImage[]> {
-  const response = await fetchFn(nasaImagesSearchUrl(query));
+  const response = await fetchViaProxy(fetchFn, nasaImagesSearchUrl(query));
   if (!response.ok) {
     throw new Error(`NASA image search for "${query}" failed with status ${response.status ?? 'unknown'}`);
   }

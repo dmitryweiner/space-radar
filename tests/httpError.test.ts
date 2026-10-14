@@ -17,3 +17,11 @@ describe('describeHttpError', () => {
     expect(message).toBe('NASA DONKI request failed with status unknown: https://api.nasa.gov/DONKI/FLR');
   });
 });
+
+describe('describeHttpError key redaction', () => {
+  it('does not echo API keys into the user-visible message', () => {
+    const message = describeHttpError('NASA APOD', 500, 'https://api.nasa.gov/planetary/apod?api_key=SECRET&thumbs=true');
+    expect(message).not.toContain('SECRET');
+    expect(message).toContain('thumbs=true');
+  });
+});

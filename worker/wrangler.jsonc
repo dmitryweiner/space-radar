@@ -1,0 +1,11 @@
+{
+  // Space Radar caching proxy — see ../backend-plan.md.
+  // Deploy: npm run worker:deploy  (from the repo root)
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "space-radar-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "kv_namespaces": [{ "binding": "CACHE", "id": "13ffdf0a5c594900b72eed670aedef08" }],
+  "observability": { "enabled": true }
+}

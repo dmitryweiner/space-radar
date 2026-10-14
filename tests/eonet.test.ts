@@ -58,7 +58,7 @@ describe('fetchNaturalEvents', () => {
   it('fetches the EONET open-events endpoint', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(SAMPLE) });
     const events = await fetchNaturalEvents(fetchMock);
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('eonet.gsfc.nasa.gov'));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('workers.dev/eonet/events'));
     expect(events).toHaveLength(2);
   });
 

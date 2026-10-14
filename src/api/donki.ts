@@ -1,4 +1,5 @@
 import type { SpaceWeatherEvent } from './types';
+import { fetchViaProxy } from './proxy';
 import { describeHttpError } from './httpError';
 import { NASA_API_KEY } from './nasaApiKey';
 
@@ -57,7 +58,7 @@ interface FetchResponse {
 type FetchFn = (url: string) => Promise<FetchResponse>;
 
 async function fetchJson(url: string, fetchFn: FetchFn): Promise<unknown> {
-  const response = await fetchFn(url);
+  const response = await fetchViaProxy(fetchFn, url);
   if (!response.ok) {
     throw new Error(describeHttpError('NASA DONKI', response.status, url));
   }

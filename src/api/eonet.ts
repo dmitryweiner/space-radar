@@ -1,4 +1,5 @@
 import type { NaturalEvent } from './types';
+import { fetchViaProxy } from './proxy';
 import { describeHttpError } from './httpError';
 
 // NASA EONET (Earth Observatory Natural Event Tracker): open natural events
@@ -165,7 +166,7 @@ interface FetchResponse {
 type FetchFn = (url: string) => Promise<FetchResponse>;
 
 async function fetchEvents(fetchFn: FetchFn, url: string): Promise<NaturalEvent[]> {
-  const response = await fetchFn(url);
+  const response = await fetchViaProxy(fetchFn, url);
   if (!response.ok) {
     throw new Error(describeHttpError('NASA EONET', response.status, url));
   }

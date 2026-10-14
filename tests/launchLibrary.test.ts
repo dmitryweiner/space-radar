@@ -57,7 +57,7 @@ describe('fetchUpcomingLaunches', () => {
   it('fetches the Launch Library upcoming endpoint', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(SAMPLE) });
     const launches = await fetchUpcomingLaunches(fetchMock);
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('ll.thespacedevs.com'));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('workers.dev/ll2/launch/upcoming'));
     expect(launches).toHaveLength(2);
   });
 

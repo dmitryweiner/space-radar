@@ -1,4 +1,5 @@
 import type { EpicFrame } from './types';
+import { fetchViaProxy } from './proxy';
 import { describeHttpError } from './httpError';
 
 // DSCOVR/EPIC natural-colour full-disk Earth images from the L1 point. Direct
@@ -56,7 +57,7 @@ interface FetchResponse {
 type FetchFn = (url: string) => Promise<FetchResponse>;
 
 export async function fetchEpic(fetchFn: FetchFn = fetch): Promise<EpicFrame[]> {
-  const response = await fetchFn(API_URL);
+  const response = await fetchViaProxy(fetchFn, API_URL);
   if (!response.ok) {
     throw new Error(describeHttpError('NASA EPIC', response.status, API_URL));
   }

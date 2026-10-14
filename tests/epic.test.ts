@@ -52,7 +52,7 @@ describe('fetchEpic', () => {
   it('fetches the EPIC natural endpoint', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(SAMPLE) });
     const frames = await fetchEpic(fetchMock);
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('epic.gsfc.nasa.gov/api/natural'));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('workers.dev/epic/natural'));
     expect(frames).toHaveLength(2);
   });
 

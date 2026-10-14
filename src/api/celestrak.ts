@@ -1,4 +1,5 @@
 import type { TleRecord } from './types';
+import { fetchViaProxy } from './proxy';
 
 const CELESTRAK_BASE = 'https://celestrak.org/NORAD/elements/gp.php';
 
@@ -25,7 +26,7 @@ type FetchFn = (url: string) => Promise<FetchResponse>;
 
 export async function fetchTleGroup(group: string, fetchFn: FetchFn = fetch): Promise<TleRecord[]> {
   const url = `${CELESTRAK_BASE}?GROUP=${group}&FORMAT=tle`;
-  const response = await fetchFn(url);
+  const response = await fetchViaProxy(fetchFn, url);
   if (!response.ok) {
     // CelesTrak rate-limits by returning 403 with an HTML page (common when
     // requesting several large groups in quick succession).

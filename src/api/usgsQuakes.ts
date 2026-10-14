@@ -1,4 +1,5 @@
 import type { Quake } from './types';
+import { fetchViaProxy } from './proxy';
 
 // USGS realtime earthquake GeoJSON feeds — no key, CORS `*`, updated every
 // minute. Each option is a magnitude-threshold × time-window combination and
@@ -78,7 +79,7 @@ export async function fetchQuakes(feeds: string[], fetchFn: FetchFn = fetch): Pr
 
   const results = await Promise.allSettled(
     effective.map(async (feed) => {
-      const response = await fetchFn(quakeFeedUrl(feed));
+      const response = await fetchViaProxy(fetchFn, quakeFeedUrl(feed));
       if (!response.ok) {
         throw new Error(`USGS quakes feed "${feed}" failed with status ${response.status ?? 'unknown'}`);
       }

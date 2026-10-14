@@ -1,4 +1,5 @@
 import type { ApodInfo } from './types';
+import { fetchViaProxy } from './proxy';
 import { describeHttpError } from './httpError';
 import { NASA_API_KEY } from './nasaApiKey';
 
@@ -45,7 +46,7 @@ interface FetchResponse {
 type FetchFn = (url: string) => Promise<FetchResponse>;
 
 export async function fetchApod(fetchFn: FetchFn = fetch): Promise<ApodInfo> {
-  const response = await fetchFn(API_URL);
+  const response = await fetchViaProxy(fetchFn, API_URL);
   if (!response.ok) {
     throw new Error(describeHttpError('NASA APOD', response.status, API_URL));
   }

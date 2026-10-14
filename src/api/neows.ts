@@ -1,4 +1,5 @@
 import type { Asteroid } from './types';
+import { fetchViaProxy } from './proxy';
 import { describeHttpError } from './httpError';
 import { NASA_API_KEY } from './nasaApiKey';
 
@@ -107,7 +108,7 @@ type FetchFn = (url: string) => Promise<FetchResponse>;
 export async function fetchAsteroids(fetchFn: FetchFn = fetch, now: Date = new Date()): Promise<Asteroid[]> {
   const date = formatDate(now);
   const url = `${API_BASE}?start_date=${date}&end_date=${date}&api_key=${NASA_API_KEY}`;
-  const response = await fetchFn(url);
+  const response = await fetchViaProxy(fetchFn, url);
   if (!response.ok) {
     throw new Error(describeHttpError('NASA NeoWs', response.status, url));
   }

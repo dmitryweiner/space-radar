@@ -1,4 +1,5 @@
 import type { FirePoint } from './types';
+import { fetchViaProxy } from './proxy';
 import { describeHttpError } from './httpError';
 import { FIRMS_MAP_KEY } from './firmsMapKey';
 
@@ -74,16 +75,15 @@ export interface FirmsOptions {
 }
 
 export async function fetchFirePoints(fetchFn: FetchFn = fetch, options: FirmsOptions = {}): Promise<FirePoint[]> {
-  if (!FIRMS_MAP_KEY) {
-    throw new Error('Add your FIRMS MAP_KEY in src/api/firmsMapKey.ts to load fire detections.');
-  }
   // NOAA-20 is the primary operational VIIRS feed; the older Suomi-NPP NRT
   // source (VIIRS_SNPP_NRT) went intermittent and now returns near-zero rows.
   const source = options.source ?? 'VIIRS_NOAA20_NRT';
   const area = options.area ?? 'world';
   const dayRange = options.dayRange ?? 1;
+  // Built with the client key for the direct fallback; fetchViaProxy swaps in
+  // the key-free proxy path (the worker inserts its own MAP_KEY).
   const url = `${API_BASE}/${FIRMS_MAP_KEY}/${source}/${area}/${dayRange}`;
-  const response = await fetchFn(url);
+  const response = await fetchViaProxy(fetchFn, url);
   if (!response.ok) {
     throw new Error(describeHttpError('NASA FIRMS', response.status, url));
   }

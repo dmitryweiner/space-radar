@@ -50,6 +50,8 @@ Card ids: `iss-globe`, `solar-system`, `kp-index`, `solar-wind`,
 ## Build / test commands
 
 ```bash
+npm run worker:deploy  # deploy the caching proxy (worker/) to Cloudflare
+npm run worker:tail    # live worker logs
 npm run check     # tsc + eslint (bans `as` casts) + vitest
 npm run smoke      # browser smoke (see above); --preview for prod build
 npm run snap        # debug screenshot
@@ -68,6 +70,23 @@ npm run build       # production build → ./docs (GitHub Pages)
   is no data for Saturn/Uranus/Neptune moons, so the Solar System card shows
   only those five (drawn on exaggerated display orbits since real separations
   are far smaller than a planet's rendered radius).
+- **Caching proxy (`worker/`, Cloudflare Worker
+  `https://space-radar-proxy.dmitry-weiner.workers.dev`, see `backend-plan.md`).**
+  `worker/src/routes.ts` is the single allowlist table (service → upstream,
+  TTL, key injection) as pure functions, tested in `npm run check` and
+  **imported by the client too** (`src/api/proxy.ts` → `toProxyPath`), so the
+  two can't drift. Every `src/api` module still builds its *direct* upstream
+  URL (with the client key) and calls `fetchViaProxy(fetchFn, url)`: proxy
+  first, direct fallback on any proxy error/unreachability — so the client
+  keys in `nasaApiKey.ts`/`firmsMapKey.ts` are deliberately kept as the
+  fallback path. Worker keys are secrets (`wrangler secret put NASA_API_KEY` /
+  `FIRMS_MAP_KEY --config worker/wrangler.jsonc`). Cache = KV + in-isolate
+  `Map`, stale-while-revalidate, last-good on upstream error, empty 200s never
+  cached. **Free-tier KV allows only 1,000 writes/day** — `put` failures are
+  swallowed (the isolate cache keeps serving) and no TTL is under 10 min.
+  **LL2 throttles Cloudflare's shared egress IPs** (429 straight away), so
+  launches usually go via the client's direct fallback — expected, not a bug.
+  `describeHttpError` redacts keys from the URL it shows in a card.
 - `src/api/` is pure fetch+parse — **never** import React there. Each module
   takes an injectable fetch function (default: global `fetch`) so tests can
   mock it without touching the network.

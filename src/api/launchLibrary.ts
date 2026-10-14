@@ -1,4 +1,5 @@
 import type { LaunchInfo } from './types';
+import { fetchViaProxy } from './proxy';
 import { describeHttpError } from './httpError';
 
 // Launch Library 2 (The Space Devs): upcoming orbital launches. No API key;
@@ -58,7 +59,7 @@ interface FetchResponse {
 type FetchFn = (url: string) => Promise<FetchResponse>;
 
 export async function fetchUpcomingLaunches(fetchFn: FetchFn = fetch): Promise<LaunchInfo[]> {
-  const response = await fetchFn(API_URL);
+  const response = await fetchViaProxy(fetchFn, API_URL);
   if (!response.ok) {
     throw new Error(describeHttpError('Launch Library', response.status, API_URL));
   }

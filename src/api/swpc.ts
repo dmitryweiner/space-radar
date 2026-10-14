@@ -7,6 +7,7 @@ import type {
   SolarWindPoint,
   SpaceWeatherEvent,
 } from './types';
+import { fetchViaProxy } from './proxy';
 
 const KP_INDEX_URL = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
 const SOLAR_WIND_URL = 'https://services.swpc.noaa.gov/products/geospace/propagated-solar-wind-1-hour.json';
@@ -190,7 +191,7 @@ interface FetchResponse {
 type FetchFn = (url: string) => Promise<FetchResponse>;
 
 export async function fetchKpIndex(fetchFn: FetchFn = fetch): Promise<KpIndexPoint[]> {
-  const response = await fetchFn(KP_INDEX_URL);
+  const response = await fetchViaProxy(fetchFn, KP_INDEX_URL);
   if (!response.ok) {
     throw new Error(`NOAA SWPC Kp-index request failed with status ${response.status ?? 'unknown'}`);
   }
@@ -198,7 +199,7 @@ export async function fetchKpIndex(fetchFn: FetchFn = fetch): Promise<KpIndexPoi
 }
 
 export async function fetchSolarWind(fetchFn: FetchFn = fetch): Promise<SolarWindPoint[]> {
-  const response = await fetchFn(SOLAR_WIND_URL);
+  const response = await fetchViaProxy(fetchFn, SOLAR_WIND_URL);
   if (!response.ok) {
     throw new Error(`NOAA SWPC solar wind request failed with status ${response.status ?? 'unknown'}`);
   }
@@ -206,7 +207,7 @@ export async function fetchSolarWind(fetchFn: FetchFn = fetch): Promise<SolarWin
 }
 
 export async function fetchGoesFlares(fetchFn: FetchFn = fetch): Promise<SpaceWeatherEvent[]> {
-  const response = await fetchFn(GOES_FLARES_URL);
+  const response = await fetchViaProxy(fetchFn, GOES_FLARES_URL);
   if (!response.ok) {
     throw new Error(`NOAA SWPC GOES flares request failed with status ${response.status ?? 'unknown'}`);
   }
@@ -216,7 +217,7 @@ export async function fetchGoesFlares(fetchFn: FetchFn = fetch): Promise<SpaceWe
 // Observed and predicted series in one resource. The predicted feed is
 // best-effort — the observed curve alone is still useful if it fails.
 export async function fetchSolarCycle(fetchFn: FetchFn = fetch): Promise<SolarCycleData> {
-  const observedResponse = await fetchFn(OBSERVED_CYCLE_URL);
+  const observedResponse = await fetchViaProxy(fetchFn, OBSERVED_CYCLE_URL);
   if (!observedResponse.ok) {
     throw new Error(`NOAA SWPC solar cycle request failed with status ${observedResponse.status ?? 'unknown'}`);
   }
@@ -224,7 +225,7 @@ export async function fetchSolarCycle(fetchFn: FetchFn = fetch): Promise<SolarCy
 
   let predicted: SolarCyclePrediction[] = [];
   try {
-    const predictedResponse = await fetchFn(PREDICTED_CYCLE_URL);
+    const predictedResponse = await fetchViaProxy(fetchFn, PREDICTED_CYCLE_URL);
     if (predictedResponse.ok) {
       predicted = parsePredictedSolarCycle(await predictedResponse.json());
     }
@@ -236,7 +237,7 @@ export async function fetchSolarCycle(fetchFn: FetchFn = fetch): Promise<SolarCy
 }
 
 export async function fetchAurora(fetchFn: FetchFn = fetch): Promise<AuroraSample[]> {
-  const response = await fetchFn(OVATION_AURORA_URL);
+  const response = await fetchViaProxy(fetchFn, OVATION_AURORA_URL);
   if (!response.ok) {
     throw new Error(`NOAA SWPC OVATION aurora request failed with status ${response.status ?? 'unknown'}`);
   }
