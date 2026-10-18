@@ -1,4 +1,4 @@
-import type { Asteroid } from './types';
+import type { Asteroid, AsteroidElements } from './types';
 import { fetchViaProxy } from './proxy';
 import { describeHttpError } from './httpError';
 import { NASA_API_KEY } from './nasaApiKey';
@@ -18,6 +18,20 @@ function toNumber(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+function parseElements(orbital: Record<string, unknown>): AsteroidElements | null {
+  const a = toNumber(orbital.semi_major_axis);
+  const e = toNumber(orbital.eccentricity);
+  const i = toNumber(orbital.inclination);
+  const node = toNumber(orbital.ascending_node_longitude);
+  const peri = toNumber(orbital.perihelion_argument);
+  const meanAnomaly = toNumber(orbital.mean_anomaly);
+  const epochJd = toNumber(orbital.epoch_osculation);
+  if (a === null || e === null || i === null || node === null || peri === null || meanAnomaly === null || epochJd === null) {
+    return null;
+  }
+  return { a, e, i, node, peri, meanAnomaly, epochJd };
 }
 
 function parseAsteroidRecord(item: unknown): Asteroid | null {
@@ -80,6 +94,7 @@ function parseAsteroidRecord(item: unknown): Asteroid | null {
       ? {
           orbitUncertainty: toNumber(orbital.orbit_uncertainty),
           orbitClass: typeof orbitClass === 'string' ? orbitClass : null,
+          elements: parseElements(orbital),
         }
       : {}),
   };

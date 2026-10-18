@@ -14,7 +14,7 @@ export default defineConfig({
     outDir: 'docs',
     emptyOutDir: true,
     // The vendor chunk below (three.js + satellite.js + astronomy-engine +
-    // react/react-dom/react-grid-layout) is inherently >500kB for a
+    // react/react-dom) is inherently >500kB for a
     // client-side 3D dashboard — raise the warning threshold instead of
     // chasing an unrealistic budget.
     chunkSizeWarningLimit: 1000,

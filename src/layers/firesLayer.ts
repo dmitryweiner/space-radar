@@ -4,7 +4,7 @@ import { fetchFirePoints } from '../api/firms';
 import { geodeticToSceneVector } from '../astro/coords';
 import { EARTH_RADIUS_UNITS, type FirePoint as SceneFirePoint } from '../render/earthScene';
 import type { FirePoint } from '../api/types';
-import { numberSetting } from '../layout/layoutState';
+import { numberSetting } from '../settings/values';
 import { isRecord, type LayerDefinition } from './types';
 
 const CACHE_KEY = 'space-radar:fire-points';

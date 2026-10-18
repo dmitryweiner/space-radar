@@ -59,9 +59,9 @@ export function makeLabelSprite(text: string, color = '#e6ecff'): LabelSprite {
 
 // Size a label so its on-screen height is a fixed number of CSS pixels,
 // independent of both zoom (camera distance) and the canvas size. Dividing by
-// the viewport pixel height is what keeps the text the same size when a card is
-// expanded to full screen — a plain `K × distance` scale stays constant only as
-// a *fraction* of the viewport, so it grows on a larger canvas.
+// the viewport pixel height is what keeps the text the same size when the canvas
+// grows — a plain `K × distance` scale stays constant only as a *fraction* of
+// the viewport, so it grows on a larger canvas.
 export function scaleLabelToScreen(
   label: LabelSprite,
   camera: THREE.PerspectiveCamera,

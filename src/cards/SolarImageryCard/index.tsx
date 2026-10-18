@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { CardComponentProps } from '../../layout/types';
-import { listSetting } from '../../layout/layoutState';
+import type { CardComponentProps } from '../../settings/types';
+import { listSetting } from '../../settings/values';
 
 const REFRESH_MS = 15 * 60 * 1000;
 
@@ -14,7 +14,7 @@ interface ImageryLayer {
 // image every ~15 min per wavelength; GOES-19 gives a live Earth full disk.
 const SDO_BASE = 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_';
 
-export const SOLAR_IMAGERY_LAYERS: ImageryLayer[] = [
+const SOLAR_IMAGERY_LAYERS: ImageryLayer[] = [
   { value: '0193', label: 'Corona 193Å', url: `${SDO_BASE}0193.jpg` },
   { value: '0171', label: 'Corona 171Å', url: `${SDO_BASE}0171.jpg` },
   { value: '0304', label: 'Chromosphere 304Å', url: `${SDO_BASE}0304.jpg` },

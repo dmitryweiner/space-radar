@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { LayerDefinition, LayerState, MarkerDetails } from '../layers/types';
-import type { LayerSelection, LayerStatusMap } from './EarthStage';
+import type { LayerInfo, MarkerDetails } from '../layers/types';
+import type { LayerSelection, LayerStatesRef, LayerStatusMap } from './layerHost';
 import { INSPECTOR_PANELS, panelById, type InspectorPanelId } from './panels';
 import type { SceneId } from './sceneState';
 import { computeMoonInfo } from '../astro/moonInfo';
@@ -18,9 +18,9 @@ interface InspectorProps {
   scene: SceneId;
   selection: LayerSelection | null;
   panel: InspectorPanelId | null;
-  layers: LayerDefinition[];
+  layers: LayerInfo[];
   statuses: LayerStatusMap;
-  statesRef: React.MutableRefObject<Record<string, LayerState>>;
+  statesRef: LayerStatesRef;
   onOpenPanel: (panel: InspectorPanelId) => void;
   onClose: () => void;
 }
@@ -60,14 +60,14 @@ export function Inspector({ scene, selection, panel, layers, statuses, statesRef
       <div className="inspector" data-testid="inspector">
         <div className="inspector-header">
           <span className="inspector-title">{details?.title ?? '…'}</span>
-          <button type="button" className="card-shell-action" aria-label="Close details" onClick={onClose}>
+          <button type="button" className="icon-btn" aria-label="Close details" onClick={onClose}>
             ×
           </button>
         </div>
         {details && (
-          <dl className="marker-info-popup-fields">
+          <dl className="detail-fields">
             {details.fields.map((field) => (
-              <div key={field.label} className="marker-info-popup-field">
+              <div key={field.label} className="detail-field">
                 <dt>{field.label}</dt>
                 <dd>{field.value}</dd>
               </div>
@@ -89,7 +89,7 @@ export function Inspector({ scene, selection, panel, layers, statuses, statesRef
       <div className="inspector" data-testid="inspector">
         <div className="inspector-header">
           <span className="inspector-title">{openPanel.title}</span>
-          <button type="button" className="card-shell-action" aria-label="Close panel" onClick={onClose}>
+          <button type="button" className="icon-btn" aria-label="Close panel" onClick={onClose}>
             ×
           </button>
         </div>
@@ -104,9 +104,9 @@ export function Inspector({ scene, selection, panel, layers, statuses, statesRef
   const others = INSPECTOR_PANELS.filter((p) => !suggested.includes(p.id));
   return (
     <div className="inspector" data-testid="inspector">
-      {scene === 'earth' && (
+      {scene !== 'sun' && (
         <section className="inspector-section">
-          <h2 className="panel-heading">On the globe</h2>
+          <h2 className="panel-heading">{scene === 'earth' ? 'On the globe' : 'In view'}</h2>
           {layers.length === 0 && <p className="card-status">No layers on — pick some on the left.</p>}
           {layers.map((layer) => {
             const status = statuses[layer.id];
@@ -117,8 +117,8 @@ export function Inspector({ scene, selection, panel, layers, statuses, statesRef
                   {layer.title}
                 </div>
                 {status?.legend.map((item) => (
-                  <span key={item.label} className="globe-legend-item">
-                    <span className="globe-legend-swatch" style={{ backgroundColor: item.color }} />
+                  <span key={item.label} className="legend-item">
+                    <span className="legend-swatch" style={{ backgroundColor: item.color }} />
                     {item.label}
                   </span>
                 ))}

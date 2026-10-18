@@ -6,11 +6,10 @@
 from public space agencies — satellite orbits, planetary positions, space
 weather, solar flares/CMEs, the solar cycle, near-Earth asteroids, earthquakes,
 natural events, rocket launches, active fires, fireballs, the Moon and
-eclipses, and full-disk Earth and Sun imagery — into one interactive **Scene**,
-or into a classic grid of cards (the **Dashboard**). Your choices are saved
-locally.
+eclipses, and full-disk Earth and Sun imagery — into one interactive **Scene**.
+Your choices are saved locally.
 
-## Scene (default view)
+## Scene
 
 - **One globe, many layers.** Satellites & the ISS, the aurora oval,
   earthquakes, natural events, active fires, asteroid flybys, fireballs and
@@ -19,6 +18,16 @@ locally.
   ⚙ settings; the Earth surface can be the photo globe, a ~2-day-old **NASA
   GIBS satellite mosaic**, or a flat map. The day/night terminator is the
   **real one**, computed for the current (or scrubbed) time.
+  - **ISS & satellites** — the ISS plus satellites from selectable CelesTrak
+    groups (stations, Starlink, GPS, weather, …), each labelled with a fading
+    orbit trail, propagated client-side via SGP4 (`satellite.js`).
+  - **Earthquakes** — USGS feeds (magnitude threshold × time window), coloured
+    and sized by magnitude.
+  - **Natural events** — wildfires, volcanoes, storms and more from NASA EONET,
+    spread across regions and categories.
+  - **Active fires** — VIIRS/MODIS detections from NASA FIRMS, strongest fires
+    labelled (needs a free FIRMS MAP_KEY — see below).
+  - **Aurora oval** — NOAA OVATION probability grid as a glowing point cloud.
 - **Time scrubber** (±7 days, with playback at 1 min/s … 1 day/s): satellites,
   the terminator, night lights, the Moon, asteroid flybys and the Solar System
   all follow it. "Live" returns to now.
@@ -27,74 +36,38 @@ locally.
   distance scale with the Moon's orbit for reference. Directions are schematic
   (NeoWs gives no geometry), and the layer says so.
 - **Inspector** (right): click any marker for details; otherwise legends, the
-  Moon, the Sun right now, and detail panels (Kp, solar wind, flares, aurora
-  forecast, launches, EPIC, APOD, …).
+  Moon, the Sun right now, and detail panels — Kp-index and solar-wind charts,
+  solar flares & CMEs, the aurora forecast image, upcoming launches, today's
+  near-Earth asteroids, the Moon & eclipses, the solar cycle, EPIC full-disk
+  Earth photos from L1, APOD, the Sun in other wavelengths (SDO), and the NASA
+  image library.
 - **Status bar**: NOAA R/S/G space-weather scales, Kp, solar-wind speed, people
   in space, next launch — click a chip for details.
 - Scenes: **Earth**, **Sun** (SDO) and **Solar System**.
+- **Solar System** — the Sun, the eight planets, Earth's Moon and Jupiter's
+  four Galilean moons with **real surface maps**, sized by their real relative
+  diameters and each turned on its **real spin axis** (Saturn's rings tilt,
+  Uranus lies on its side), positions computed offline via `astronomy-engine`.
+  Click a body (or its name, or a chip in the side panel) to fly to it; the
+  camera follows it as time moves.
+  Toggleable layers there:
+  - **Spacecraft** — 13 active deep-space missions (Voyagers, New Horizons,
+    Parker Solar Probe, Europa Clipper, JUICE, Psyche, Lucy, JWST, …) at
+    their real positions from **JPL Horizons**, with fading trails; distance
+    from the Sun and Earth, light time and speed in the inspector.
+  - **Asteroid flybys** — this week's closest Earth passes (NASA NeoWs) on
+    their **real orbits** from JPL orbital elements.
+  - **Comets** — comets near perihelion now plus famous periodic ones (Halley,
+    Encke, 67P, Swift–Tuttle, …) from the **JPL Small-Body Database**,
+    including hyperbolic one-time visitors.
+  Beyond 35 AU the distance scale is compressed so the Voyagers fit on screen.
+- The 3D views **rotate by dragging** and **zoom** with the mouse wheel,
+  trackpad pinch, or `+`/`-`. The globe idle-spins until you drag it — zooming
+  never stops the spin. **Settings** in the header: label/marker size and
+  auto-rotate speed (0 turns it off).
 - On phones the globe is full screen (one finger rotates it — the page doesn't
   scroll), layers and details live in a bottom sheet, and the status chips
   scroll sideways.
-
-## Dashboard
-
-- **ISS & Satellites** — 3D Earth (Three.js) showing the ISS plus satellites
-  from selectable CelesTrak groups (stations, Starlink, GPS, weather, …), each
-  labelled by name with a fading orbit trail, propagated client-side via SGP4
-  (`satellite.js`).
-- **Solar System** — 3D view of the Sun, the eight planets, and the large moons
-  (Earth's Moon and Jupiter's four Galilean moons) sized by their real relative
-  diameters, positions computed client-side (no network) via `astronomy-engine`.
-- **Geomagnetic Activity (Kp-index)** — bar chart of recent planetary Kp
-  readings from NOAA SWPC with a time axis, colour-coded by storm severity.
-- **Solar Wind** — speed and density mini-charts (with a time axis) from NOAA's
-  propagated solar-wind product.
-- **Aurora Forecast** — NOAA OVATION aurora oval image, refreshed periodically.
-- **Solar Flares & CME** — recent X-ray flares from NOAA SWPC GOES plus
-  coronal-mass-ejection events from NASA DONKI (best-effort).
-- **Near-Earth Asteroids** — sortable table of close approaches from NASA NeoWs.
-- **Natural Events** — wildfires, volcanoes, storms and more from NASA EONET,
-  plotted on a 3D globe with a category legend.
-- **Upcoming Launches** — the next orbital launches from Launch Library 2.
-- **Astronomy Picture of the Day** — NASA APOD image with its caption.
-- **Active Fires** — VIIRS/MODIS fire detections from NASA FIRMS as a point
-  cloud on a 3D globe, with the strongest fires labelled (time + brightness);
-  needs a free FIRMS MAP_KEY — see below.
-- **Earth from L1 (EPIC)** — a day's worth of full-disk Earth photos from the
-  DSCOVR/EPIC camera at the L1 point, with a play/scrub slider so you can watch
-  the planet rotate.
-- **Earthquakes (USGS)** — recent quakes on a 3D globe, coloured and sized by
-  magnitude, from selectable USGS feeds (magnitude threshold × time window).
-- **Live Sun (SDO)** — latest full-disk Sun images from NASA SDO in selectable
-  wavelengths (corona, chromosphere, sunspots, magnetogram) plus a live GOES-19
-  Earth disk, refreshed every ~15 minutes.
-- **Solar Cycle** — sunspot-number history and the official SWPC forecast on one
-  chart, with a "now" marker showing where the current cycle stands.
-- **Moon & Eclipses** — current Moon phase (rendered icon + illuminated
-  percentage), distance, and the next perigee/apogee and lunar/solar eclipses —
-  computed entirely offline via `astronomy-engine`.
-- **Aurora Oval (3D)** — the NOAA OVATION aurora probability oval drawn as a
-  glowing point cloud on a 3D globe.
-- **NASA Image Library** — a browsable pick of images from the NASA image
-  archive across selectable topics (nebulae, galaxies, Apollo, planets, …).
-- The 3D cards (globes and the Solar System) can be **rotated by dragging** and
-  **zoomed** with the mouse wheel, trackpad pinch, or the `+`/`-` keys (the
-  keys zoom whichever card the pointer is hovering, even while a globe is
-  still spinning). The five Earth-globe cards idle-spin until you drag them —
-  zooming never stops that spin, only dragging does — and each has its own
-  **Earth style** setting (⚙ per-card settings) to switch between the
-  photographic globe (day/night shading) and a flat political map with no
-  shadow, for spotting markers on what would otherwise be the dark side.
-- A **Settings** button in the header opens general settings shared by every
-  globe card: label/marker size, auto-rotate speed (0 to turn it off), and a
-  comfortable/compact card-density preset for the whole grid.
-- Every card can be shown or hidden from the **Cards** menu, dragged/resized on
-  the grid, opened full-screen, or tuned via its **⚙ settings** popup (size in
-  rows/columns plus card-specific options). Layout and settings are saved to
-  `localStorage` and restored on reload; **Reset layout** returns the
-  defaults. On narrow screens, cards stack in a single column; reorder them by
-  the ≡ grip. On touch screens one finger over a globe scrolls the page and
-  two fingers rotate/zoom it (like web maps); full screen rotates with one.
 
 ## Development
 
@@ -102,11 +75,10 @@ locally.
 npm install
 npm run dev       # Vite dev server
 npm run check     # tsc + eslint + vitest
-npm run smoke     # headless-Chromium smoke: visibility, drag, resize,
-                   # localStorage persistence, reset — no console errors
+npm run smoke     # headless-Chromium smoke of the Scene: layers, scrubber,
+                   # tabs, zoom/rotate, settings, phone — no console errors
 npm run snap      # flexible single debug screenshot, e.g.
-                   #   npm run snap -- --out /tmp/x.png --show solar-system
-npm run shot      # one screenshot per card → ./shots
+                   #   npm run snap -- --out /tmp/x.png --tab 'Solar System'
 npm run build     # production build → ./docs (GitHub Pages)
 npm run worker:deploy   # deploy the caching proxy (worker/) to Cloudflare
 npm run worker:tail     # live proxy logs
@@ -130,10 +102,9 @@ src/layers/    one LayerDefinition per geographic source: settings + a
                useLayer(settings, time) hook returning what to draw
 src/scene/     the Scene view: globe stage, layer panel, inspector, status
                bar, time scrubber, persisted scene state
-src/layout/    card registry, grid/visibility/settings state, react-grid-layout
-               wiring, per-card and general settings popups
-src/cards/     one React component per card (globe cards = GlobeLayerCard +
-               a layer)
+src/settings/  setting types/readers, form fields, general settings popup
+src/cards/     self-contained panels shown in the inspector (charts, lists,
+               images) plus the Solar System scene component
 worker/        Cloudflare Worker: caching proxy over an allowlist of the
                upstream APIs (see backend-plan.md)
 ```
@@ -146,9 +117,9 @@ works only through the proxy.
 
 `src/astro/` never imports Three.js and `src/api/` never imports React — the
 same core/UI separation used in the sibling `mathsculpt` project. Three.js
-scenes can't run in `jsdom` (no WebGL), so `render/` and the mounting effects
-in the six WebGL cards are exercised by `scripts/smoke.mjs` in a real browser
-rather than by `vitest`.
+scenes can't run in `jsdom` (no WebGL), so `render/` and the components that
+mount it are exercised by `scripts/smoke.mjs` in a real browser rather than by
+`vitest`.
 
 ## Data sources
 
@@ -158,7 +129,7 @@ rather than by `vitest`.
 | [NOAA SWPC](https://www.swpc.noaa.gov/) | Kp-index, solar wind, aurora | none |
 | [NOAA SWPC GOES](https://www.swpc.noaa.gov/) | solar flares (X-ray events) | none |
 | [NASA DONKI](https://ccmc.gsfc.nasa.gov/tools/DONKI/) | CMEs (best-effort) | personal key |
-| [NASA NeoWs](https://api.nasa.gov/) | near-Earth asteroids | personal key |
+| [NASA NeoWs](https://api.nasa.gov/) | near-Earth asteroids and their orbital elements | personal key |
 | [NASA EONET](https://eonet.gsfc.nasa.gov/) | natural events (wildfires, volcanoes, …) | none |
 | [Launch Library 2](https://thespacedevs.com/llapi) | upcoming rocket launches | none |
 | [NASA APOD](https://api.nasa.gov/) | astronomy picture of the day | personal key |
@@ -174,13 +145,21 @@ rather than by `vitest`.
 | [NOAA SWPC scales](https://www.swpc.noaa.gov/noaa-scales-explanation) | R/S/G space-weather scales | none |
 | [Launch Library 2 astronauts](https://thespacedevs.com/llapi) | people in space | none |
 | [JPL Fireball API](https://ssd-api.jpl.nasa.gov/doc/fireball.html) | bolides with location and energy (via the proxy) | none |
+| [JPL Horizons](https://ssd-api.jpl.nasa.gov/doc/horizons.html) | spacecraft trajectories (via the proxy) | none |
+| [JPL SBDB Query](https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html) | comet orbital elements (via the proxy) | none |
 
-The starfield background in the 3D cards is the Milky Way panorama texture
-from [Solar System Scope](https://www.solarsystemscope.com/textures/)
-(CC BY 4.0).
+The starfield background and the Sun/planet/Moon surface maps in the Solar
+System are textures from
+[Solar System Scope](https://www.solarsystemscope.com/textures/) (CC BY 4.0),
+downscaled to 1024×512. The Galilean moon maps are public-domain NASA/JPL/USGS
+mosaics via Wikimedia Commons
+([Io](https://commons.wikimedia.org/wiki/File:Io_for_GeoHacks.jpg),
+[Europa](https://commons.wikimedia.org/wiki/File:Europa_Voyager_GalileoSSI_global_mosaic.jpg),
+[Ganymede](https://commons.wikimedia.org/wiki/File:Ganymede_map_NASA_JPL_Voyager.jpg),
+[Callisto](https://commons.wikimedia.org/wiki/File:Callisto_map_NASA_JPL_Voyager.jpg)).
 
 The flat "map" Earth style (an alternative to the default photographic globe,
-selectable per-card in Settings) uses a blank political world map from
+selectable in the layer panel) uses a blank political world map from
 [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Blank_Map_of_The_World_Equirectangular_Projection.png)
 by FelixCountryBalls163 (CC BY 4.0), downscaled to 2048×1024.
 
@@ -192,7 +171,7 @@ resolves under the GitHub Pages sub-path.
 FIRMS uses a separate free MAP_KEY (not the `api.nasa.gov` key) — get one at
 [firms.modaps.eosdis.nasa.gov/api/map_key](https://firms.modaps.eosdis.nasa.gov/api/map_key/)
 and paste it into `src/api/firmsMapKey.ts`. Valid FIRMS requests send
-`Access-Control-Allow-Origin: *`, so the Fire Map card works directly from the
+`Access-Control-Allow-Origin: *`, so the fires layer works directly from the
 browser — no proxy needed. (Only the invalid-key **400** error page omits the
 CORS header.)
 

@@ -1,4 +1,4 @@
-// Shared by smoke/snap/shot: find (or start) a Vite server that is serving
+// Shared by smoke/snap: find (or start) a Vite server that is serving
 // *this* app. Another project's dev server often sits on Vite's default
 // :5173, so a port answering 200 isn't enough — the page must be Space Radar.
 // Walks a small port range: reuses a Space Radar server if one is already up,
@@ -30,13 +30,23 @@ export async function ensureServer({ preview = false } = {}) {
     const cmd = preview
       ? ['vite', 'preview', '--port', String(port), '--strictPort']
       : ['vite', '--port', String(port), '--strictPort'];
-    const proc = spawn('npx', cmd, { stdio: 'ignore' });
+    // Own process group: `npx` forks the real vite process, and killing only
+    // npx would leave vite running (an orphan that the next run then reuses —
+    // with whatever env it was started with).
+    const proc = spawn('npx', cmd, { stdio: 'ignore', detached: true });
+    const stop = () => {
+      try {
+        process.kill(-proc.pid);
+      } catch {
+        // already gone
+      }
+    };
     for (let i = 0; i < 30 && (await probe(base)) !== 'ours'; i++) await new Promise((r) => setTimeout(r, 1000));
     if ((await probe(base)) !== 'ours') {
-      proc.kill();
+      stop();
       throw new Error(`server did not start on :${port}`);
     }
-    return { base, stop: () => proc.kill() };
+    return { base, stop };
   }
   throw new Error(`no free port in ${first}..${first + RANGE - 1}`);
 }

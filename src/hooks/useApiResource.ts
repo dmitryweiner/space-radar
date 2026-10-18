@@ -15,8 +15,8 @@ export interface UseApiResourceOptions<T> {
   isValue: (value: unknown) => value is T;
 }
 
-// Several components can share one resource (a dashboard card and the Scene
-// view's status bar both show Kp, launches, …). One in-flight request per key,
+// Several components can share one resource (the status bar and an inspector
+// panel both show Kp, launches, …). One in-flight request per key,
 // and a poll is skipped when another instance refreshed the cache moments
 // ago — so N consumers still cost one request per interval (LL2's 15/hour!).
 // An entry is dropped once settled *or* once its last waiter unmounts, so a

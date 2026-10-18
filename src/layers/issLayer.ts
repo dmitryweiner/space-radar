@@ -3,7 +3,7 @@ import { computeSatellitePosition } from '../astro/satellitePosition';
 import { geodeticToSceneVector, type SceneVector3 } from '../astro/coords';
 import { EARTH_RADIUS_UNITS, type NamedPosition } from '../render/earthScene';
 import type { TleRecord } from '../api/types';
-import { listSetting, numberSetting } from '../layout/layoutState';
+import { listSetting, numberSetting } from '../settings/values';
 import { useTleSatellites } from './useTleSatellites';
 import type { LayerDefinition, LayerFrame, MarkerDetails } from './types';
 

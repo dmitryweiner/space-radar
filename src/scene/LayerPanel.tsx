@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import type { CardSettingValue, CardSettingValues } from '../layout/types';
-import { SettingField } from '../layout/SettingField';
-import { SelectField } from '../layout/SelectField';
-import type { LayerDefinition } from '../layers/types';
-import type { LayerStatusMap } from './EarthStage';
+import type { CardSettingValue, CardSettingValues } from '../settings/types';
+import { SettingField } from '../settings/SettingField';
+import { SelectField } from '../settings/SelectField';
+import type { LayerInfo } from '../layers/types';
+import type { LayerStatusMap } from './layerHost';
 
 const EARTH_STYLE_OPTIONS = [
   { value: 'globe', label: 'Photo (day/night)' },
@@ -12,14 +12,15 @@ const EARTH_STYLE_OPTIONS = [
 ];
 
 interface LayerPanelProps {
-  layers: LayerDefinition[];
+  layers: LayerInfo[];
   enabled: string[];
   settings: Record<string, CardSettingValues>;
   statuses: LayerStatusMap;
-  earthStyle: string;
   onToggle: (id: string) => void;
   onChangeSetting: (id: string, key: string, value: CardSettingValue) => void;
-  onChangeEarthStyle: (style: string) => void;
+  /** Earth scene only: the surface style picker under the list. */
+  earthStyle?: string;
+  onChangeEarthStyle?: (style: string) => void;
 }
 
 function statusText(status: LayerStatusMap[string] | undefined): { text: string; error: boolean } | null {
@@ -58,7 +59,7 @@ export function LayerPanel({
                 {layer.settings && layer.settings.length > 0 && (
                   <button
                     type="button"
-                    className="card-shell-action"
+                    className="icon-btn"
                     aria-label={`Settings for ${layer.title} layer`}
                     aria-expanded={openSettings === layer.id}
                     onClick={() => setOpenSettings((current) => (current === layer.id ? null : layer.id))}
@@ -85,15 +86,17 @@ export function LayerPanel({
           );
         })}
       </ul>
-      <div className="layer-earth-style">
-        <SelectField
-          idPrefix="scene-earth-style"
-          label="Earth surface"
-          options={EARTH_STYLE_OPTIONS}
-          value={earthStyle}
-          onChange={onChangeEarthStyle}
-        />
-      </div>
+      {earthStyle !== undefined && onChangeEarthStyle && (
+        <div className="layer-earth-style">
+          <SelectField
+            idPrefix="scene-earth-style"
+            label="Earth surface"
+            options={EARTH_STYLE_OPTIONS}
+            value={earthStyle}
+            onChange={onChangeEarthStyle}
+          />
+        </div>
+      )}
     </div>
   );
 }

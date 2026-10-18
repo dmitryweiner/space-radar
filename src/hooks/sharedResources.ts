@@ -1,10 +1,11 @@
 import { useApiResource } from './useApiResource';
 import { fetchKpIndex, fetchNoaaScales, fetchSolarWind } from '../api/swpc';
 import { fetchPeopleInSpace, fetchUpcomingLaunches } from '../api/launchLibrary';
-import type { KpIndexPoint, LaunchInfo, NoaaScales, PeopleInSpace, SolarWindPoint } from '../api/types';
+import { fetchFlybys } from '../api/neows';
+import type { Asteroid, KpIndexPoint, LaunchInfo, NoaaScales, PeopleInSpace, SolarWindPoint } from '../api/types';
 
-// Resources used by more than one component (a dashboard card *and* the Scene
-// view's status bar/inspector). Defined once so every consumer shares one
+// Resources used by more than one component (the Scene view's status bar *and*
+// an inspector panel). Defined once so every consumer shares one
 // cache key, TTL and validator — useApiResource then dedups their requests.
 
 const MINUTE = 60 * 1000;
@@ -124,5 +125,32 @@ export function useNoaaScales() {
     pollMs: 10 * MINUTE,
     fetcher: () => fetchNoaaScales(),
     isValue: isNoaaScales,
+  });
+}
+
+function isAsteroids(value: unknown): value is Asteroid[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.id === 'string' &&
+        typeof item.name === 'string' &&
+        typeof item.missDistanceKm === 'number' &&
+        typeof item.relativeVelocityKmH === 'number',
+    )
+  );
+}
+
+/** Every Earth close approach within ±windowDays, with orbital elements —
+ * shared by the Earth flyby layer and the Solar System asteroid layer. (v2:
+ * v1 caches predate the parsed `elements`.) */
+export function useFlybys(windowDays: number) {
+  return useApiResource<Asteroid[]>({
+    key: `space-radar:flybys:v2:${windowDays}`,
+    ttlMs: HOUR,
+    pollMs: HOUR,
+    fetcher: () => fetchFlybys(windowDays),
+    isValue: isAsteroids,
   });
 }

@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { useApiResource } from '../hooks/useApiResource';
-import { fetchFlybys } from '../api/neows';
+import { useFlybys } from '../hooks/sharedResources';
 import type { Asteroid } from '../api/types';
 import {
   compressedSceneVector,
@@ -13,13 +12,11 @@ import {
 import { geodeticToSceneVector, type SceneVector3 } from '../astro/coords';
 import { sublunarPoint } from '../astro/subsolar';
 import { EARTH_RADIUS_UNITS, type GlobeMarker, type GlobeTrack } from '../render/earthScene';
-import { numberSetting } from '../layout/layoutState';
+import { numberSetting } from '../settings/values';
 import { formatUtcTimestamp } from '../cards/formatTimestamp';
 import { useClock } from './issLayer';
-import { isRecord, type LayerDefinition, type LayerFrame } from './types';
+import type { LayerDefinition, LayerFrame } from './types';
 
-const TTL_MS = 60 * 60 * 1000;
-const POLL_MS = 60 * 60 * 1000;
 const DEFAULT_WINDOW_DAYS = 7;
 const DEFAULT_MAX_OBJECTS = 15;
 // Positions move ~10 km/s — at this scale a 10 s refresh is visually smooth.
@@ -33,22 +30,8 @@ const HAZARD_COLOR = 0xff4d4d;
 const MOON_COLOR = 0xcfd4e0;
 export const MOON_MARKER_ID = 'moon';
 
-interface Flyby extends FlybyApproach {
+export interface Flyby extends FlybyApproach {
   asteroid: Asteroid;
-}
-
-function isAsteroids(value: unknown): value is Asteroid[] {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (item) =>
-        isRecord(item) &&
-        typeof item.id === 'string' &&
-        typeof item.name === 'string' &&
-        typeof item.missDistanceKm === 'number' &&
-        typeof item.relativeVelocityKmH === 'number',
-    )
-  );
 }
 
 function toFlyby(asteroid: Asteroid): Flyby | null {
@@ -80,17 +63,24 @@ export function dedupeFlybys<T extends { closeApproachMs: number; asteroid: { na
   return [...byKey.values()];
 }
 
+/** The closest passes in the window — the ones worth looking at. */
+export function closestFlybys(asteroids: Asteroid[], max: number): Flyby[] {
+  return dedupeFlybys(asteroids.map(toFlyby).filter((f): f is Flyby => f !== null))
+    .sort((a, b) => a.missDistanceKm - b.missDistanceKm)
+    .slice(0, max);
+}
+
 function toScene(km: Vec3): SceneVector3 {
   return compressedSceneVector(km, EARTH_RADIUS_UNITS);
 }
 
-function relativeTime(deltaMs: number): string {
+export function relativeTime(deltaMs: number): string {
   const abs = Math.abs(deltaMs);
   const text = abs >= DAY_MS ? `${(abs / DAY_MS).toFixed(1)} d` : `${Math.max(1, Math.round(abs / HOUR_MS))} h`;
   return deltaMs >= 0 ? `in ${text}` : `${text} ago`;
 }
 
-function shortName(name: string): string {
+export function shortName(name: string): string {
   // NeoWs names look like "(2016 UZ41)" or "678976 (2018 EH4)".
   return name.replace(/^\d+\s+/, '').replace(/[()]/g, '');
 }
@@ -132,22 +122,10 @@ export const neoFlybyLayer: LayerDefinition = {
   useLayer(settings, time) {
     const windowDays = numberSetting(settings, 'windowDays', DEFAULT_WINDOW_DAYS);
     const maxObjects = numberSetting(settings, 'maxObjects', DEFAULT_MAX_OBJECTS);
-    const { data, loading, error } = useApiResource<Asteroid[]>({
-      key: `space-radar:flybys:${windowDays}`,
-      ttlMs: TTL_MS,
-      pollMs: POLL_MS,
-      fetcher: () => fetchFlybys(windowDays),
-      isValue: isAsteroids,
-    });
+    const { data, loading, error } = useFlybys(windowDays);
     const nowMs = useClock(time, LIVE_TICK_MS);
 
-    // The closest passes in the window — the ones worth looking at.
-    const flybys = useMemo(
-      () => dedupeFlybys((data ?? []).map(toFlyby).filter((f): f is Flyby => f !== null))
-        .sort((a, b) => a.missDistanceKm - b.missDistanceKm)
-        .slice(0, maxObjects),
-      [data, maxObjects],
-    );
+    const flybys = useMemo(() => closestFlybys(data ?? [], maxObjects), [data, maxObjects]);
 
     // Paths only change with the data, so they're memoized separately and
     // setTracks skips the unchanged array on every position tick.

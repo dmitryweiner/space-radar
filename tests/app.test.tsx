@@ -6,22 +6,13 @@ import { createEarthScene } from '../src/render/earthScene';
 
 vi.mock('../src/render/earthScene', () => ({
   createEarthScene: vi.fn(() => ({
-    setIssPosition: vi.fn(),
-    setOrbitPath: vi.fn(),
-    setSatellites: vi.fn(),
-    setMarkers: vi.fn(),
-    setFirePoints: vi.fn(),
     setLabelScale: vi.fn(),
     setEarthStyle: vi.fn(),
     setAutoRotateSpeed: vi.fn(),
     setOnMarkerClick: vi.fn(),
     setSatelliteTexture: vi.fn(),
     setSunPosition: vi.fn(),
-  setViewDistance: vi.fn(),
-    setAuroraPoints: vi.fn(),
-    setVisible: vi.fn(),
-    setTracks: vi.fn(),
-    setNightLights: vi.fn(),
+    setViewDistance: vi.fn(),
     layer: vi.fn(() => ({
       setIssPosition: vi.fn(),
       setSatellites: vi.fn(),
@@ -40,10 +31,16 @@ vi.mock('../src/render/earthScene', () => ({
 }));
 
 vi.mock('../src/render/solarSystemScene', () => ({
+  markerFocusKey: (layerId: string, id: string) => `${layerId}/${id}`,
   createSolarSystemScene: vi.fn(() => ({
     setPlanetPositions: vi.fn(),
     setOrbitPaths: vi.fn(),
     setMoons: vi.fn(),
+    setOrientations: vi.fn(),
+    focusBody: vi.fn(),
+    setOnFocusChange: vi.fn(),
+    layer: vi.fn(() => ({ setMarkers: vi.fn(), setTracks: vi.fn(), setVisible: vi.fn() })),
+    removeLayer: vi.fn(),
     resize: vi.fn(),
     dispose: vi.fn(),
   })),
@@ -64,14 +61,12 @@ describe('App', () => {
     expect(screen.getByText('Space Radar')).toBeInTheDocument();
   });
 
-  it('opens on the Scene by default, with layers, status bar and inspector', async () => {
+  it('opens on the Scene, with layers, status bar and inspector', async () => {
     render(<App />);
     expect(screen.getByTestId('scene-view')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Scene' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('status-bar')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'ISS & satellites' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Active fires' })).not.toBeChecked();
-    expect(screen.queryByRole('button', { name: 'Cards' })).not.toBeInTheDocument();
   });
 
   it('toggles a layer and persists the choice', async () => {
@@ -82,12 +77,18 @@ describe('App', () => {
     expect(stored.enabledLayers).toContain('fires');
   });
 
-  it('switches to the dashboard and remembers it', async () => {
+
+  it('shows the Solar System layers (on by default) and fly-to chips including spacecraft', async () => {
     render(<App />);
-    await userEvent.click(screen.getByRole('button', { name: 'Dashboard' }));
-    expect(screen.queryByTestId('scene-view')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cards' })).toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem('space-radar:ui-mode:v1') ?? 'null')).toBe('dashboard');
+    await userEvent.click(screen.getByRole('tab', { name: 'Solar System' }));
+    for (const name of ['Spacecraft', 'Asteroid flybys', 'Comets']) {
+      expect(screen.getByRole('checkbox', { name })).toBeChecked();
+    }
+    expect(screen.getByRole('button', { name: 'Voyager 1' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Spacecraft' }));
+    expect(screen.queryByRole('button', { name: 'Voyager 1' })).not.toBeInTheDocument();
+    const stored = JSON.parse(window.localStorage.getItem('space-radar:scene:v1') ?? '{}');
+    expect(stored.solarLayers).toEqual(['sol-asteroids', 'comets']);
   });
 
   it('opens a detail panel from a status-bar chip', async () => {
@@ -133,26 +134,4 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: /Details/ })).toHaveAttribute('href', 'https://usgs.test/q1');
   });
 
-  it('shows a full-screen overlay for a card, and exits it again', async () => {
-    window.localStorage.setItem('space-radar:ui-mode:v1', '"dashboard"');
-    render(<App />);
-
-    await userEvent.click(screen.getByRole('button', { name: 'Full screen Near-Earth Asteroids' }));
-    expect(screen.getByTestId('fullscreen-overlay')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Exit full screen for Near-Earth Asteroids' })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Exit full screen for Near-Earth Asteroids' }));
-    expect(screen.queryByTestId('fullscreen-overlay')).not.toBeInTheDocument();
-  });
-
-  it('exits full screen when Escape is pressed', async () => {
-    window.localStorage.setItem('space-radar:ui-mode:v1', '"dashboard"');
-    render(<App />);
-
-    await userEvent.click(screen.getByRole('button', { name: 'Full screen Near-Earth Asteroids' }));
-    expect(screen.getByTestId('fullscreen-overlay')).toBeInTheDocument();
-
-    await userEvent.keyboard('{Escape}');
-    expect(screen.queryByTestId('fullscreen-overlay')).not.toBeInTheDocument();
-  });
 });

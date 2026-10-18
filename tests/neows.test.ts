@@ -41,6 +41,34 @@ const FEED_SAMPLE = {
 };
 
 describe('parseAsteroids', () => {
+  it('reads orbital elements from detailed=true orbital_data', () => {
+    const detailed = structuredClone(FEED_SAMPLE);
+    Object.assign(detailed.near_earth_objects['2026-07-30'][0], {
+      orbital_data: {
+        orbit_uncertainty: '0',
+        semi_major_axis: '.8185729577105973',
+        eccentricity: '.3163015049894188',
+        inclination: '42.05593094639838',
+        ascending_node_longitude: '202.0638790027087',
+        perihelion_argument: '30.57809831737618',
+        mean_anomaly: '32.83154289764934',
+        epoch_osculation: '2461000.5',
+        orbit_class: { orbit_class_type: 'ATE' },
+      },
+    });
+    const [asteroid] = parseAsteroids(detailed);
+    expect(asteroid.elements).toEqual({
+      a: 0.8185729577105973,
+      e: 0.3163015049894188,
+      i: 42.05593094639838,
+      node: 202.0638790027087,
+      peri: 30.57809831737618,
+      meanAnomaly: 32.83154289764934,
+      epochJd: 2461000.5,
+    });
+    expect(asteroid.orbitClass).toBe('ATE');
+  });
+
   it('flattens the near_earth_objects-by-date map into a normalized list', () => {
     const asteroids = parseAsteroids(FEED_SAMPLE);
     expect(asteroids).toHaveLength(2);

@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { useApiResource } from '../../hooks/useApiResource';
 import { fetchNasaImagesForTopics } from '../../api/nasaImages';
 import type { NasaImage } from '../../api/types';
-import type { CardComponentProps } from '../../layout/types';
-import { listSetting } from '../../layout/layoutState';
+import type { CardComponentProps } from '../../settings/types';
+import { listSetting } from '../../settings/values';
 
 const TTL_MS = 6 * 60 * 60 * 1000;
 const POLL_MS = 6 * 60 * 60 * 1000;

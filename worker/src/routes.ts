@@ -94,7 +94,15 @@ export const SERVICES: Record<string, ServiceRoute> = {
       { prefix: 'fireball.api', ttlSeconds: 6 * HOUR },
       { prefix: 'sentry.api', ttlSeconds: DAY },
       { prefix: 'sbdb.api', ttlSeconds: DAY },
+      { prefix: 'sbdb_query.api', ttlSeconds: DAY },
     ],
+  },
+  // JPL Horizons ephemerides (spacecraft trajectories). No CORS either. The
+  // client asks for a fixed daily date range, so one cached copy per day.
+  horizons: {
+    upstream: 'https://ssd.jpl.nasa.gov/api/',
+    ttlSeconds: DAY,
+    paths: [{ prefix: 'horizons.api' }],
   },
   sfn: {
     upstream: 'https://api.spaceflightnewsapi.net/v4/',

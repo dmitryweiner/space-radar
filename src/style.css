@@ -28,8 +28,12 @@ body {
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
+/* The Scene fills exactly the viewport — the page itself never scrolls, so one
+   finger is free to rotate the globe. */
 #app {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -50,12 +54,6 @@ body {
 #brand {
   font-weight: 700;
   letter-spacing: 0.02em;
-}
-
-#content {
-  flex: 1;
-  display: flex;
-  min-height: 0;
 }
 
 .tb-spacer {
@@ -99,102 +97,7 @@ body {
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6);
 }
 
-/* Overlays the grid (fixed under the topbar) on the right — next to the Cards
-   button that opens it — instead of pushing cards aside. */
-#cardMenu {
-  position: fixed;
-  top: var(--topbar-height);
-  right: 0;
-  bottom: 0;
-  z-index: 90;
-  width: 260px;
-  padding: 16px;
-  background: var(--panel);
-  border-left: 1px solid var(--panel-border);
-  box-shadow: -6px 0 18px rgba(0, 0, 0, 0.45);
-  overflow-y: auto;
-}
-
-@media (max-width: 700px) {
-  #cardMenu {
-    left: 0;
-    right: 0;
-    bottom: auto;
-    width: auto;
-    max-height: 60vh;
-    border-left: none;
-    border-bottom: 1px solid var(--panel-border);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-  }
-}
-
-.card-menu-reset {
-  margin: 0 0 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--panel-border);
-}
-
-.card-menu-reset .tb-btn {
-  display: block;
-  width: 100%;
-}
-
-.card-visibility-menu {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.card-visibility-menu label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-#viewWrap {
-  flex: 1;
-  overflow: auto;
-  padding: 16px;
-}
-
-.grid-layout-container {
-  width: 100%;
-}
-
-.card-shell {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.card-shell-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: #111830;
-  border-bottom: 1px solid var(--panel-border);
-  cursor: grab;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.card-shell-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.card-shell-action {
+.icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -208,25 +111,9 @@ body {
   border-radius: 4px;
 }
 
-.card-shell-hide {
-  font-size: 16px;
-}
-
-.card-shell-action:hover {
+.icon-btn:hover {
   background: #232f56;
   color: var(--text);
-}
-
-.card-shell-fullscreen {
-  height: 100%;
-}
-
-.fullscreen-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  padding: 16px;
-  background: rgba(5, 7, 13, 0.96);
 }
 
 .settings-backdrop {
@@ -372,19 +259,6 @@ body {
   width: auto;
 }
 
-.card-shell-body {
-  flex: 1;
-  min-height: 0;
-  padding: 12px;
-  overflow: auto;
-  color: var(--text-dim);
-}
-
-.card-placeholder {
-  color: var(--text-dim);
-  font-size: 13px;
-}
-
 .card-status {
   color: var(--text-dim);
   font-size: 13px;
@@ -487,18 +361,6 @@ body {
 
 .event-location {
   color: var(--text);
-}
-
-.event-title {
-  color: var(--text);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.event-magnitude {
-  color: var(--text-dim);
 }
 
 .launch-list {
@@ -621,6 +483,61 @@ body {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+.solar-focus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.solar-focus-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.body-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.body-list > .body-chip {
+  align-self: flex-start;
+}
+
+.body-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.body-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.body-chip:hover {
+  background: #232f56;
+}
+
+.body-chip-moon {
+  color: var(--text-dim);
+}
+
+.body-chip-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.body-credits {
+  font-size: 11px;
 }
 
 .aurora-card {
@@ -873,188 +790,12 @@ body {
   border-radius: 6px;
 }
 
-.globe-legend {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  max-width: calc(100% - 16px);
-  padding: 6px 8px;
-  background: rgba(13, 18, 32, 0.82);
-  border-radius: 6px;
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.globe-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-
-.globe-legend-swatch {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.marker-info-popup {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 10;
-  width: 220px;
-  max-width: calc(100% - 16px);
-  padding: 8px 10px;
-  background: rgba(13, 18, 32, 0.92);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  font-size: 12px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-}
-
-.marker-info-popup-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.marker-info-popup-title {
-  font-weight: 600;
-  color: var(--text);
-}
-
-.marker-info-popup-fields {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.marker-info-popup-field {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.marker-info-popup-field dt {
-  color: var(--text-dim);
-}
-
-.marker-info-popup-field dd {
-  margin: 0;
-  color: var(--text);
-  text-align: right;
-}
-
-.marker-info-popup .detail-link {
-  display: inline-block;
-  margin-top: 6px;
-}
-
-/* --- Touch gestures (see attachCooperativeGestures) --- */
-
-/* Desktop / fine pointers: the scene owns every gesture. */
-.coop-gestures {
-  touch-action: none;
-}
-
-@media (pointer: coarse) {
-  /* One finger scrolls the page vertically; two fingers rotate/zoom. */
-  .coop-gestures {
-    touch-action: pan-y;
-  }
-  /* Full-screen card / Scene view: nothing to scroll, one finger rotates. */
-  [data-free-gestures] .coop-gestures {
-    touch-action: none;
-  }
-}
-
-.gesture-hint {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(5, 7, 13, 0.55);
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 600;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.gesture-hint-visible {
-  opacity: 1;
-}
-
-/* Mobile drag grip: hidden on the desktop grid (whole header drags there). */
-.card-drag-grip {
-  display: none;
-  margin-right: 8px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  color: var(--text-dim);
-  font-size: 16px;
-  line-height: 1;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-
-.grid-mobile .card-drag-grip {
-  display: inline-flex;
-}
-
-.grid-mobile .card-shell-header {
-  cursor: default;
-  justify-content: flex-start;
-  touch-action: pan-y;
-}
-
-.grid-mobile .card-shell-title {
-  flex: 1;
-}
-
-/* Wheel-scrolling to the end of a list inside a card must not chain into the
-   page. Mouse/trackpad only: on touch, `contain` on a card body that has
-   nothing to scroll (e.g. a globe card) swallows the swipe and the page never
-   scrolls; chaining out of a finished list is what a finger expects anyway. */
-@media (pointer: fine) {
-  .card-shell-body {
-    overscroll-behavior: contain;
-  }
-}
-
 .solar-imagery-grid,
-.settings-checkbox-list,
-#cardMenu {
+.settings-checkbox-list {
   overscroll-behavior: contain;
 }
 
 /* ===================== Scene view ===================== */
-
-.mode-toggle {
-  display: inline-flex;
-  gap: 4px;
-  margin-left: 8px;
-}
-
-/* The Scene fills exactly the viewport — the page itself never scrolls, so one
-   finger is free to rotate the globe (see attachCooperativeGestures). */
-#app.app-scene {
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-}
 
 .scene-view {
   flex: 1;
@@ -1323,6 +1064,46 @@ body {
   font-size: 12px;
 }
 
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 10px;
+  white-space: nowrap;
+}
+
+.legend-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Clicked-marker details in the inspector: label left, value right. */
+.detail-fields {
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-field {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.detail-field dt {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.detail-field dd {
+  margin: 0;
+  color: var(--text);
+  text-align: right;
+}
+
 .legend-block-title {
   flex-basis: 100%;
   display: flex;
@@ -1478,10 +1259,6 @@ body {
 }
 
 @media (max-width: 700px) {
-  .mode-toggle {
-    margin-left: 0;
-  }
-
   #topbar {
     gap: 8px;
   }

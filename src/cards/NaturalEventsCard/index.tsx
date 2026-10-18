@@ -1,7 +1,0 @@
-import type { CardComponentProps } from '../../layout/types';
-import { eonetLayer } from '../../layers/eonetLayer';
-import { GlobeLayerCard } from '../GlobeLayerCard';
-
-export function NaturalEventsCard(props: CardComponentProps) {
-  return <GlobeLayerCard layer={eonetLayer} {...props} />;
-}

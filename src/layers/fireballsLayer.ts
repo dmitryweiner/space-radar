@@ -4,7 +4,7 @@ import { fetchFireballs } from '../api/jplFireballs';
 import type { Fireball } from '../api/types';
 import { geodeticToSceneVector } from '../astro/coords';
 import { EARTH_RADIUS_UNITS, type GlobeMarker } from '../render/earthScene';
-import { numberSetting } from '../layout/layoutState';
+import { numberSetting } from '../settings/values';
 import { hexToCss, isRecord, type LayerDefinition } from './types';
 
 const TTL_MS = 6 * 60 * 60 * 1000;

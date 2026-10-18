@@ -150,6 +150,49 @@ export interface Asteroid {
   orbitUncertainty?: number | null;
   /** Only with `detailed=true`: e.g. "Apollo", "Aten". */
   orbitClass?: string | null;
+  /** Only with `detailed=true`: heliocentric ecliptic J2000 elements. */
+  elements?: AsteroidElements | null;
+}
+
+/** NeoWs `orbital_data` elements (angles in degrees, epoch as a Julian Date). */
+export interface AsteroidElements {
+  a: number;
+  e: number;
+  i: number;
+  node: number;
+  peri: number;
+  meanAnomaly: number;
+  epochJd: number;
+}
+
+/** One heliocentric ecliptic J2000 position (AU) at an instant. */
+export interface TrackSample {
+  ms: number;
+  xAu: number;
+  yAu: number;
+  zAu: number;
+}
+
+/** A spacecraft's positions from JPL Horizons, ordered by time. */
+export interface SpacecraftTrack {
+  /** Horizons id, e.g. "-31". */
+  id: string;
+  samples: TrackSample[];
+}
+
+/** A comet from the JPL Small-Body Database (perihelion-form elements). */
+export interface Comet {
+  /** Primary designation, e.g. "1P" or "2025 E1". */
+  id: string;
+  name: string;
+  q: number;
+  e: number;
+  i: number;
+  node: number;
+  peri: number;
+  tpJd: number;
+  /** Comet total absolute magnitude M1 (smaller = brighter), if known. */
+  magnitude: number | null;
 }
 
 /** NOAA space-weather scales, 0 (none) … 5 (extreme). */

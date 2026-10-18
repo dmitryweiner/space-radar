@@ -7,7 +7,7 @@ import earthMapTextureUrl from '../assets/earth-map.jpg';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
 import { makeTrail, type TrailLine } from './trailLine';
-import { attachCooperativeGestures, attachKeyboardZoom } from './orbitControlsExtras';
+import { attachKeyboardZoom } from './orbitControlsExtras';
 
 export const EARTH_RADIUS_UNITS = 2;
 
@@ -31,7 +31,7 @@ function currentControlsState(controls: OrbitControls): unknown {
 }
 
 // Labels and markers keep a constant on-screen *pixel* size — unchanged by zoom
-// and by expanding a card to full screen (see scaleLabelToScreen). Marker sizes
+// and by the canvas size (see scaleLabelToScreen). Marker sizes
 // below are on-screen radii in CSS pixels.
 const LABEL_PX = 13;
 const ISS_MARKER_PX = 5;
@@ -118,12 +118,10 @@ export interface SunPosition {
 }
 
 /**
- * The flat EarthLayerHandle methods act on a built-in "default" layer — what
- * a single-source dashboard card uses. The Scene view instead draws several
- * sources on one globe via `layer(id)`, one group per source, so each can be
- * toggled and cleared without touching the others.
+ * One globe drawing several sources via `layer(id)`, one group per source, so
+ * each can be toggled and cleared without touching the others.
  */
-export interface EarthSceneHandle extends EarthLayerHandle {
+export interface EarthSceneHandle {
   layer(id: string): EarthLayerHandle;
   removeLayer(id: string): void;
   /** Multiplies every label/marker's on-screen pixel size (see the global
@@ -154,8 +152,6 @@ export interface EarthSceneHandle extends EarthLayerHandle {
   dispose(): void;
 }
 
-export const DEFAULT_LAYER_ID = 'default';
-
 const LABEL_RADIAL_OFFSET = 0.22;
 
 function labelPosition(position: SceneVector3, target: THREE.Vector3): THREE.Vector3 {
@@ -174,7 +170,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   // The FOV is vertical, so on a tall, narrow canvas (a phone in portrait) a
-  // globe framed for a landscape card overflows the sides. Until the user
+  // globe framed for a landscape canvas overflows the sides. Until the user
   // zooms, keep the distance fitted to the aspect ratio; once the distance no
   // longer matches the last fit (wheel, pinch, +/- keys), leave it alone.
   const BASE_DISTANCE = camera.position.length();
@@ -237,7 +233,8 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   };
   controls.addEventListener('start', stopAutoRotateOnMove);
   const detachKeyboardZoom = attachKeyboardZoom(controls, camera, canvas);
-  const detachCooperativeGestures = attachCooperativeGestures(controls, canvas);
+  // One finger rotates (the page never scrolls); two fingers rotate + pinch-zoom.
+  controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
 
   const starfield = createStarfield(100);
   scene.add(starfield.mesh);
@@ -758,7 +755,6 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
     }
     return content;
   }
-  const defaultLayer = layerContent(DEFAULT_LAYER_ID).handle;
 
   // Click-to-inspect: one raycaster shared by every marker representation
   // this scene can hold (individual meshes for ISS/satellites/event markers,
@@ -873,20 +869,12 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   }
 
   return {
-    setIssPosition: (position, trail) => defaultLayer.setIssPosition(position, trail),
-    setSatellites: (satellites) => defaultLayer.setSatellites(satellites),
-    setMarkers: (markers) => defaultLayer.setMarkers(markers),
-    setFirePoints: (points) => defaultLayer.setFirePoints(points),
-    setAuroraPoints: (points) => defaultLayer.setAuroraPoints(points),
-    setTracks: (next) => defaultLayer.setTracks(next),
-    setNightLights: (url) => defaultLayer.setNightLights(url),
-    setVisible: (visible) => defaultLayer.setVisible(visible),
     layer(id) {
       return layerContent(id).handle;
     },
     removeLayer(id) {
       const content = layers.get(id);
-      if (content && id !== DEFAULT_LAYER_ID) {
+      if (content) {
         content.dispose();
         layers.delete(id);
       }
@@ -954,7 +942,6 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       canvas.removeEventListener('click', handleCanvasClick);
       controls.removeEventListener('start', stopAutoRotateOnMove);
       detachKeyboardZoom();
-      detachCooperativeGestures();
       controls.dispose();
       for (const content of layers.values()) {
         content.dispose();

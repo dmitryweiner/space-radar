@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { useApiResource } from '../../hooks/useApiResource';
 import { fetchSolarCycle } from '../../api/swpc';
 import type { SolarCycleData } from '../../api/types';
-import type { CardComponentProps } from '../../layout/types';
-import { numberSetting } from '../../layout/layoutState';
+import type { CardComponentProps } from '../../settings/types';
+import { numberSetting } from '../../settings/values';
 
 const CACHE_KEY = 'space-radar:solar-cycle';
 const TTL_MS = 12 * 60 * 60 * 1000;

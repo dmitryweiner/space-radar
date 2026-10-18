@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { CardComponentProps, CardSettingValues } from '../layout/types';
+import type { CardComponentProps, CardSettingValues } from '../settings/types';
 import { KpIndexCard } from '../cards/KpIndexCard';
 import { SolarWindCard } from '../cards/SolarWindCard';
 import { LaunchesCard } from '../cards/LaunchesCard';
@@ -15,7 +15,7 @@ import { NasaImagesCard } from '../cards/NasaImagesCard';
 import { useNoaaScales, usePeopleInSpace } from '../hooks/sharedResources';
 
 // Detail panels the inspector can open (from a status-bar chip or the widget
-// menu). Most are the dashboard's own card components, reused as-is.
+// menu). Most are the self-contained components in src/cards/.
 
 function ScalesPanel() {
   const { data, loading, error } = useNoaaScales();

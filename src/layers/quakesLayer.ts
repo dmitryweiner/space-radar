@@ -4,7 +4,7 @@ import { fetchQuakes, QUAKE_FEEDS } from '../api/usgsQuakes';
 import { geodeticToSceneVector } from '../astro/coords';
 import { EARTH_RADIUS_UNITS, type GlobeMarker } from '../render/earthScene';
 import type { Quake } from '../api/types';
-import { listSetting, numberSetting } from '../layout/layoutState';
+import { listSetting, numberSetting } from '../settings/values';
 import { formatUtcTimestamp } from '../cards/formatTimestamp';
 import { hexToCss, isRecord, type LayerDefinition } from './types';
 

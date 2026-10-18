@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useApiResource } from '../../hooks/useApiResource';
 import { fetchEpic } from '../../api/epic';
 import type { EpicFrame } from '../../api/types';
-import type { CardComponentProps } from '../../layout/types';
-import { numberSetting } from '../../layout/layoutState';
+import type { CardComponentProps } from '../../settings/types';
+import { numberSetting } from '../../settings/values';
 import { formatUtcTimestamp } from '../formatTimestamp';
 
 const CACHE_KEY = 'space-radar:epic';

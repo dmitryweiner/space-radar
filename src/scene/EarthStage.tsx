@@ -1,29 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { createEarthScene, type EarthSceneHandle, type MarkerHit } from '../render/earthScene';
+import { createEarthScene, type EarthSceneHandle } from '../render/earthScene';
 import { subsolarPoint } from '../astro/subsolar';
-import type { CardSettingValues } from '../layout/types';
+import type { CardSettingValues } from '../settings/types';
 import { applyFrame } from '../layers/applyFrame';
 import { useGibsTexture } from '../layers/useGibsTexture';
-import type { LayerDefinition, LayerState, LayerTime } from '../layers/types';
+import type { LayerDefinition, LayerTime } from '../layers/types';
+import { useReportLayerState, type LayerSelection, type LayerStatesRef, type OnLayerStatus } from './layerHost';
 
 const SUN_UPDATE_MS = 60 * 1000;
 const FLYBY_VIEW_DISTANCE = 26;
-
-export interface LayerSelection {
-  layerId: string;
-  hit: MarkerHit;
-}
-
-/** What the panels need from a running layer — updated only on change. */
-export type LayerStatusMap = Record<string, Pick<LayerState, 'loading' | 'error' | 'summary' | 'legend'>>;
 
 interface LayerHostProps {
   layer: LayerDefinition;
   scene: EarthSceneHandle;
   settings: CardSettingValues;
   time: LayerTime;
-  statesRef: React.MutableRefObject<Record<string, LayerState>>;
-  onStatus: (id: string, status: LayerStatusMap[string] | null) => void;
+  statesRef: LayerStatesRef;
+  onStatus: OnLayerStatus;
 }
 
 // Renders nothing: runs one layer's hook (hooks can't be called in a loop, so
@@ -31,34 +24,13 @@ interface LayerHostProps {
 function LayerHost({ layer, scene, settings, time, statesRef, onStatus }: LayerHostProps) {
   const state = layer.useLayer(settings, time);
   const target = scene.layer(layer.id);
-
-  // Latest full state (with describe()) for the inspector, outside render.
-  useEffect(() => {
-    statesRef.current[layer.id] = state;
-  });
+  useReportLayerState(layer.id, state, statesRef, onStatus);
 
   useEffect(() => {
     applyFrame(target, state.frame);
   }, [target, state.frame]);
 
-  useEffect(
-    () => () => {
-      scene.removeLayer(layer.id);
-      delete statesRef.current[layer.id];
-      onStatus(layer.id, null);
-    },
-    [scene, layer.id, statesRef, onStatus],
-  );
-
-  // Panels re-render only when what they show changes — not on every
-  // per-second position tick of the ISS layer.
-  const legendKey = state.legend.map((item) => `${item.label}:${item.color}`).join('|');
-  const { loading, error, summary, legend } = state;
-  useEffect(() => {
-    onStatus(layer.id, { loading, error, summary, legend });
-    // legend is tracked through legendKey (a new array every render).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layer.id, loading, error, summary, legendKey, onStatus]);
+  useEffect(() => () => scene.removeLayer(layer.id), [scene, layer.id]);
 
   return null;
 }
@@ -70,8 +42,8 @@ interface EarthStageProps {
   earthStyle: string;
   labelScale: number;
   rotateSpeed: number;
-  statesRef: React.MutableRefObject<Record<string, LayerState>>;
-  onStatus: (id: string, status: LayerStatusMap[string] | null) => void;
+  statesRef: LayerStatesRef;
+  onStatus: OnLayerStatus;
   onSelect: (selection: LayerSelection) => void;
 }
 

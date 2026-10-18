@@ -2,8 +2,8 @@ import { useApiResource } from '../../hooks/useApiResource';
 import { fetchCmeEvents } from '../../api/donki';
 import { fetchGoesFlares } from '../../api/swpc';
 import type { SpaceWeatherEvent } from '../../api/types';
-import type { CardComponentProps } from '../../layout/types';
-import { numberSetting } from '../../layout/layoutState';
+import type { CardComponentProps } from '../../settings/types';
+import { numberSetting } from '../../settings/values';
 
 const CACHE_KEY = 'space-radar:space-weather-events';
 const TTL_MS = 60 * 60 * 1000;

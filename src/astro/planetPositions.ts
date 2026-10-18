@@ -63,3 +63,8 @@ export function computePlanetOrbitPath(
   }
   return points;
 }
+
+/** Earth's heliocentric ecliptic position (for "distance from Earth"). */
+export function earthPositionAt(date: Date): HeliocentricVector {
+  return eclipticVector(Body.Earth, date);
+}

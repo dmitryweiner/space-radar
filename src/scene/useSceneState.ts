@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CardSettingValue } from '../layout/types';
+import type { CardSettingValue } from '../settings/types';
 import {
   SCENE_STORAGE_KEY,
-  UI_MODE_STORAGE_KEY,
   changeLayerSetting,
   defaultSceneState,
   sanitizeSceneState,
-  sanitizeUiMode,
   toggleLayer,
+  toggleSolarLayer,
   type SceneId,
   type SceneState,
-  type UiMode,
 } from './sceneState';
 
 function readJson(key: string): unknown {
@@ -30,25 +28,27 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
-export function useUiMode() {
-  const [mode, setMode] = useState<UiMode>(() => sanitizeUiMode(readJson(UI_MODE_STORAGE_KEY)));
-  useEffect(() => writeJson(UI_MODE_STORAGE_KEY, mode), [mode]);
-  return [mode, setMode] as const;
-}
-
-export function useSceneState(knownLayers: string[], defaultLayers: string[]) {
+export function useSceneState(
+  knownLayers: string[],
+  defaultLayers: string[],
+  knownSolarLayers: string[] = [],
+  defaultSolarLayers: string[] = [],
+) {
   const [state, setState] = useState<SceneState>(() => {
     const raw = readJson(SCENE_STORAGE_KEY);
-    return raw === null ? defaultSceneState(defaultLayers) : sanitizeSceneState(raw, knownLayers, defaultLayers);
+    return raw === null
+      ? defaultSceneState(defaultLayers, defaultSolarLayers)
+      : sanitizeSceneState(raw, knownLayers, defaultLayers, knownSolarLayers, defaultSolarLayers);
   });
   useEffect(() => writeJson(SCENE_STORAGE_KEY, state), [state]);
 
   const setScene = useCallback((scene: SceneId) => setState((prev) => ({ ...prev, scene })), []);
   const toggle = useCallback((id: string) => setState((prev) => toggleLayer(prev, id)), []);
+  const toggleSolar = useCallback((id: string) => setState((prev) => toggleSolarLayer(prev, id)), []);
   const setLayerSetting = useCallback(
     (id: string, key: string, value: CardSettingValue) => setState((prev) => changeLayerSetting(prev, id, key, value)),
     [],
   );
   const setEarthStyle = useCallback((earthStyle: string) => setState((prev) => ({ ...prev, earthStyle })), []);
-  return { state, setScene, toggle, setLayerSetting, setEarthStyle };
+  return { state, setScene, toggle, toggleSolar, setLayerSetting, setEarthStyle };
 }

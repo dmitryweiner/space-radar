@@ -1,4 +1,4 @@
-import { defaultGlobalSettings, sanitizeGlobalSettings } from '../src/layout/globalSettings';
+import { defaultGlobalSettings, sanitizeGlobalSettings } from '../src/settings/globalSettings';
 
 describe('sanitizeGlobalSettings', () => {
   it('returns defaults when input is not an object', () => {
@@ -8,27 +8,20 @@ describe('sanitizeGlobalSettings', () => {
   });
 
   it('keeps valid values and clamps out-of-range numbers', () => {
-    expect(sanitizeGlobalSettings({ labelScale: 1.8, rotateSpeed: 2, density: 'compact' })).toEqual({
+    expect(sanitizeGlobalSettings({ labelScale: 1.8, rotateSpeed: 2 })).toEqual({
       labelScale: 1.8,
-      rotateSpeed: 2,
-      density: 'compact',
+      rotateSpeed: 2
     });
     expect(sanitizeGlobalSettings({ labelScale: 99, rotateSpeed: -5 })).toEqual({
       labelScale: 2.5,
-      rotateSpeed: 0,
-      density: 'comfortable',
+      rotateSpeed: 0
     });
   });
 
   it('falls back per-field instead of resetting everything, so old storage missing new fields keeps what it has', () => {
     expect(sanitizeGlobalSettings({ labelScale: 1.4 })).toEqual({
       labelScale: 1.4,
-      rotateSpeed: 1,
-      density: 'comfortable',
+      rotateSpeed: 1
     });
-  });
-
-  it('rejects an unknown density value', () => {
-    expect(sanitizeGlobalSettings({ density: 'spacious' }).density).toBe('comfortable');
   });
 });

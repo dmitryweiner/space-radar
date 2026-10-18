@@ -45,6 +45,13 @@ describe('resolveRoute', () => {
     expect(resolveRoute('/jpl/fireball.api', '?limit=5', secrets)?.upstreamUrl).toBe(
       'https://ssd-api.jpl.nasa.gov/fireball.api?limit=5',
     );
+    expect(resolveRoute('/jpl/sbdb_query.api', '?sb-kind=c', secrets)?.ttlSeconds).toBe(24 * 3600);
+    expect(resolveRoute('/horizons/horizons.api', "?COMMAND='-31'", secrets)?.upstreamUrl).toBe(
+      'https://ssd.jpl.nasa.gov/api/horizons.api?COMMAND=%27-31%27',
+    );
+    expect(toProxyPath("https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND='-31'")).toBe(
+      'horizons/horizons.api?format=json&COMMAND=%27-31%27',
+    );
     expect(resolveRoute('/sfn/articles/', '', secrets)).not.toBeNull();
     expect(resolveRoute('/exoplanets/TAP/sync', '?query=x', secrets)).not.toBeNull();
   });

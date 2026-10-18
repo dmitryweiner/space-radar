@@ -1,18 +1,18 @@
-import type { CardSettingValue, CardSettingValues } from '../layout/types';
+import type { CardSettingValue, CardSettingValues } from '../settings/types';
 
 // Scene view state, persisted under its own key. Sanitized field by field
 // (like globalSettings) so storage from an older version keeps what it can.
 
 export const SCENE_STORAGE_KEY = 'space-radar:scene:v1';
-export const UI_MODE_STORAGE_KEY = 'space-radar:ui-mode:v1';
 
-export type UiMode = 'scene' | 'dashboard';
 export type SceneId = 'earth' | 'sun' | 'solar-system';
 export const SCENE_IDS: SceneId[] = ['earth', 'sun', 'solar-system'];
 
 export interface SceneState {
   scene: SceneId;
   enabledLayers: string[];
+  /** Enabled layers of the Solar System scene. */
+  solarLayers: string[];
   layerSettings: Record<string, CardSettingValues>;
   earthStyle: string;
 }
@@ -35,19 +35,35 @@ function isSceneId(value: unknown): value is SceneId {
   return value === 'earth' || value === 'sun' || value === 'solar-system';
 }
 
-export function defaultSceneState(defaultLayers: string[]): SceneState {
-  return { scene: 'earth', enabledLayers: [...defaultLayers], layerSettings: {}, earthStyle: 'globe' };
+export function defaultSceneState(defaultLayers: string[], defaultSolarLayers: string[] = []): SceneState {
+  return {
+    scene: 'earth',
+    enabledLayers: [...defaultLayers],
+    solarLayers: [...defaultSolarLayers],
+    layerSettings: {},
+    earthStyle: 'globe',
+  };
 }
 
-export function sanitizeSceneState(raw: unknown, knownLayers: string[], defaultLayers: string[]): SceneState {
-  const fallback = defaultSceneState(defaultLayers);
+function knownIds(raw: unknown, known: Set<string>, fallback: string[]): string[] {
+  return Array.isArray(raw) ? [...new Set(raw.filter((id): id is string => typeof id === 'string' && known.has(id)))] : fallback;
+}
+
+export function sanitizeSceneState(
+  raw: unknown,
+  knownLayers: string[],
+  defaultLayers: string[],
+  knownSolarLayers: string[] = [],
+  defaultSolarLayers: string[] = [],
+): SceneState {
+  const fallback = defaultSceneState(defaultLayers, defaultSolarLayers);
   if (!isRecord(raw)) {
     return fallback;
   }
-  const known = new Set(knownLayers);
-  const enabledLayers = Array.isArray(raw.enabledLayers)
-    ? raw.enabledLayers.filter((id): id is string => typeof id === 'string' && known.has(id))
-    : fallback.enabledLayers;
+  const known = new Set([...knownLayers, ...knownSolarLayers]);
+  const enabledLayers = knownIds(raw.enabledLayers, new Set(knownLayers), fallback.enabledLayers);
+  // Absent in storage from before the Solar System had layers → defaults on.
+  const solarLayers = knownIds(raw.solarLayers, new Set(knownSolarLayers), fallback.solarLayers);
   const layerSettings: Record<string, CardSettingValues> = {};
   if (isRecord(raw.layerSettings)) {
     for (const [id, values] of Object.entries(raw.layerSettings)) {
@@ -65,7 +81,8 @@ export function sanitizeSceneState(raw: unknown, knownLayers: string[], defaultL
   }
   return {
     scene: isSceneId(raw.scene) ? raw.scene : fallback.scene,
-    enabledLayers: [...new Set(enabledLayers)],
+    enabledLayers,
+    solarLayers,
     layerSettings,
     earthStyle: typeof raw.earthStyle === 'string' && EARTH_STYLES.includes(raw.earthStyle) ? raw.earthStyle : fallback.earthStyle,
   };
@@ -78,12 +95,13 @@ export function toggleLayer(state: SceneState, id: string): SceneState {
   return { ...state, enabledLayers };
 }
 
-export function changeLayerSetting(state: SceneState, id: string, key: string, value: CardSettingValue): SceneState {
-  return { ...state, layerSettings: { ...state.layerSettings, [id]: { ...state.layerSettings[id], [key]: value } } };
+export function toggleSolarLayer(state: SceneState, id: string): SceneState {
+  const solarLayers = state.solarLayers.includes(id)
+    ? state.solarLayers.filter((layer) => layer !== id)
+    : [...state.solarLayers, id];
+  return { ...state, solarLayers };
 }
 
-export function sanitizeUiMode(raw: unknown): UiMode {
-  // The Scene is the default for everyone — including visitors whose storage
-  // predates it (no key at all).
-  return raw === 'dashboard' ? 'dashboard' : 'scene';
+export function changeLayerSetting(state: SceneState, id: string, key: string, value: CardSettingValue): SceneState {
+  return { ...state, layerSettings: { ...state.layerSettings, [id]: { ...state.layerSettings[id], [key]: value } } };
 }

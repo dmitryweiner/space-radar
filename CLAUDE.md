@@ -8,42 +8,37 @@ tooling in `scripts/` **once**, give it CLI flags, and call it thereafter.
 
 Existing helpers:
 
-- `scripts/smoke.mjs` — headless Chromium: default card visibility, toggling
-  every card via the Cards menu, canvases mounting for the six WebGL cards
-  (`iss-globe`, `solar-system`, `natural-events`, `fire-map`, `quakes`,
-  `aurora-globe`), drag-to-reposition, resize, `localStorage` persistence
-  across reload, layout reset, keyboard/wheel zoom, auto-rotate
-  stop-only-on-move (see the OrbitControls `state` note below), the general
-  settings popup (label scale / auto-rotate speed / card density, live-update
-  + persistence), a per-card `earthStyle` select, full-screen, and the mobile
-  single-column layout (stacking + drag-to-reorder via the `≡` grip +
-  persistence, on a separate narrow-viewport page), and touch gestures on an
-  emulated phone (`hasTouch`/`isMobile` context, swipes sent through CDP
-  `Input.dispatchTouchEvent` since Playwright's `touchscreen` can only tap):
-  one finger over a 3D card scrolls the page and leaves the scene alone, two
-  fingers rotate and don't scroll, a header swipe scrolls instead of dragging.
-  `--screenshot <path>`, `--preview` (prod build on :4173). Any console/page
-  error → exit code 2. "Did the globe stop" checks use `settledDiff` (poll
-  until still, up to 10s), not a fixed wait: OrbitControls' damping decays
-  *per frame* and with six WebGL cards on the software rasterizer the frame
-  rate is low, so a fixed 2s settle that's plenty with one card isn't enough.
-- **smoke also covers the Scene view** (the default UI): exactly one WebGL
-  canvas, default layers on, a layer toggle persisting, the globe rendering,
-  a status chip opening its inspector panel, the scrubber leaving/returning to
-  Live, the Earth/Sun/Solar System tabs, the header mode toggle persisting, and
-  on an emulated phone a one-finger drag rotating the full-screen globe
-  without scrolling the page plus the Layers bottom sheet. **All dashboard
-  sections run on pages pre-switched to the dashboard** via `useDashboard(page)`
-  (an init script that seeds `space-radar:ui-mode:v1` on first load only).
-- `scripts/devServer.mjs` — `ensureServer({ preview })` shared by smoke/snap/
-  shot: reuses a running Space Radar dev server, **skips ports held by other
+- `scripts/smoke.mjs` — headless Chromium over the Scene view (the whole UI):
+  exactly one WebGL canvas, default layers on, a layer toggle persisting, the
+  globe rendering, a status chip opening its inspector panel, the scrubber
+  leaving/returning to Live, the Earth/Sun/Solar System tabs, hover-routed
+  keyboard zoom (solar-system canvas), Solar System fly-to (a body chip →
+  overlay + view change → "Whole system"), the Solar System data layers
+  (on by default, toggling one removes its fly-to chips — UI only, their JPL
+  data needs the deployed proxy), auto-rotate stop-only-on-move (see
+  the OrbitControls `state` note below), the general settings popup (label
+  scale / auto-rotate speed, rotate 0 stops the spin, persistence, Escape),
+  the Earth style select, and on an emulated phone (`hasTouch`/`isMobile`,
+  swipes sent through CDP `Input.dispatchTouchEvent` since Playwright's
+  `touchscreen` can only tap) a one-finger drag rotating the full-screen globe
+  without scrolling the page plus the Layers bottom sheet. The ISS layer is
+  switched off before the "did the globe stop" checks — its markers move every
+  second. `--screenshot <path>`, `--preview` (prod build on :4173). Any
+  console/page error → exit code 2. "Did the globe stop" checks use
+  `settledDiff` (poll until still, up to 10s), not a fixed wait: OrbitControls'
+  damping decays *per frame* and the software rasterizer's frame rate is low.
+- `scripts/devServer.mjs` — `ensureServer({ preview })` shared by smoke and
+  snap: reuses a running Space Radar dev server, **skips ports held by other
   projects' Vite servers** (checks the page `<title>`, not just HTTP 200 —
-  another project often sits on :5173) and spawns one on the first free port.
+  another project often sits on :5173) and spawns one on the first free port,
+  **in its own process group** — `stop()` kills the group, because killing
+  just `npx` left the real vite running as an orphan that later runs then
+  silently reused (with whatever env it had been started with).
 - `scripts/snap.mjs` — single debug screenshot. Flags: `--out <path>`
-  (required), `--show <cardId>` / `--hide <cardId>` / `--click <selector>` /
-  `--storage 'key=<json>'` (seed localStorage before boot, e.g. card settings)
-  (repeatable), `--width`, `--height`, `--wait <ms>`, `--preview`.
-- `scripts/shot.mjs` — one screenshot per card into `./shots`.
+  (required), `--tab <Earth|Sun|Solar System>`, `--click <selector>` /
+  `--click-at <selector:x,y>` / `--key <key>` / `--storage 'key=<json>'` (seed
+  localStorage before boot) (repeatable), `--width`, `--height`, `--wait <ms>`,
+  `--preview`. E.g. `--tab 'Solar System' --click '.body-chip:text-is("Saturn")'`.
 - `scripts/pngDiff.mjs` — `countDiffPixels(pngBufferA, pngBufferB, tolerance?)`:
   decodes two 8-bit PNGs and counts pixels that actually changed, for
   Playwright screenshot comparisons where exact-byte `Buffer.equals()` is too
@@ -51,10 +46,8 @@ Existing helpers:
   by `smoke.mjs`'s auto-rotate section; reach for it any time a smoke check
   needs "did this canvas really change" rather than "did any byte change."
 
-Card ids: `iss-globe`, `solar-system`, `kp-index`, `solar-wind`,
-`aurora-forecast`, `solar-flares`, `asteroids`, `natural-events`, `launches`,
-`apod`, `fire-map`, `epic`, `quakes`, `solar-imagery`, `solar-cycle`, `moon`,
-`aurora-globe`, `nasa-images` (see `src/layout/cardRegistry.ts`).
+Layer ids: see `src/layers/registry.ts`; inspector panel ids: see
+`src/scene/panels.tsx`.
 
 ## Build / test commands
 
@@ -64,7 +57,6 @@ npm run worker:tail    # live worker logs
 npm run check     # tsc + eslint (bans `as` casts) + vitest
 npm run smoke      # browser smoke (see above); --preview for prod build
 npm run snap        # debug screenshot
-npm run shot        # per-card screenshots → ./shots
 npm run build       # production build → ./docs (GitHub Pages)
 ```
 
@@ -76,7 +68,7 @@ npm run build       # production build → ./docs (GitHub Pages)
   heliocentric vectors + `moonPositions.ts`), plus `coords.ts` for lat/lon/AU →
   3D scene vectors. **astronomy-engine only has moon ephemerides for Earth's
   Moon (`GeoMoon`) and Jupiter's four Galilean moons (`JupiterMoons`)** — there
-  is no data for Saturn/Uranus/Neptune moons, so the Solar System card shows
+  is no data for Saturn/Uranus/Neptune moons, so the Solar System scene shows
   only those five (drawn on exaggerated display orbits since real separations
   are far smaller than a planet's rendered radius).
 - **Caching proxy (`worker/`, Cloudflare Worker
@@ -95,7 +87,18 @@ npm run build       # production build → ./docs (GitHub Pages)
   swallowed (the isolate cache keeps serving) and no TTL is under 10 min.
   **LL2 throttles Cloudflare's shared egress IPs** (429 straight away), so
   launches usually go via the client's direct fallback — expected, not a bug.
-  `describeHttpError` redacts keys from the URL it shows in a card.
+  `describeHttpError` redacts keys from the URL it shows in the UI.
+  **JPL (`ssd-api.jpl.nasa.gov`: fireballs, SBDB query) and Horizons
+  (`ssd.jpl.nasa.gov/api`, its own `horizons` service) send no CORS headers**,
+  so those layers work *only* through the deployed proxy — a new route there
+  needs `npm run worker:deploy` before the browser can use it. Horizons 503s
+  when busy; `api/horizons.ts` retries with backoff and the spacecraft layer
+  fetches two craft at a time. **`VITE_PROXY_BASE`** overrides the proxy URL
+  for development. Local `wrangler dev` is no use for the JPL routes: this
+  wrangler's runtime is older than the worker's compatibility date (needs
+  `--compatibility-date 2026-05-03`) and even then it can't reach the JPL
+  hosts (502, while production gets 200) — test JPL routes against a small
+  Node proxy or the deployed worker instead.
 - `src/api/` is pure fetch+parse — **never** import React there. Each module
   takes an injectable fetch function (default: global `fetch`) so tests can
   mock it without touching the network.
@@ -124,75 +127,45 @@ npm run build       # production build → ./docs (GitHub Pages)
   (canvas mounts, no console errors). Both scene modules self-manage sizing
   via an internal `ResizeObserver` on the canvas; nobody needs to call the
   exposed `resize()` method manually.
-- **Card settings** are a discriminated union in `src/layout/types.ts`:
-  `{ kind: 'number', ... }` renders a stepper, `{ kind: 'multiselect', options,
-  ... }` renders a checkbox list whose value is a `string[]`, `{ kind: 'select',
-  options, ... }` renders a radio group whose value is a single `string`. Read
-  them in a card with the `numberSetting(values, id, fallback)` /
-  `listSetting(values, id, fallback)` / `stringSetting(values, id, fallback)`
-  helpers from `layoutState.ts` — never index `settings[id]` directly, since the
-  value type is `number | string[] | string`. `NumberField` (`src/layout/
-  NumberField.tsx`, shared by `CardSettingsPopup` and `GlobalSettingsPopup`)
-  rounds its committed value to the nearest `step`, not the nearest integer
-  (`Math.round(next / step) * step`, then a second rounding pass to shake off
-  float noise like `0.30000000000000004`) — needed once a fractional `step`
-  (the 0.1 label-scale coefficient below) showed up; for the default `step: 1`
-  it's identical to the old `Math.round(next)`.
+- **Settings** (per layer, and per inspector panel) are a discriminated union
+  in `src/settings/types.ts`: `{ kind: 'number', ... }` renders a stepper,
+  `{ kind: 'multiselect', options, ... }` a checkbox list whose value is a
+  `string[]`, `{ kind: 'select', options, ... }` a radio group whose value is a
+  single `string` (`SettingField` / `SelectField`). Read them with the
+  `numberSetting(values, id, fallback)` / `listSetting(values, id, fallback)`
+  helpers from `src/settings/values.ts` — never index `settings[id]` directly,
+  since the value type is `number | string[] | string`. (`src/cards/` holds the
+  self-contained panels the inspector shows — the name is historical; there is
+  no card grid any more.)
 - **General settings** (header "Settings" button → `GlobalSettingsPopup`,
-  state in `src/layout/globalSettings.ts` + `useGlobalSettings.ts`) hold three
-  values, all persisted to their own `space-radar:global-settings:v1`
-  localStorage key (which is already per-browser, so desktop and mobile
-  naturally end up with independent values with no viewport-based branching
-  needed) and sanitized *per-field* (`sanitizeGlobalSettings` falls back
-  field-by-field, not all-or-nothing — old storage saved before a new field
-  existed keeps its other values instead of resetting everything):
+  state in `src/settings/globalSettings.ts` + `useGlobalSettings.ts`) hold two
+  values, persisted to their own `space-radar:global-settings:v1` localStorage
+  key (per-browser, so desktop and mobile naturally keep independent values)
+  and sanitized *per-field* (old storage missing a field keeps its other
+  values; an old `density` field is simply dropped):
   - `labelScale`: a 0.5–2.5× multiplier on every label/marker's on-screen
-    pixel size across all five `createEarthScene` cards (`earthScene.ts`'s
-    `setLabelScale`, applied inside `rescaleLabel`/`scaleMarker` each frame,
-    and patched onto any already-created fire/aurora `PointsMaterial.size`
-    since those bake their size in once at creation).
-  - `rotateSpeed`: a 0–3× multiplier on the same five cards' idle auto-rotate
-    speed (`setAutoRotateSpeed`, multiplies `AUTO_ROTATE_SPEED`). **0 doubles
-    as "off"** — no separate boolean toggle, since a zero speed is a zero
-    per-frame rotation delta regardless of the `autoRotate` flag.
-  - `density`: `'comfortable' | 'compact'`, mapped through
-    `DENSITY_ROW_HEIGHT` to `GridLayout`'s `rowHeight` prop (was a hardcoded
-    module constant; now threaded from `App` through `GridLayout` since it
-    has to be user-configurable). Affects every card, not just the globes.
-  `App` passes `labelScale`/`rotateSpeed` down through `GridLayout`'s
-  `CardComponentProps` to every card (all cards get the props; only the five
-  globe cards read them) and `rowHeight` directly into `GridLayout`'s
-  `gridConfig`. `SelectField` (`src/layout/SelectField.tsx`, extracted
-  alongside `NumberField` once `GlobalSettingsPopup` needed the same
-  radio-group UI `CardSettingsPopup` already had for per-card `select`
-  settings) renders the density choice.
-- **Per-card "Earth style" setting** (`earthStyle`, `'globe' | 'map'`, on
-  `iss-globe`/`natural-events`/`fire-map`/`quakes`/`aurora-globe`) swaps
-  `earthScene.ts`'s Earth mesh between the default photo texture lit by a
-  directional "sun" light (day/night terminator) and a flat, fully *unlit*
+    pixel size on the globe (`earthScene.ts`'s `setLabelScale`, applied inside
+    `rescaleLabel`/`scaleMarker` each frame, and patched onto any
+    already-created fire/aurora `PointsMaterial.size` since those bake their
+    size in once at creation).
+  - `rotateSpeed`: a 0–3× multiplier on the globe's idle auto-rotate speed
+    (`setAutoRotateSpeed`, multiplies `AUTO_ROTATE_SPEED`). **0 doubles as
+    "off"** — no separate boolean toggle.
+  `App` passes both to `SceneView` → `EarthStage`.
+- **Earth style** (`earthStyle` in scene state, `'globe' | 'satellite' |
+  'map'`, the radio group under the layer list) swaps `earthScene.ts`'s Earth
+  material between the photo texture lit by a directional "sun" light
+  (day/night terminator), the GIBS mosaic (below), and a flat, fully *unlit*
   `MeshBasicMaterial` using `src/assets/earth-map.jpg` — a blank political
   world map (Wikimedia Commons, FelixCountryBalls163, CC BY 4.0, downscaled to
-  2048×1024) — for cards where the shaded/dark side hides markers. Both
-  textures/materials load eagerly at scene creation (matches the existing
-  eager-load pattern for `earth-diffuse.jpg`); `setEarthStyle` just swaps
-  `earth.material`, so markers/labels/occlusion are unaffected either way (same
-  sphere geometry).
-- **Touch: cooperative gestures (`orbitControlsExtras.attachCooperativeGestures`,
-  all six 3D scenes).** On `(pointer: coarse)` devices one finger scrolls the
-  page and two fingers rotate+pinch-zoom (`touches.TWO = DOLLY_ROTATE`); a
-  one-finger swipe flashes a "Use two fingers to rotate" hint. Inside any
-  `[data-free-gestures]` ancestor (the full-screen overlay, the Scene view)
-  one finger rotates as usual — decided per touch in a capture-phase
-  `pointerdown` that sets `controls.touches.ONE` before OrbitControls reads
-  it. The page-scroll half is CSS (`.coop-gestures { touch-action: pan-y }`)
-  because the browser reads `touch-action` before any JS runs; OrbitControls'
-  inline `touch-action: none` is cleared for that. **Don't put
-  `overscroll-behavior: contain` on `.card-shell-body` for touch** — on a body
-  with nothing to scroll (every globe card) it swallows the swipe and the page
-  never scrolls; it's `(pointer: fine)`-only. On the mobile single column only
-  the `≡` grip (`.card-drag-grip`, shown by `.grid-mobile`) starts a card drag;
-  the rest of the header has `touch-action: pan-y`.
-- **All six 3D scenes share `orbitControlsExtras.attachKeyboardZoom`** — it binds
+  2048×1024) — for when the shaded side hides markers. `setEarthStyle` just
+  swaps `earth.material`, so markers/labels/occlusion are unaffected.
+- **Touch:** both scenes live in a page that never scrolls (`#app` is exactly
+  `100dvh`), so OrbitControls keeps its own `touch-action: none` and one finger
+  rotates; two fingers rotate + pinch-zoom (`touches.TWO = DOLLY_ROTATE`). (The
+  old dashboard's "cooperative gestures" — one finger scrolls the page — went
+  away with the card grid.)
+- **Both 3D scenes share `orbitControlsExtras.attachKeyboardZoom`** — it binds
   `+`/`-` (and `=`/`_`) to dolly the camera along its view direction (clamped to
   the controls' min/max distance). **The keys are routed by *hover*, not DOM
   focus: a `window` keydown listener acts on whichever canvas the pointer is over
@@ -201,9 +174,9 @@ npm run build       # production build → ./docs (GitHub Pages)
   focus can only be gained by clicking, and clicking a globe also stops its
   auto-rotation, so the keys would never fire *while the globe is still spinning*.
   A click-focused canvas is a fallback target only when the pointer is over no
-  globe, so two cards never zoom at once. (Zoom is keyboard + mouse-wheel only; an
-  on-screen-button version was tried and removed.) The five `createEarthScene`
-  globes additionally auto-rotate (`controls.autoRotate`, `AUTO_ROTATE_SPEED`).
+  scene, so two canvases never zoom at once. (Zoom is keyboard + mouse-wheel only; an
+  on-screen-button version was tried and removed.) The Earth globe
+  additionally auto-rotates (`controls.autoRotate`, `AUTO_ROTATE_SPEED`).
   **Only a rotate/pan move stops the spin — zooming (wheel, trackpad pinch,
   keyboard `+`/`-`, or a middle-drag dolly) leaves it spinning.** OrbitControls
   fires `start` on any pointer interaction, but only *sets* its internal
@@ -225,7 +198,7 @@ npm run build       # production build → ./docs (GitHub Pages)
   always mix a pinch with pan/rotate, so those still stop it. The solar-system
   scene gets keyboard zoom but no auto-rotate. `scripts/smoke.mjs` guards the
   zoom-hover-while-spinning case (hovers, does not click, the solar-system
-  canvas) and separately guards the stop/no-stop distinction on `aurora-globe`
+  canvas) and separately guards the stop/no-stop distinction on the Scene globe
   via `scripts/pngDiff.mjs`'s `countDiffPixels` — **exact-byte
   `Buffer.equals()` is not a reliable "did it move" signal on these canvases**:
   headless Chromium's software rasterizer leaves small frame-to-frame dithering
@@ -236,17 +209,14 @@ npm run build       # production build → ./docs (GitHub Pages)
   reads as motion; the smoke check uses a zero-movement press to isolate the
   state transition, plus a 2s settle wait, then thresholds `countDiffPixels`
   at 1,000 vs. the ~10,000+ pixels genuine rotation moves per 600ms).
-  `MIN_CAMERA_DISTANCE` (`EARTH_RADIUS_UNITS + 0.3`) sets how close the five
-  globes can zoom in — a flat `3` (1 full unit of clearance) was too far to
+  `MIN_CAMERA_DISTANCE` (`EARTH_RADIUS_UNITS + 0.3`) sets how close the
+  globe can zoom in — a flat `3` (1 full unit of clearance) was too far to
   make out detail.
 - **Layers (`src/layers/`).** The data half of each geographic source is a
   `LayerDefinition` (`issLayer`, `quakesLayer`, `firesLayer`, `auroraLayer`,
   `eonetLayer`, …): its own `settings` plus a `useLayer(settings, time)` *hook*
-  returning `{ frame, loading, error, summary, legend, describe(hit) }`. The
-  five dashboard globe cards are all `GlobeLayerCard` with a different layer
-  (thin wrappers in `src/cards/*Card/index.tsx`); the registry builds their
-  settings as `globeSettings(layer)` = layer settings + the card-level
-  `earthStyle`. `applyFrame` only touches the fields a frame carries, so `{}`
+  returning `{ frame, loading, error, summary, legend, describe(hit) }`
+  (unit-tested with `renderHook`, e.g. `tests/issLayer.test.ts`). `applyFrame` only touches the fields a frame carries, so `{}`
   (still loading) draws nothing. `time` is `null` for live (layers tick on
   their own via `useClock`) or a fixed ms instant from the Scene scrubber.
   Since `useLayer` is a hook, a host must call it unconditionally — the Scene
@@ -254,14 +224,12 @@ npm run build       # production build → ./docs (GitHub Pages)
   hooks in a loop.
 - **`earthScene` is layered.** `scene.layer(id)` returns an independent
   `EarthLayerHandle` (own THREE.Group: ISS, satellites, markers, fire/aurora
-  Points; `setVisible`, `removeLayer`); the flat `setIssPosition`/`setMarkers`/…
-  methods act on the built-in `'default'` layer, which is what single-layer
-  cards use. Click hits report `(hit, layerId)`. **The "sun" light sits over
-  the real sub-solar point** (`src/astro/subsolar.ts`, `setSunPosition`,
-  refreshed each minute by `GlobeLayerCard`) and **the initial camera opens
-  over the sunlit hemisphere** — with a real terminator a fixed start view is
-  a black night side half the day. Ambient was raised so night continents
-  stay faintly readable.
+  Points; `setVisible`, `removeLayer`) — there is no flat single-layer API any
+  more. Click hits report `(hit, layerId)`. **The "sun" light sits over the
+  real sub-solar point** (`src/astro/subsolar.ts`, `setSunPosition`) and **the
+  initial camera opens over the sunlit hemisphere** — with a real terminator a
+  fixed start view is a black night side half the day. Ambient was raised so
+  night continents stay faintly readable.
 - **`earthStyle: 'satellite'`** = NASA GIBS VIIRS true-colour daily mosaic
   (`src/api/gibs.ts`, WMS GetMap 2048×1024, CORS `*`, no key). Starts at
   today−2 and steps back while a day 4xx's or is under 150 kB (the newest day
@@ -269,8 +237,7 @@ npm run build       # production build → ./docs (GitHub Pages)
   wedges between swaths, so `useGibsTexture` composites the mosaic over the
   static photo texture (black pixels → base) in a canvas; one download per
   page load, shared by every globe.
-- **Five of the cards (`iss-globe`, `natural-events`, `fire-map`, `quakes`,
-  `aurora-globe`) share `createEarthScene`.** The globe exposes `setSatellites`
+- **The globe (`createEarthScene`)** layer handles expose `setSatellites`
   (named markers with labels), `setMarkers` (generic id/colour/label markers),
   `setFirePoints` (a single yellow→red `THREE.Points` cloud), and
   `setAuroraPoints` (an additive-blended green `THREE.Points` cloud whose
@@ -280,17 +247,17 @@ npm run build       # production build → ./docs (GitHub Pages)
   occlusion math.
 - **Fire points carry an optional `label` string drawn as a permanent sprite
   beside the point** (not a hover tooltip — there are several thousand points, so
-  `FireMapCard` labels only the strongest `labelCount` fires by brightness; the
+  `firesLayer` labels only the strongest `labelCount` fires by brightness; the
   full `THREE.Points` cloud is unlabelled). The label text (detection time +
-  brightness K + confidence) is built in `FireMapCard`. These are ordinary
+  brightness K + confidence) is built in `firesLayer`. These are ordinary
   depth-tested `labelSprite`s, so the opaque Earth hides far-side ones for free —
   no raycast/horizon math (the earlier hover-tooltip approach needed both).
 - **FIRMS default source is `VIIRS_NOAA20_NRT`, not `VIIRS_SNPP_NRT`.** The
   Suomi-NPP NRT feed went intermittent and now returns ~0 rows for `world/1`;
-  NOAA-20 (and NOAA-21) are the healthy operational VIIRS feeds. If the fire card
+  NOAA-20 (and NOAA-21) are the healthy operational VIIRS feeds. If the fires layer
   ever shows almost no points again, `curl` the source URLs and switch — it's a
   feed outage, not a parsing bug.
-- **The ISS card caches TLEs per CelesTrak group, not per group-combination**
+- **The ISS layer caches TLEs per CelesTrak group, not per group-combination**
   (`useTleSatellites`), under `space-radar:tle-group:<name>` keys. Caching by
   combination (the earlier design) re-fetched huge groups on every toggle —
   tripping CelesTrak's 403 rate-limit — and piled up unbounded localStorage
@@ -298,12 +265,8 @@ npm run build       # production build → ./docs (GitHub Pages)
   quota/storage errors. CelesTrak's `stations` group is the whole "Space
   Stations" set (cargo ships + cubesats deployed from the ISS), not just
   ISS/CSS — hence the "Space stations & nearby" label.
-- **Numeric settings inputs commit on blur/Enter, not per keystroke** (see
-  `CardSettingsPopup`). Clamping every keystroke made "type 2 into a field
-  showing 1" become "12" → clamped to the max (4/8). The field keeps a raw
-  draft string and clamps once on commit; focus selects-all so typing replaces.
 - **A 3D scene's camera `far` must clear the far side of its star sphere at max
-  zoom-out** (`camera distance + starfield radius`). The Solar System card
+  zoom-out** (`camera distance + starfield radius`). The Solar System scene
   showed a grey disc because `far` (500) was less than 300 + 400.
 - **Globe/solar-system labels and markers keep a constant on-screen *pixel*
   size** via `scaleLabelToScreen` (in `labelSprite.ts`) and `scaleMarker` (in
@@ -311,18 +274,14 @@ npm run build       # production build → ./docs (GitHub Pages)
   where `worldPerPx = 2·tan(fov/2) / canvas.clientHeight`. Dividing by the
   canvas pixel height is the crucial part: the earlier `K × cameraDistance`
   scale was constant only as a *fraction* of the viewport, so labels/markers
-  **grew when a card was expanded to full screen** (a larger canvas). Fire
+  **grew on a larger canvas**. Fire
   points use `sizeAttenuation:false` (size in framebuffer px, so multiply by
   `renderer.getPixelRatio()`) for the same constant-size effect. Solar-system
   planet names are labels too (added alongside the moon labels).
-- **`IssGlobeCard`'s scene effect must guard `if (!scene || !data) return`.**
-  Without the `!data` guard it pushes a null ISS frame on first mount before
-  TLEs load, which makes `waitFor(setIssPosition called)` in the test resolve
-  on that premature null call instead of the real position.
 - **FIRMS needs a separate MAP_KEY** (`src/api/firmsMapKey.ts`, now populated).
-  Valid FIRMS requests **do** send `access-control-allow-origin: *`, so the Fire
-  Map card works from the browser with no proxy — the earlier "no CORS" note was
-  only the invalid-key **400 error page**, which omits the header. The card
+  Valid FIRMS requests **do** send `access-control-allow-origin: *`, so the fires
+  layer works from the browser with no proxy — the earlier "no CORS" note was
+  only the invalid-key **400 error page**, which omits the header. The layer
   still degrades gracefully (empty-key prompt / network error) rather than
   throwing.
 - **EONET looks US-only from a naive query** — its events are sorted newest-
@@ -336,26 +295,26 @@ npm run build       # production build → ./docs (GitHub Pages)
   they never make the newest-first `limit` cut. So `fetchNaturalEvents` *also*
   fetches per-continent `bbox` queries (`REGION_BBOXES`, minus North America
   which the category queries already cover) to pull them into the pool.
-  `NaturalEventsCard.pickDiverse` then round-robins across **region+category**
+  `eonetLayer`'s `pickDiverse` then round-robins across **region+category**
   buckets (region via the exported `regionOf`), so both geography and type are
   spread — Europe/Asia/etc. show alongside the far more numerous US wildfires
   instead of being crowded out of the `maxEvents` slice.
-- **The Scene view (`src/scene/`) is the default UI**; the card grid is the
-  "Dashboard", behind the header toggle (`space-radar:ui-mode:v1`, anything but
-  `"dashboard"` → scene). Scene state (`space-radar:scene:v1`: scene tab,
-  enabled layers, per-layer settings, Earth style) is sanitized field by field
-  (`sceneState.ts`). `EarthStage` owns one `createEarthScene` and mounts one
-  render-less `LayerHost` per enabled layer (from `layers/registry.ts`), which
-  runs the layer hook, `applyFrame`s into `scene.layer(id)` and on unmount
-  `removeLayer`s. Hosts report `{loading,error,summary,legend}` upward **only
-  when that changes** (keyed effect) — reporting every render would re-render
-  the whole view on the ISS layer's per-second tick (and loop). The latest
-  full layer state (for `describe()`) lives in a ref written **in an effect**:
-  react-hooks v7's `react-hooks/refs` rule rejects ref reads/writes during
-  render, so the inspector polls it from an effect too. The inspector's detail
-  panels (`scene/panels.tsx`) are mostly the dashboard's own card components.
-  The Scene container carries `data-free-gestures` (one finger rotates; the
-  page never scrolls — `#app.app-scene` is exactly `100dvh`). Phones (<700px,
+- **The Scene view (`src/scene/`) is the whole UI** (the card-grid
+  "Dashboard" was removed; its leftover `space-radar:layout:v1` /
+  `space-radar:ui-mode:v1` localStorage keys are simply ignored). Scene state
+  (`space-radar:scene:v1`: scene tab, enabled layers, per-layer settings,
+  Earth style) is sanitized field by field (`sceneState.ts`). `EarthStage`
+  owns one `createEarthScene` and mounts one render-less `LayerHost` per
+  enabled layer (from `layers/registry.ts`), which runs the layer hook,
+  `applyFrame`s into `scene.layer(id)` and on unmount `removeLayer`s. Hosts
+  report `{loading,error,summary,legend}` upward **only when that changes**
+  (keyed effect) — reporting every render would re-render the whole view on
+  the ISS layer's per-second tick (and loop). The latest full layer state (for
+  `describe()`) lives in a ref written **in an effect**: react-hooks v7's
+  `react-hooks/refs` rule rejects ref reads/writes during render, so the
+  inspector polls it from an effect too. The inspector's detail panels
+  (`scene/panels.tsx`) are the components in `src/cards/`. `#app` is exactly
+  `100dvh`. Phones (<700px,
   `matchMedia`, guarded for jsdom) get a bottom sheet instead of side panels.
 - **Time cursor**: `TimeScrubber` (±7 d, playback speeds) sets `time` (null =
   live). Layers get it via `useLayer(settings, time)` + `useClock`; the globe's
@@ -386,31 +345,61 @@ npm run build       # production build → ./docs (GitHub Pages)
   another instance refreshed the cache within the last half poll interval.
   Resources shown in more than one place live in `hooks/sharedResources.ts`
   (Kp, solar wind, launches, people in space, NOAA scales) — **don't
-  redefine their cache key/TTL in a card**.
-- **Default layout is six cards in two columns** (`w:2`), reading order
-  ISS · Solar System / Natural Events · APOD / Launches / Asteroids. The
-  registry lists these first (all `defaultVisible:true`); the rest are hidden and
-  parked below (`y ≥ 6`). `scripts/smoke.mjs`'s `DEFAULT_VISIBLE` /
-  `HIDDEN_BY_DEFAULT` and `tests/app.test.tsx` (which fullscreens a
-  *default-visible* card) must be kept in sync with these defaults.
-- **Below `GridLayout.MOBILE_BREAKPOINT_PX` (700px container width, matching
-  the `#cardMenu` CSS breakpoint), cards stack in a single, still-draggable
-  column** instead of the 4-col grid (`GridLayout`'s `toMobileRglLayout`, cols
-  forced to 1). Reordering is tracked separately from the desktop
-  x/y/w-per-card `layout` map: `StoredLayoutState.mobileOrder` is just a
-  `string[]` of visible ids in stacked order, defaulting to reading order
-  (top-to-bottom, left-to-right on the desktop layout —
-  `layoutState.ts`'s `readingOrder`) and kept in sync by `toggleVisibility`
-  (hide → remove, show → append at the end). Resizing a card's *height* in
-  mobile mode still writes through to the shared desktop `layout[id].h` (x/y/w
-  there are untouched — mobile's are synthetic). **`toMobileRglLayout` must
-  stack using each card's actual height in grid rows (`y +=
-  rect.h`), not just its array index** — react-grid-layout's drag/collision
-  math operates on the given `y` values directly during an interactive drag,
-  so index-based y's (e.g. every `h:2` card at consecutive integers 0,1,2…,
-  which overlap) confused live reordering even though a *static* render still
-  looked right, because the library's own compaction pass silently resolves
-  overlapping-but-correctly-ordered input on a plain re-render.
+  redefine their cache key/TTL in a component**.
+- **Solar System (`render/solarSystemScene.ts`, `scene/SolarStage.tsx`).**
+  Every body is textured: Sun/planets/Moon from Solar System Scope (CC BY 4.0,
+  same source as the starfield; Earth reuses `earth-diffuse.jpg`), Galilean
+  moons from public-domain NASA/JPL/USGS mosaics on Wikimedia Commons — all in
+  `src/assets/planets/`, downscaled to 1024×512 (~1.7 MB total), loaded only
+  when the tab mounts. The credit line is in the Solar System side panel and
+  the README. Saturn has a ring mesh (`RingGeometry` with UVs remapped
+  radially, since the ring texture is a radial strip). **Each body is turned on
+  its real spin axis** via `astro/bodyOrientation.ts` (astronomy-engine
+  `RotationAxis` → pole + prime-meridian vectors in the J2000 ecliptic frame);
+  the mesh basis is (meridian, north, meridian×north) because SphereGeometry
+  puts an equirectangular map's centre (lon 0) on +X. IAU "north" is the pole
+  on the ecliptic-north side, so Uranus reads 82°, not 98° (retrograde shows as
+  the spin direction). Galilean moons have no IAU model there and borrow
+  Jupiter's axis; per-texture longitude conventions aren't calibrated, so the
+  axis/spin rate are real but which face points at you is approximate.
+  **Fly-to:** clicking a body or its label (or a `.body-chip` in the side
+  panel; `SceneView` owns `solarFocus` and passes `focus`/`onFocusChange`)
+  flies the camera to `radius × 5` (Saturn ×7 so the rings fit) and then
+  follows the body by moving camera+target by its per-frame delta.
+  `controls.minDistance` is relaxed during the flight (OrbitControls clamps
+  every update, so flying out from a close-up would jump) and `camera.near` is
+  re-derived each frame from the view distance so small moons aren't clipped.
+  Labels sit just above their body in *screen* space (camera-up offset of
+  radius + a few px), so they work at any zoom. Moon meshes are created once
+  and moved, not rebuilt each update.
+- **Solar System layers** (`layers/registry.ts` → `solarLayers`, hosted by
+  `scene/SolarStage.tsx`, state in `SceneState.solarLayers` — a separate list
+  so storage from before it existed gets them all on). Same
+  `LayerDefinition` shape as Earth's, generic over the frame:
+  `SolarLayerDefinition = LayerDefinition<SolarFrame>`, a frame being
+  `{ markers, tracks }` in **true heliocentric ecliptic AU**; the scene
+  (`scene.layer(id).setMarkers/setTracks`) applies the display transform.
+  Status reporting is shared with `EarthStage` via `scene/layerHost.ts`.
+  - `sol-asteroids`: the same NeoWs passes as the Earth flyby layer
+    (`useFlybys`, shared cache key `space-radar:flybys:v2:*` — v2 because v1
+    caches lack the parsed `elements`) on their real orbits.
+  - `comets`: JPL SBDB query — "near perihelion" (tp within ±1 yr, q < 4 AU,
+    sorted by M1) + `FAMOUS_COMETS`. Many new comets are hyperbolic (e > 1),
+    so `astro/kepler.ts` solves ellipse, hyperbola and exact parabola from
+    perihelion-form elements (q, e, i, Ω, ω, tp). Open/very long orbits are
+    drawn as an arc within 12 AU — 40 AU arcs criss-crossed the whole view.
+  - `spacecraft`: JPL Horizons vectors (Sun-centred, ecliptic, AU) for a year
+    back + 2 weeks ahead, step 1–4 d per craft, linearly interpolated;
+    coverage edges ("No ephemeris … after A.D. …", e.g. Hera's) are retried
+    inside the range. Ids checked against Horizons in Oct 2026.
+  Beyond 35 AU distances are **log-compressed** (`displayRadiusAu`: Voyager
+  1's 172 AU → ~62 AU on screen); planets (≤ 30 AU) are exact. Markers are
+  constant-pixel spheres/diamonds; their names show only near the camera
+  unless `labelAlways` (spacecraft). Clicking a marker = fly-to + inspector
+  details (the scene's `SolarFocus` carries layer/marker ids); `focusBody` on
+  a marker not loaded yet is kept pending until its layer delivers it.
+  Planets are drawn hundreds of times too large relative to distances, so a
+  very close asteroid pass can sit inside Earth's ball — the layer says so.
 - ESLint bans `as` type assertions (`@typescript-eslint/consistent-type-assertions:
   'never'`). Narrow `unknown` with a type-predicate helper
   (`function isRecord(v): v is Record<string, unknown>`) instead of casting.
@@ -420,10 +409,6 @@ npm run build       # production build → ./docs (GitHub Pages)
 
 ## Gotchas learned while building this
 
-- **`react-grid-layout` is on v2**, a hooks-first rewrite with a different API
-  from the commonly-documented v1 (`gridConfig`/`dragConfig`/`resizeConfig`
-  objects, `useContainerWidth` for width, no `WidthProvider` needed). Don't
-  reach for v1-style flat props or `react-grid-layout/legacy` docs/examples.
 - **NOAA SWPC response shapes are inconsistent across products** — verified
   against the live endpoints, not just docs/memory:
   - `noaa-planetary-k-index.json` is an **array of objects**
@@ -459,10 +444,5 @@ npm run build       # production build → ./docs (GitHub Pages)
   (Heroku "Application Error" / 503), independent of DONKI on the same
   `api.nasa.gov` host. `AsteroidsCard`'s error state is not a bug when this
   happens — it's the intended graceful-failure path.
-- **Playwright drag/resize needs a real multi-step `mouse.move`** (`{ steps: N
-  }`), not a single jump — react-draggable/react-resizable can end up with a
-  stuck placeholder or a half-registered gesture otherwise. For resizing a
-  grid item, the horizontal delta must exceed one full column width (not just
-  the pixel distance you'd eyeball) or the drag registers as a height-only
-  change with no visible width difference — measure the actual column width
-  from a `boundingBox()` diff rather than guessing a delta.
+- **Playwright drags need a real multi-step `mouse.move`** (`{ steps: N }`),
+  not a single jump — a one-shot move can leave a half-registered gesture.

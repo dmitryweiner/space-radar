@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 // Flexible single debug screenshot. Auto-starts the dev server, optionally
-// shows/hides specific cards first, prints any console/page errors.
+// switches the scene tab / clicks things first, prints any console/page errors.
 //
 //   node scripts/snap.mjs --out /tmp/x.png
-//   node scripts/snap.mjs --out /tmp/x.png --show solar-system --show asteroids --hide kp-index
+//   node scripts/snap.mjs --out /tmp/x.png --tab 'Solar System'   # Earth | Sun | Solar System
 //   node scripts/snap.mjs --out /tmp/x.png --width 1400 --height 900 --wait 2000
 //   node scripts/snap.mjs --out /tmp/x.png --preview   # prod build (vite preview :4173)
-//   node scripts/snap.mjs --out /tmp/x.png --click 'button[aria-label="Settings for Solar Wind"]'
-//   node scripts/snap.mjs --out /tmp/x.png --click-at '[data-card-id="quakes"] canvas:200,150'  # click at an
+//   node scripts/snap.mjs --out /tmp/x.png --click 'button[aria-label^="Kp"]'
+//   node scripts/snap.mjs --out /tmp/x.png --click-at '[data-testid="scene-canvas"]:200,150'  # click at an
 //     offset (px) from an element's top-left — for canvas/WebGL content with no clickable DOM node per point
 //   node scripts/snap.mjs --out /tmp/x.png --click '#generalSettingsBtn' --key Escape  # runs after
-//     --show/--hide, --click, and --click-at, in that order (each flag type is its own phase)
-//   node scripts/snap.mjs --out /tmp/x.png --storage 'space-radar:ui-mode:v1="dashboard"'  # seed a
+//     --tab, --click, and --click-at, in that order (each flag type is its own phase)
+//   node scripts/snap.mjs --out /tmp/x.png --storage 'space-radar:global-settings:v1={"labelScale":2,"rotateSpeed":0}'  # seed a
 //     localStorage key (value is raw JSON text) before the app boots; repeatable
 
 import { mkdirSync } from 'node:fs';
@@ -20,8 +20,8 @@ import { chromium } from 'playwright';
 import { ensureServer } from './devServer.mjs';
 
 const args = process.argv.slice(2);
-const MULTI_FLAGS = new Set(['show', 'hide', 'click', 'click-at', 'key', 'storage']);
-const VALUE_FLAGS = new Set(['out', 'width', 'height', 'wait', ...MULTI_FLAGS]);
+const MULTI_FLAGS = new Set(['click', 'click-at', 'key', 'storage']);
+const VALUE_FLAGS = new Set(['out', 'width', 'height', 'wait', 'tab', ...MULTI_FLAGS]);
 const flags = new Map();
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
@@ -43,31 +43,10 @@ for (let i = 0; i < args.length; i++) {
 
 if (!flags.has('out')) {
   console.error(
-    'usage: node scripts/snap.mjs --out <path> [--show <cardId>]... [--hide <cardId>]... [--click <selector>]... [--click-at <selector:x,y>]... [--width n] [--height n] [--wait ms] [--preview]',
+    'usage: node scripts/snap.mjs --out <path> [--tab <name>] [--click <selector>]... [--click-at <selector:x,y>]... [--width n] [--height n] [--wait ms] [--preview]',
   );
   process.exit(1);
 }
-
-const CARD_TITLES = {
-  'iss-globe': 'ISS & Satellites',
-  'solar-system': 'Solar System',
-  'kp-index': 'Geomagnetic Activity (Kp-index)',
-  'solar-wind': 'Solar Wind',
-  'aurora-forecast': 'Aurora Forecast',
-  'solar-flares': 'Solar Flares & CME',
-  asteroids: 'Near-Earth Asteroids',
-  'natural-events': 'Natural Events (EONET)',
-  launches: 'Upcoming Launches',
-  apod: 'Astronomy Picture of the Day',
-  'fire-map': 'Active Fires (FIRMS)',
-  epic: 'Earth from L1 (EPIC)',
-  quakes: 'Earthquakes (USGS)',
-  'solar-imagery': 'Live Sun (SDO)',
-  'solar-cycle': 'Solar Cycle',
-  moon: 'Moon & Eclipses',
-  'aurora-globe': 'Aurora Oval (3D)',
-  'nasa-images': 'NASA Image Library',
-};
 
 const preview = flags.has('preview');
 const width = Number(flags.get('width') ?? 1400);
@@ -104,30 +83,10 @@ if (seeds.length) {
 await page.goto(BASE);
 await page.waitForSelector('#app');
 
-const toShow = flags.get('show') ?? [];
-const toHide = flags.get('hide') ?? [];
-if (toShow.length || toHide.length) {
-  await page.locator('#cardsMenuBtn').click();
-  await page.waitForTimeout(100);
-  for (const id of toShow) {
-    const title = CARD_TITLES[id];
-    if (!title) {
-      console.error(`unknown card id "${id}"`);
-      continue;
-    }
-    const checkbox = page.getByRole('checkbox', { name: title });
-    if (!(await checkbox.isChecked())) await checkbox.click();
-  }
-  for (const id of toHide) {
-    const title = CARD_TITLES[id];
-    if (!title) {
-      console.error(`unknown card id "${id}"`);
-      continue;
-    }
-    const checkbox = page.getByRole('checkbox', { name: title });
-    if (await checkbox.isChecked()) await checkbox.click();
-  }
-  await page.locator('#cardsMenuBtn').click();
+const tab = flags.get('tab');
+if (tab) {
+  await page.getByRole('tab', { name: tab }).click();
+  await page.waitForTimeout(300);
 }
 
 for (const selector of flags.get('click') ?? []) {

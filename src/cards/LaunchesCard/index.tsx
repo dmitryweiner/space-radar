@@ -1,6 +1,6 @@
 import { useLaunches } from '../../hooks/sharedResources';
-import type { CardComponentProps } from '../../layout/types';
-import { numberSetting } from '../../layout/layoutState';
+import type { CardComponentProps } from '../../settings/types';
+import { numberSetting } from '../../settings/values';
 import { formatUtcTimestamp } from '../formatTimestamp';
 
 const DEFAULT_COUNT = 8;
