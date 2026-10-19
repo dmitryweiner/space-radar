@@ -1,6 +1,6 @@
 # [Space Radar](https://dmitryweiner.github.io/space-radar/)
 
-<img width="600" alt="image" src="https://github.com/user-attachments/assets/d29114fa-af54-4924-a1ff-2d55a2702f6e" />
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/39847b24-16e2-4c04-914c-7c495e315856" />
 
 **A space situational awareness dashboard.** A web app that pulls live data
 from public space agencies — satellite orbits, planetary positions, space
