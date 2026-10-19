@@ -21,7 +21,8 @@ Existing helpers:
   the Earth style select, and on an emulated phone (`hasTouch`/`isMobile`,
   swipes sent through CDP `Input.dispatchTouchEvent` since Playwright's
   `touchscreen` can only tap) a one-finger drag rotating the full-screen globe
-  without scrolling the page plus the Layers bottom sheet. The ISS layer is
+  without scrolling the page, the Layers bottom sheet, and a Details panel's ×
+  returning to the Details list (not closing the sheet). The ISS layer is
   switched off before the "did the globe stop" checks — its markers move every
   second. `--screenshot <path>`, `--preview` (prod build on :4173). Any
   console/page error → exit code 2. "Did the globe stop" checks use
@@ -51,13 +52,18 @@ Layer ids: see `src/layers/registry.ts`; inspector panel ids: see
 
 ## Build / test commands
 
+**Deploy = push to `main`.** `.github/workflows/deploy.yml` runs `npm ci`,
+`npm run check`, `npm run build` and publishes `dist/` to GitHub Pages (repo
+Pages source: "GitHub Actions"). The build output is not committed — the old
+`docs/` folder is gone. PRs run the same check + build without deploying.
+
 ```bash
 npm run worker:deploy  # deploy the caching proxy (worker/) to Cloudflare
 npm run worker:tail    # live worker logs
 npm run check     # tsc + eslint (bans `as` casts) + vitest
 npm run smoke      # browser smoke (see above); --preview for prod build
 npm run snap        # debug screenshot
-npm run build       # production build → ./docs (GitHub Pages)
+npm run build       # production build → ./dist (local check only — CI deploys)
 ```
 
 ## Architecture notes
@@ -102,7 +108,7 @@ npm run build       # production build → ./docs (GitHub Pages)
 - `src/api/` is pure fetch+parse — **never** import React there. Each module
   takes an injectable fetch function (default: global `fetch`) so tests can
   mock it without touching the network.
-- Static assets live in `public/` (copied verbatim to `docs/` on build) —
+- Static assets live in `public/` (copied verbatim to `dist/` on build) —
   currently `favicon.svg`, a self-contained SVG radar scope (cropped to its
   top-right quarter via `viewBox="28 0 32 32"`, full-bleed; the `#scope`
   gradient uses `gradientUnits="userSpaceOnUse"` so the crop stays dark toward
@@ -138,8 +144,12 @@ npm run build       # production build → ./docs (GitHub Pages)
   self-contained panels the inspector shows — the name is historical; there is
   no card grid any more.)
 - **General settings** (header "Settings" button → `GlobalSettingsPopup`,
-  state in `src/settings/globalSettings.ts` + `useGlobalSettings.ts`) hold two
-  values, persisted to their own `space-radar:global-settings:v1` localStorage
+  state in `src/settings/globalSettings.ts` + `useGlobalSettings.ts`) are a
+  **module-level store** (`getGlobalSettings`/`updateGlobalSettings`,
+  components subscribe via `useGlobalSettings()` = `useSyncExternalStore`) so
+  non-React code (formatters inside a layer's `describe()`, `useApiResource`)
+  reads the same values. Tests that seed the storage key call
+  `reloadGlobalSettings()`. Persisted to their own `space-radar:global-settings:v1` localStorage
   key (per-browser, so desktop and mobile naturally keep independent values)
   and sanitized *per-field* (old storage missing a field keeps its other
   values; an old `density` field is simply dropped):
@@ -147,11 +157,27 @@ npm run build       # production build → ./docs (GitHub Pages)
     pixel size on the globe (`earthScene.ts`'s `setLabelScale`, applied inside
     `rescaleLabel`/`scaleMarker` each frame, and patched onto any
     already-created fire/aurora `PointsMaterial.size` since those bake their
-    size in once at creation).
+    size in once at creation) **and in the Solar System scene**
+    (`solarSystemScene.ts`'s `setLabelScale`: planet/moon/marker labels and
+    layer marker sizes, in `placeLabel`).
   - `rotateSpeed`: a 0–3× multiplier on the globe's idle auto-rotate speed
     (`setAutoRotateSpeed`, multiplies `AUTO_ROTATE_SPEED`). **0 doubles as
     "off"** — no separate boolean toggle.
-  `App` passes both to `SceneView` → `EarthStage`.
+  - `timeZone` (`utc`|`local`) and `units` (`metric`|`imperial`): **all**
+    user-visible times/distances/speeds go through `src/format/display.ts`
+    (`formatTime`, `formatDistance`, `formatSpeed`, …) — never hand-format a
+    "… UTC" or "… km" string. Zone-less "YYYY-MM-DD hh:mm" feed strings are
+    UTC. Fire labels bake the time into sprites, so `firesLayer`'s memo keys
+    on `timeZone`. AU stays AU.
+  - `startScene` (`last`|scene id): overrides the stored tab on mount only.
+  - `dataSaver`: `useApiResource` stretches every TTL/poll ×3
+    (`DATA_SAVER_FACTOR`); SDO/GOES images use their 512/678 px renditions;
+    GIBS mosaic/night lights are fetched at 1024×512; both scenes'
+    `setLowPower` cap rendering at 30 fps (`render/lowPower.ts` frame gate)
+    with a 1× pixel ratio (earthScene re-derives fire/aurora point sizes).
+  - "Reset everything…" (two taps, no `window.confirm`) removes every
+    `space-radar:` localStorage key and reloads.
+  `App` passes labelScale/rotateSpeed/dataSaver/startScene to `SceneView`.
 - **Earth style** (`earthStyle` in scene state, `'globe' | 'satellite' |
   'map'`, the radio group under the layer list) swaps `earthScene.ts`'s Earth
   material between the photo texture lit by a directional "sun" light
@@ -316,6 +342,15 @@ npm run build       # production build → ./docs (GitHub Pages)
   (`scene/panels.tsx`) are the components in `src/cards/`. `#app` is exactly
   `100dvh`. Phones (<700px,
   `matchMedia`, guarded for jsdom) get a bottom sheet instead of side panels.
+  An open inspector panel in the sheet gets `.scene-sheet-panel` (fixed sheet
+  height, the panel body is the *only* scroller) — nested scrollers there
+  trapped touch scrolling so the × was unreachable; × (`closeDetails`) goes
+  back to the inspector's list and never closes the sheet. **The Sun tab**
+  (`scene/SunStage.tsx`) lays out the SDO image plus `SUN_PANELS` (flares,
+  solar wind, solar cycle, other wavelengths — `panels.tsx`) as one scrolling
+  grid; those panels are left out of the inspector's "More" list (Kp, NOAA
+  scales, aurora are Earth's response and stay there). The sheet's first tab
+  reads "Layers" on Earth and Solar System, "About" only on Sun.
 - **Time cursor**: `TimeScrubber` (±7 d, playback speeds) sets `time` (null =
   live). Layers get it via `useLayer(settings, time)` + `useClock`; the globe's
   sun position and `SolarSystemCard` (new optional `time` prop on

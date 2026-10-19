@@ -6,6 +6,9 @@ import { EARTH_RADIUS_UNITS, type FirePoint as SceneFirePoint } from '../render/
 import type { FirePoint } from '../api/types';
 import { numberSetting } from '../settings/values';
 import { isRecord, type LayerDefinition } from './types';
+import { formatTime } from '../format/display';
+import { useGlobalSettings } from '../settings/useGlobalSettings';
+import type { TimeZoneSetting } from '../settings/globalSettings';
 
 const CACHE_KEY = 'space-radar:fire-points';
 // FIRMS updates a few times a day and the world CSV is large — poll slowly.
@@ -42,16 +45,16 @@ function intensity(point: FirePoint): number {
   return Math.min(1, Math.max(0, point.confidence ?? base));
 }
 
-// acquiredAt is "YYYY-MM-DD HHMM" (UTC); pretty-print the HHMM time.
-function formatAcquiredAt(point: FirePoint): string {
+// acquiredAt is "YYYY-MM-DD HHMM" (UTC); shown in the chosen time zone.
+function formatAcquiredAt(point: FirePoint, zone?: TimeZoneSetting): string {
   const [date, rawTime] = point.acquiredAt.split(' ');
   const digits = (rawTime ?? '').padStart(4, '0');
-  return rawTime ? `${date} ${digits.slice(0, 2)}:${digits.slice(2)} UTC` : date;
+  return rawTime ? formatTime(`${date} ${digits.slice(0, 2)}:${digits.slice(2)}`, zone) : date;
 }
 
 // Label text drawn beside the strongest fire points: time + brightness.
-function fireInfo(point: FirePoint): string {
-  const parts = [formatAcquiredAt(point)];
+function fireInfo(point: FirePoint, zone: TimeZoneSetting): string {
+  const parts = [formatAcquiredAt(point, zone)];
   if (Number.isFinite(point.brightnessKelvin) && point.brightnessKelvin > 0) {
     parts.push(`${Math.round(point.brightnessKelvin)} K`);
   }
@@ -69,6 +72,8 @@ export const firesLayer: LayerDefinition = {
   useLayer(settings) {
     const dayRange = numberSetting(settings, 'dayRange', DEFAULT_DAY_RANGE);
     const labelCount = numberSetting(settings, 'labelCount', DEFAULT_LABEL_COUNT);
+    // The labels bake in a formatted time, so rebuild them when the zone changes.
+    const { timeZone } = useGlobalSettings();
     const { data, loading, error } = useApiResource<FirePoint[]>({
       key: `${CACHE_KEY}:${dayRange}`,
       ttlMs: TTL_MS,
@@ -91,10 +96,10 @@ export const firesLayer: LayerDefinition = {
       const firePoints: SceneFirePoint[] = points.map((point, index) => ({
         position: geodeticToSceneVector(point.latitude, point.longitude, 0, EARTH_RADIUS_UNITS),
         intensity: intensity(point),
-        label: labelled.has(index) ? fireInfo(point) : undefined,
+        label: labelled.has(index) ? fireInfo(point, timeZone) : undefined,
       }));
       return { firePoints };
-    }, [data, labelCount]);
+    }, [data, labelCount, timeZone]);
 
     const count = data?.length ?? 0;
     return {

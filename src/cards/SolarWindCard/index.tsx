@@ -2,8 +2,9 @@ import { useSolarWind } from '../../hooks/sharedResources';
 import type { SolarWindPoint } from '../../api/types';
 import type { CardComponentProps } from '../../settings/types';
 import { numberSetting } from '../../settings/values';
-import { formatUtcTimestamp } from '../formatTimestamp';
 import { TimeAxis } from '../TimeAxis';
+import { formatSpeed, formatTime, speedUnit } from '../../format/display';
+import { useGlobalSettings } from '../../settings/useGlobalSettings';
 
 const CHART_WIDTH = 100;
 const CHART_HEIGHT = 32;
@@ -68,6 +69,7 @@ function SubChart({ testId, label, points }: SubChartProps) {
 const DEFAULT_POINTS = 48;
 
 export function SolarWindCard({ settings = {} }: CardComponentProps) {
+  useGlobalSettings(); // re-render when the time zone / units change
   const { data, loading, error } = useSolarWind();
 
   if (loading) {
@@ -85,7 +87,7 @@ export function SolarWindCard({ settings = {} }: CardComponentProps) {
 
   return (
     <div className="solar-wind-chart">
-      <SubChart testId="solar-wind-speed-chart" label="Speed (km/s)" points={polylinePoints(points, (p) => p.speed)} />
+      <SubChart testId="solar-wind-speed-chart" label={`Speed (${speedUnit()})`} points={polylinePoints(points, (p) => p.speed)} />
       <SubChart
         testId="solar-wind-density-chart"
         label="Density (p/cm³)"
@@ -93,10 +95,10 @@ export function SolarWindCard({ settings = {} }: CardComponentProps) {
       />
       <TimeAxis times={points.map((point) => point.time)} />
       <p className="chart-status-line">
-        Speed: <strong>{formatValue(latest.speed, 'km/s')}</strong> · Density:{' '}
+        Speed: <strong>{latest.speed === null ? '—' : formatSpeed(latest.speed, 0)}</strong> · Density:{' '}
         <strong>{formatValue(latest.density, 'p/cm³', 1)}</strong>
       </p>
-      <p className="chart-timestamp">As of {formatUtcTimestamp(latest.time)}</p>
+      <p className="chart-timestamp">As of {formatTime(latest.time)}</p>
     </div>
   );
 }

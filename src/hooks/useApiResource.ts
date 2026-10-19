@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { readCache, writeCache } from '../api/cache';
+import { useGlobalSettings } from '../settings/useGlobalSettings';
 
 export interface ApiResourceState<T> {
   data: T | null;
@@ -21,13 +22,20 @@ export interface UseApiResourceOptions<T> {
 // ago — so N consumers still cost one request per interval (LL2's 15/hour!).
 // An entry is dropped once settled *or* once its last waiter unmounts, so a
 // hung request can't block a later mount of the same resource forever.
+// The data-saver setting stretches every TTL and poll interval by this much.
+export const DATA_SAVER_FACTOR = 3;
+
 const inFlight = new Map<string, { promise: Promise<unknown>; waiters: number }>();
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function useApiResource<T>({ key, ttlMs, pollMs, fetcher, isValue }: UseApiResourceOptions<T>): ApiResourceState<T> {
+export function useApiResource<T>(options: UseApiResourceOptions<T>): ApiResourceState<T> {
+  const { key, fetcher, isValue } = options;
+  const factor = useGlobalSettings().dataSaver ? DATA_SAVER_FACTOR : 1;
+  const ttlMs = options.ttlMs * factor;
+  const pollMs = options.pollMs * factor;
   const [state, setState] = useState<ApiResourceState<T>>(() => {
     const cached = readCache(key, ttlMs, isValue);
     return { data: cached, loading: cached === null, error: null };

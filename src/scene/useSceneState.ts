@@ -33,12 +33,16 @@ export function useSceneState(
   defaultLayers: string[],
   knownSolarLayers: string[] = [],
   defaultSolarLayers: string[] = [],
+  /** Overrides the stored scene tab on load (the "Open on" setting). */
+  initialScene: SceneId | null = null,
 ) {
   const [state, setState] = useState<SceneState>(() => {
     const raw = readJson(SCENE_STORAGE_KEY);
-    return raw === null
-      ? defaultSceneState(defaultLayers, defaultSolarLayers)
-      : sanitizeSceneState(raw, knownLayers, defaultLayers, knownSolarLayers, defaultSolarLayers);
+    const loaded =
+      raw === null
+        ? defaultSceneState(defaultLayers, defaultSolarLayers)
+        : sanitizeSceneState(raw, knownLayers, defaultLayers, knownSolarLayers, defaultSolarLayers);
+    return initialScene ? { ...loaded, scene: initialScene } : loaded;
   });
   useEffect(() => writeJson(SCENE_STORAGE_KEY, state), [state]);
 

@@ -6,6 +6,7 @@ import { geodeticToSceneVector } from '../astro/coords';
 import { EARTH_RADIUS_UNITS, type GlobeMarker } from '../render/earthScene';
 import { numberSetting } from '../settings/values';
 import { hexToCss, isRecord, type LayerDefinition } from './types';
+import { formatDistance, formatSpeed, formatTime } from '../format/display';
 
 const TTL_MS = 6 * 60 * 60 * 1000;
 const POLL_MS = 6 * 60 * 60 * 1000;
@@ -77,12 +78,12 @@ export const fireballsLayer: LayerDefinition = {
           return null;
         }
         return {
-          title: `Fireball ${fireball.date} UTC`,
+          title: `Fireball ${formatTime(fireball.date)}`,
           fields: [
             { label: 'Impact energy', value: `${fireball.impactEnergyKt} kt TNT` },
             { label: 'Location', value: `${fireball.latitude.toFixed(1)}°, ${fireball.longitude.toFixed(1)}°` },
-            ...(fireball.altitudeKm !== null ? [{ label: 'Altitude', value: `${fireball.altitudeKm} km` }] : []),
-            ...(fireball.velocityKmS !== null ? [{ label: 'Velocity', value: `${fireball.velocityKmS} km/s` }] : []),
+            ...(fireball.altitudeKm !== null ? [{ label: 'Altitude', value: formatDistance(fireball.altitudeKm, 1) }] : []),
+            ...(fireball.velocityKmS !== null ? [{ label: 'Velocity', value: formatSpeed(fireball.velocityKmS) }] : []),
           ],
           detailUrl: 'https://cneos.jpl.nasa.gov/fireballs/',
         };

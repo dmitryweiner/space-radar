@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchGibsSnapshot } from '../api/gibs';
+import { GIBS_FULL_WIDTH, GIBS_SAVER_WIDTH, fetchGibsSnapshot } from '../api/gibs';
 import earthTextureUrl from '../assets/earth-diffuse.jpg';
 
 // A daily GIBS mosaic has pure-black no-data gaps between orbit swaths (wide
@@ -48,26 +48,32 @@ async function composite(snapshot: Blob): Promise<string> {
   }
 }
 
-// One download per page load, shared by every globe that wants the
+// One download per page load (per size), shared by every globe that wants the
 // 'satellite' style (object URL kept for the page's lifetime).
-let textureUrl: Promise<string | null> | null = null;
+const textureUrls = new Map<number, Promise<string | null>>();
 
-function loadTextureUrl(): Promise<string | null> {
-  textureUrl ??= fetchGibsSnapshot()
-    .then((snapshot) => (snapshot ? composite(snapshot.blob) : null))
-    .catch(() => null);
-  return textureUrl;
+function loadTextureUrl(width: number): Promise<string | null> {
+  let url = textureUrls.get(width);
+  if (!url) {
+    url = fetchGibsSnapshot(fetch, new Date(), width)
+      .then((snapshot) => (snapshot ? composite(snapshot.blob) : null))
+      .catch(() => null);
+    textureUrls.set(width, url);
+  }
+  return url;
 }
 
-/** Object URL of the latest GIBS mosaic once `enabled` and loaded, else null. */
-export function useGibsTexture(enabled: boolean): string | null {
+/** Object URL of the latest GIBS mosaic once `enabled` and loaded, else null.
+ * `small` (data saver) fetches a 1024×512 mosaic instead of 2048×1024. */
+export function useGibsTexture(enabled: boolean, small = false): string | null {
+  const width = small ? GIBS_SAVER_WIDTH : GIBS_FULL_WIDTH;
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!enabled) {
       return undefined;
     }
     let cancelled = false;
-    loadTextureUrl().then((value) => {
+    loadTextureUrl(width).then((value) => {
       if (!cancelled) {
         setUrl(value);
       }
@@ -75,6 +81,6 @@ export function useGibsTexture(enabled: boolean): string | null {
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, width]);
   return enabled ? url : null;
 }

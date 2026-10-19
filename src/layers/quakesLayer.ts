@@ -5,8 +5,8 @@ import { geodeticToSceneVector } from '../astro/coords';
 import { EARTH_RADIUS_UNITS, type GlobeMarker } from '../render/earthScene';
 import type { Quake } from '../api/types';
 import { listSetting, numberSetting } from '../settings/values';
-import { formatUtcTimestamp } from '../cards/formatTimestamp';
 import { hexToCss, isRecord, type LayerDefinition } from './types';
+import { formatDistance, formatTime } from '../format/display';
 
 const TTL_MS = 5 * 60 * 1000;
 const POLL_MS = 5 * 60 * 1000;
@@ -111,8 +111,8 @@ export const quakesLayer: LayerDefinition = {
         return {
           title: `M${quake.magnitude.toFixed(1)} — ${quake.place}`,
           fields: [
-            { label: 'Time', value: formatUtcTimestamp(new Date(quake.time).toISOString()) },
-            { label: 'Depth', value: `${quake.depthKm.toFixed(1)} km` },
+            { label: 'Time', value: formatTime(quake.time) },
+            { label: 'Depth', value: formatDistance(quake.depthKm, 1) },
           ],
           detailUrl: quake.url || null,
         };

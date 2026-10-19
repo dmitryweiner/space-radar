@@ -1,7 +1,8 @@
 import { useLaunches } from '../../hooks/sharedResources';
 import type { CardComponentProps } from '../../settings/types';
 import { numberSetting } from '../../settings/values';
-import { formatUtcTimestamp } from '../formatTimestamp';
+import { formatTime } from '../../format/display';
+import { useGlobalSettings } from '../../settings/useGlobalSettings';
 
 const DEFAULT_COUNT = 8;
 
@@ -18,6 +19,7 @@ function statusColor(status: string): string {
 }
 
 export function LaunchesCard({ settings = {} }: CardComponentProps) {
+  useGlobalSettings(); // re-render when the time zone / units change
   const { data, loading, error } = useLaunches();
 
   if (loading) {
@@ -41,7 +43,7 @@ export function LaunchesCard({ settings = {} }: CardComponentProps) {
             <span className="launch-name">{launch.name}</span>
           </div>
           <div className="launch-list-details">
-            <span className="event-time">{formatUtcTimestamp(launch.net)}</span>
+            <span className="event-time">{formatTime(launch.net)}</span>
             {launch.provider && <span>{launch.provider}</span>}
             {launch.location && <span>{launch.location}</span>}
             {launch.detailUrl && (

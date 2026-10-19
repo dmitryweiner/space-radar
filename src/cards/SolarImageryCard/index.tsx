@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CardComponentProps } from '../../settings/types';
 import { listSetting } from '../../settings/values';
+import { useGlobalSettings } from '../../settings/useGlobalSettings';
 
 const REFRESH_MS = 15 * 60 * 1000;
 
@@ -12,7 +13,15 @@ interface ImageryLayer {
 
 // Direct <img> sources — no CORS/key needed. SDO publishes a fresh full-disk
 // image every ~15 min per wavelength; GOES-19 gives a live Earth full disk.
+// The data-saver setting swaps in SDO's 512 px and GOES' 678 px renditions.
 const SDO_BASE = 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_';
+const SDO_SMALL_BASE = 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_512_';
+const GOES_FULL = '1808x1808.jpg';
+const GOES_SMALL = '678x678.jpg';
+
+function smallUrl(url: string): string {
+  return url.replace(SDO_BASE, SDO_SMALL_BASE).replace(GOES_FULL, GOES_SMALL);
+}
 
 const SOLAR_IMAGERY_LAYERS: ImageryLayer[] = [
   { value: '0193', label: 'Corona 193Å', url: `${SDO_BASE}0193.jpg` },
@@ -28,6 +37,7 @@ const LAYERS_BY_VALUE = new Map(SOLAR_IMAGERY_LAYERS.map((layer) => [layer.value
 
 export function SolarImageryCard({ settings = {} }: CardComponentProps) {
   const selected = listSetting(settings, 'layers', ['0193']);
+  const { dataSaver } = useGlobalSettings();
   const [cacheBust, setCacheBust] = useState(() => Date.now());
 
   useEffect(() => {
@@ -48,7 +58,7 @@ export function SolarImageryCard({ settings = {} }: CardComponentProps) {
       <div className="solar-imagery-grid">
         {layers.map((layer) => (
           <figure key={layer.value} className="solar-imagery-item">
-            <img src={`${layer.url}?t=${cacheBust}`} alt={layer.label} className="solar-imagery-img" loading="lazy" />
+            <img src={`${dataSaver ? smallUrl(layer.url) : layer.url}?t=${cacheBust}`} alt={layer.label} className="solar-imagery-img" loading="lazy" />
             <figcaption className="solar-imagery-caption">{layer.label}</figcaption>
           </figure>
         ))}

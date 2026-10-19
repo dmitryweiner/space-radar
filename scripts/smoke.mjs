@@ -6,7 +6,7 @@
 // panel, the time scrubber, the Earth/Sun/Solar System tabs, hover-routed
 // keyboard zoom, Solar System fly-to, auto-rotate stop-only-on-move, the
 // general settings popup, the Earth style select, and the phone layout
-// (one-finger rotate + bottom sheet).
+// (one-finger rotate + bottom sheet, a panel's × returning to the list).
 //
 //   node scripts/smoke.mjs                    # full smoke
 //   node scripts/smoke.mjs --screenshot shots/smoke.png
@@ -302,6 +302,19 @@ ctxLabel = 'global-settings';
     await page.keyboard.press('Escape');
     await page.waitForTimeout(150);
     if ((await popup.count()) !== 0) errors.push('[global-settings] Escape did not close the popup');
+
+    // Local time reaches the scrubber's label; data saver toggles without errors.
+    const scrubberLabel = () => page.locator('.time-scrubber').innerText();
+    await page.locator('#generalSettingsBtn').click();
+    await page.locator('#global-setting-time-zone-local').check();
+    await page.locator('#global-setting-data-saver').check();
+    await page.waitForTimeout(300);
+    const localLabel = await scrubberLabel();
+    await page.locator('#global-setting-time-zone-utc').check();
+    await page.locator('#global-setting-data-saver').uncheck();
+    await page.keyboard.press('Escape');
+    if (/UTC/.test(localLabel)) errors.push(`[global-settings] local time did not reach the scrubber: ${localLabel}`);
+    else console.log('global-settings: local time + data saver ok');
   }
 }
 
@@ -356,6 +369,18 @@ ctxLabel = 'scene-phone';
   await phone.locator('.scene-sheet-tabs').getByRole('button', { name: 'Layers' }).click();
   if (!(await phone.getByRole('checkbox', { name: 'Earthquakes' }).isVisible())) errors.push('[scene-phone] Layers sheet did not open');
   else console.log('scene-phone: layers bottom sheet ok');
+  // An open panel keeps its × in view, and × goes back to the list — it
+  // doesn't close the whole sheet.
+  await phone.locator('.scene-sheet-tabs').getByRole('button', { name: 'Details' }).click();
+  await phone.locator('.panel-link', { hasText: 'Upcoming launches' }).click();
+  const closePanel = phone.getByRole('button', { name: 'Close panel' });
+  if (!(await closePanel.isVisible())) errors.push('[scene-phone] open panel has no visible × button');
+  else {
+    await closePanel.click();
+    if (!(await phone.locator('.scene-sheet-body .panel-link').first().isVisible()))
+      errors.push('[scene-phone] × on a panel did not return to the Details list');
+    else console.log('scene-phone: panel × returns to the Details list ok');
+  }
   await phoneContext.close();
 }
 

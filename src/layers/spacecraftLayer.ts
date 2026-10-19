@@ -8,6 +8,7 @@ import type { SolarMarker, SolarTrack } from '../render/solarSystemScene';
 import { listSetting, numberSetting } from '../settings/values';
 import { useClock } from './issLayer';
 import { isRecord, type SolarFrame, type SolarLayerDefinition } from './types';
+import { formatSpeed } from '../format/display';
 
 interface Spacecraft {
   /** JPL Horizons id. */
@@ -231,7 +232,7 @@ export const spacecraftLayer: SolarLayerDefinition = {
             { label: 'Agency · launched', value: `${craft.agency} · ${craft.launched}` },
             { label: 'From the Sun', value: `${fromSun.toFixed(fromSun < 10 ? 3 : 1)} AU` },
             { label: 'From Earth', value: `${fromEarth.toFixed(fromEarth < 10 ? 3 : 1)} AU · light ${formatLightTime(fromEarth)}` },
-            ...(speed !== null ? [{ label: 'Speed (vs Sun)', value: `${speed.toFixed(1)} km/s` }] : []),
+            ...(speed !== null ? [{ label: 'Speed (vs Sun)', value: formatSpeed(speed) }] : []),
           ],
           detailUrl: craft.url,
         };

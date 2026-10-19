@@ -1,8 +1,9 @@
 import { useKpIndex } from '../../hooks/sharedResources';
 import type { CardComponentProps } from '../../settings/types';
 import { numberSetting } from '../../settings/values';
-import { formatUtcTimestamp } from '../formatTimestamp';
 import { TimeAxis } from '../TimeAxis';
+import { formatTime } from '../../format/display';
+import { useGlobalSettings } from '../../settings/useGlobalSettings';
 
 const MAX_KP = 9;
 const CHART_HEIGHT = 80;
@@ -28,6 +29,7 @@ function kpStatus(kp: number): KpStatus {
 const DEFAULT_BAR_COUNT = 8;
 
 export function KpIndexCard({ settings = {} }: CardComponentProps) {
+  useGlobalSettings(); // re-render when the time zone / units change
   const { data, loading, error } = useKpIndex();
 
   if (loading) {
@@ -78,7 +80,7 @@ export function KpIndexCard({ settings = {} }: CardComponentProps) {
         Current: <strong>Kp {latest.kp.toFixed(2)}</strong> —{' '}
         <span style={{ color: status.color }}>{status.label}</span>
       </p>
-      <p className="chart-timestamp">As of {formatUtcTimestamp(latest.time)}</p>
+      <p className="chart-timestamp">As of {formatTime(latest.time)}</p>
     </div>
   );
 }

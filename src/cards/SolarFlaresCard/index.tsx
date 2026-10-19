@@ -4,6 +4,8 @@ import { fetchGoesFlares } from '../../api/swpc';
 import type { SpaceWeatherEvent } from '../../api/types';
 import type { CardComponentProps } from '../../settings/types';
 import { numberSetting } from '../../settings/values';
+import { formatTime } from '../../format/display';
+import { useGlobalSettings } from '../../settings/useGlobalSettings';
 
 const CACHE_KEY = 'space-radar:space-weather-events';
 const TTL_MS = 60 * 60 * 1000;
@@ -62,6 +64,7 @@ function badgeLabel(event: SpaceWeatherEvent): string {
 }
 
 export function SolarFlaresCard({ settings = {} }: CardComponentProps) {
+  useGlobalSettings(); // re-render when the time zone / units change
   const { data, loading, error } = useApiResource<SpaceWeatherEvent[]>({
     key: CACHE_KEY,
     ttlMs: TTL_MS,
@@ -87,7 +90,7 @@ export function SolarFlaresCard({ settings = {} }: CardComponentProps) {
           <span className="event-badge" style={{ backgroundColor: badgeColor(event) }}>
             {badgeLabel(event)}
           </span>
-          <span className="event-time">{event.time}</span>
+          <span className="event-time">{formatTime(event.time)}</span>
           {event.sourceLocation && <span className="event-location">{event.sourceLocation}</span>}
         </li>
       ))}

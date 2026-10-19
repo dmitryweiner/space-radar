@@ -42,6 +42,7 @@ interface EarthStageProps {
   earthStyle: string;
   labelScale: number;
   rotateSpeed: number;
+  dataSaver?: boolean;
   statesRef: LayerStatesRef;
   onStatus: OnLayerStatus;
   onSelect: (selection: LayerSelection) => void;
@@ -54,6 +55,7 @@ export function EarthStage({
   earthStyle,
   labelScale,
   rotateSpeed,
+  dataSaver = false,
   statesRef,
   onStatus,
   onSelect,
@@ -61,7 +63,7 @@ export function EarthStage({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [scene, setScene] = useState<EarthSceneHandle | null>(null);
   const [sceneError, setSceneError] = useState<string | null>(null);
-  const satelliteTexture = useGibsTexture(earthStyle === 'satellite');
+  const satelliteTexture = useGibsTexture(earthStyle === 'satellite', dataSaver);
   const onSelectRef = useRef(onSelect);
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -93,6 +95,9 @@ export function EarthStage({
   useEffect(() => {
     scene?.setAutoRotateSpeed(rotateSpeed);
   }, [scene, rotateSpeed]);
+  useEffect(() => {
+    scene?.setLowPower(dataSaver);
+  }, [scene, dataSaver]);
   useEffect(() => {
     scene?.setEarthStyle(earthStyle);
   }, [scene, earthStyle]);

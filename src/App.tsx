@@ -4,7 +4,7 @@ import { GlobalSettingsPopup } from './settings/GlobalSettingsPopup';
 import { SceneView } from './scene/SceneView';
 
 export function App() {
-  const { settings: globalSettings, updateLabelScale, updateRotateSpeed } = useGlobalSettings();
+  const globalSettings = useGlobalSettings();
   const [generalSettingsOpen, setGeneralSettingsOpen] = useState(false);
 
   useEffect(() => {
@@ -36,14 +36,14 @@ export function App() {
           <span className="tb-btn-label-short">Settings</span>
         </button>
       </header>
-      <SceneView labelScale={globalSettings.labelScale} rotateSpeed={globalSettings.rotateSpeed} />
+      <SceneView
+        labelScale={globalSettings.labelScale}
+        rotateSpeed={globalSettings.rotateSpeed}
+        dataSaver={globalSettings.dataSaver}
+        startScene={globalSettings.startScene}
+      />
       {generalSettingsOpen && (
-        <GlobalSettingsPopup
-          settings={globalSettings}
-          onChangeLabelScale={updateLabelScale}
-          onChangeRotateSpeed={updateRotateSpeed}
-          onClose={() => setGeneralSettingsOpen(false)}
-        />
+        <GlobalSettingsPopup settings={globalSettings} onClose={() => setGeneralSettingsOpen(false)} />
       )}
     </div>
   );

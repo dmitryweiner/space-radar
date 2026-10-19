@@ -137,6 +137,40 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.settings-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
+.settings-toggle {
+  cursor: pointer;
+}
+
+.settings-field.settings-toggle input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.settings-reset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.settings-reset-confirm {
+  border-color: var(--status-critical);
+  color: var(--status-critical);
 }
 
 .settings-popup-header {
@@ -903,22 +937,43 @@ body {
 
 .sun-stage {
   padding: 12px;
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-auto-rows: min-content;
+  gap: 12px;
+}
+
+.sun-tile {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 12px;
+  min-width: 0;
+  color: var(--text-dim);
+}
+
+/* Charts fill their parent's height, so chart tiles get a fixed one. */
+.sun-tile-body {
+  height: 260px;
   display: flex;
+  flex-direction: column;
 }
 
-.sun-stage > * {
+.sun-tile-body > * {
   flex: 1;
+  min-height: 0;
 }
 
-.sun-stage .solar-imagery-grid {
-  grid-template-columns: 1fr;
-  height: 100%;
+.sun-tile-flares .sun-tile-body,
+.sun-tile-sun-images .sun-tile-body {
+  height: auto;
 }
 
-.sun-stage img {
-  max-height: 100%;
-  object-fit: contain;
+.sun-tile-flares .sun-tile-body {
+  max-height: 360px;
+  overflow-y: auto;
 }
 
 .panel-heading {
@@ -1258,6 +1313,32 @@ body {
   min-height: 0;
 }
 
+/* An open panel fills the sheet with its own (single) scroller, so its
+   header — and the × back to the list — never scrolls away. */
+.scene-sheet-panel {
+  height: 55vh;
+  height: 55dvh;
+}
+
+.scene-sheet-panel .scene-sheet-body,
+.scene-sheet-panel .inspector {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scene-sheet-panel .inspector-panel-body {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+.scene-view-narrow .sun-stage {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 8px;
+}
+
 @media (max-width: 700px) {
   #topbar {
     gap: 8px;
@@ -1267,4 +1348,12 @@ body {
 .status-chip-unavailable .status-chip-value {
   color: var(--text-dim);
   font-weight: 400;
+}
+
+/* General settings' radio groups are short — lay them out in a row. */
+.settings-popup .settings-checkbox-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  max-height: none;
 }

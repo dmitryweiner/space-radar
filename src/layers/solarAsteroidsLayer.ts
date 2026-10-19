@@ -4,11 +4,11 @@ import { distanceAu, fromMeanAnomaly, msToJd, orbitPath, orbitPosition, orbitalP
 import { lunarDistances } from '../astro/flyby';
 import { earthPositionAt } from '../astro/planetPositions';
 import type { SolarMarker, SolarTrack } from '../render/solarSystemScene';
-import { formatUtcTimestamp } from '../cards/formatTimestamp';
 import { numberSetting } from '../settings/values';
 import { useClock } from './issLayer';
 import { closestFlybys, relativeTime, shortName, type Flyby } from './neoFlybyLayer';
 import type { SolarFrame, SolarLayerDefinition } from './types';
+import { formatDiameter, formatDistance, formatTime } from '../format/display';
 
 // The same NeoWs close approaches as the Earth "Asteroid flybys" layer (shared
 // request), but on their real heliocentric orbits from the JPL elements NeoWs
@@ -97,15 +97,15 @@ export const solarAsteroidsLayer: SolarLayerDefinition = {
         return {
           title: asteroid.name,
           fields: [
-            { label: 'Closest approach', value: `${formatUtcTimestamp(new Date(flyby.closeApproachMs).toISOString())} (${relativeTime(flyby.closeApproachMs - nowMs)})` },
-            { label: 'Miss distance', value: `${Math.round(asteroid.missDistanceKm).toLocaleString()} km · ${lunarDistances(asteroid.missDistanceKm).toFixed(2)} LD` },
+            { label: 'Closest approach', value: `${formatTime(flyby.closeApproachMs)} (${relativeTime(flyby.closeApproachMs - nowMs)})` },
+            { label: 'Miss distance', value: `${formatDistance(asteroid.missDistanceKm)} · ${lunarDistances(asteroid.missDistanceKm).toFixed(2)} LD` },
             { label: 'From Earth now', value: `${fromEarth.toFixed(4)} AU` },
             { label: 'From the Sun', value: `${fromSun.toFixed(3)} AU` },
             {
               label: 'Orbit',
               value: `${a !== undefined ? `a ${a.toFixed(2)} AU · ` : ''}e ${elements.e.toFixed(2)} · i ${elements.i.toFixed(1)}°${period !== null ? ` · ${(period / 365.25).toFixed(2)} yr` : ''}`,
             },
-            { label: 'Diameter', value: `${asteroid.diameterMinKm.toFixed(2)}–${asteroid.diameterMaxKm.toFixed(2)} km` },
+            { label: 'Diameter', value: formatDiameter(asteroid.diameterMinKm, asteroid.diameterMaxKm) },
             { label: 'Hazardous', value: asteroid.hazardous ? 'Yes (PHA)' : 'No' },
             ...(asteroid.orbitClass ? [{ label: 'Orbit class', value: asteroid.orbitClass }] : []),
           ],

@@ -4,8 +4,8 @@ import type { LayerTime } from '../layers/types';
 import { markerFocusKey } from '../render/solarSystemScene';
 import { SolarStage } from './SolarStage';
 import { SPACECRAFT } from '../layers/spacecraftLayer';
-import { SolarImageryCard } from '../cards/SolarImageryCard';
 import { EarthStage } from './EarthStage';
+import { SunStage } from './SunStage';
 import type { LayerSelection, LayerStatesRef, LayerStatusMap } from './layerHost';
 import { LayerPanel } from './LayerPanel';
 import { Inspector } from './Inspector';
@@ -14,6 +14,7 @@ import { TimeScrubber } from './TimeScrubber';
 import { useSceneState } from './useSceneState';
 import type { InspectorPanelId } from './panels';
 import type { SceneId } from './sceneState';
+import type { StartScene } from '../settings/globalSettings';
 
 // Matches the 700px phone breakpoint in style.css.
 const NARROW_QUERY = '(max-width: 700px)';
@@ -62,17 +63,22 @@ type Sheet = 'closed' | 'layers' | 'details';
 interface SceneViewProps {
   labelScale: number;
   rotateSpeed: number;
+  /** Low-power rendering (30 fps, 1× pixel ratio) and smaller textures. */
+  dataSaver?: boolean;
+  /** The "Open on" setting; only read on mount. */
+  startScene?: StartScene;
 }
 
 // The whole UI: one big scene (Earth / Sun / Solar System) with every
 // geographic source as a toggleable layer on a single globe, a shared time
 // cursor, a status strip, and an inspector for details.
-export function SceneView({ labelScale, rotateSpeed }: SceneViewProps) {
+export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startScene = 'last' }: SceneViewProps) {
   const { state, setScene, toggle, toggleSolar, setLayerSetting, setEarthStyle } = useSceneState(
     KNOWN_LAYERS,
     DEFAULT_ENABLED_LAYERS,
     KNOWN_SOLAR_LAYERS,
     DEFAULT_SOLAR_LAYERS,
+    startScene === 'last' ? null : startScene,
   );
   const [time, setTime] = useState<LayerTime>(null);
   const [selection, setSelection] = useState<LayerSelection | null>(null);
@@ -116,10 +122,15 @@ export function SceneView({ labelScale, rotateSpeed }: SceneViewProps) {
     setSheet('details');
   }
 
+  // Back to the inspector's overview; the sheet (on phones) stays open.
   function closeDetails() {
     setSelection(null);
     setPanel(null);
-    if (narrow) setSheet('closed');
+  }
+
+  function changeScene(id: SceneId) {
+    setScene(id);
+    setSelection(null);
   }
 
   const craftSetting = state.layerSettings.spacecraft?.craft;
@@ -139,20 +150,21 @@ export function SceneView({ labelScale, rotateSpeed }: SceneViewProps) {
         earthStyle={state.earthStyle}
         labelScale={labelScale}
         rotateSpeed={rotateSpeed}
+        dataSaver={dataSaver}
         statesRef={statesRef}
         onStatus={onStatus}
         onSelect={select}
       />
     ) : state.scene === 'sun' ? (
-      <div className="sun-stage">
-        <SolarImageryCard settings={{ layers: ['0193'] }} />
-      </div>
+      <SunStage />
     ) : (
       <SolarStage
         layers={enabledSolarLayers}
         layerSettings={state.layerSettings}
         time={time}
         focus={solarFocus}
+        labelScale={labelScale}
+        dataSaver={dataSaver}
         onFocusChange={setSolarFocus}
         statesRef={statesRef}
         onStatus={onStatus}
@@ -176,8 +188,8 @@ export function SceneView({ labelScale, rotateSpeed }: SceneViewProps) {
       <div className="layer-panel">
         <h2 className="panel-heading">The Sun</h2>
         <p className="card-status">
-          The Sun right now in extreme ultraviolet (SDO, 193 Å). Flares, sunspot regions and the solar cycle are in the
-          panels on the right.
+          The Sun right now in extreme ultraviolet (SDO, 193 Å), with its flares and CMEs, the solar wind, the solar
+          cycle and other wavelengths below the image. How Earth responds (Kp, NOAA scales, aurora) is under Details.
         </p>
       </div>
     ) : (
@@ -255,6 +267,7 @@ export function SceneView({ labelScale, rotateSpeed }: SceneViewProps) {
       statuses={statuses}
       statesRef={statesRef}
       onOpenPanel={openPanel}
+      onShowSun={() => changeScene('sun')}
       onClose={closeDetails}
     />
   );
@@ -273,10 +286,7 @@ export function SceneView({ labelScale, rotateSpeed }: SceneViewProps) {
               role="tab"
               aria-selected={state.scene === tab.id}
               className={state.scene === tab.id ? 'scene-tab scene-tab-active' : 'scene-tab'}
-              onClick={() => {
-                setScene(tab.id);
-                setSelection(null);
-              }}
+              onClick={() => changeScene(tab.id)}
             >
               {tab.label}
             </button>
@@ -294,14 +304,17 @@ export function SceneView({ labelScale, rotateSpeed }: SceneViewProps) {
         {!narrow && <aside className="scene-side scene-inspector">{inspector}</aside>}
       </div>
       {narrow && (
-        <div className={`scene-sheet scene-sheet-${sheet}`} data-testid="scene-sheet">
+        <div
+          className={`scene-sheet scene-sheet-${sheet}${sheet === 'details' && panel ? ' scene-sheet-panel' : ''}`}
+          data-testid="scene-sheet"
+        >
           <div className="scene-sheet-tabs">
             <button
               type="button"
               className={sheet === 'layers' ? 'scene-tab scene-tab-active' : 'scene-tab'}
               onClick={() => setSheet((s) => (s === 'layers' ? 'closed' : 'layers'))}
             >
-              {state.scene === 'earth' ? 'Layers' : 'About'}
+              {state.scene === 'sun' ? 'About' : 'Layers'}
             </button>
             <button
               type="button"

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { computeMoonInfo } from '../../astro/moonInfo';
+import { formatDistance, formatTime } from '../../format/display';
+import { useGlobalSettings } from '../../settings/useGlobalSettings';
 
 const REFRESH_MS = 60 * 1000;
 const R = 40;
@@ -8,13 +10,8 @@ const CY = 50;
 const BRIGHT = '#d8dcf0';
 const DARK = '#161c30';
 
-function formatDate(iso: string): string {
-  return iso.slice(0, 10);
-}
-
-function formatKm(km: number): string {
-  return `${Math.round(km).toLocaleString('en-US')} km`;
-}
+const formatDate = (iso: string) => formatTime(iso);
+const formatKm = (km: number) => formatDistance(km);
 
 // Two-shape phase disc: a bright semicircle on the lit side, then a centred
 // ellipse (bright for gibbous, dark for crescent) whose width encodes the
@@ -25,6 +22,7 @@ function litSemicircle(waxing: boolean): string {
 }
 
 export function MoonCard() {
+  useGlobalSettings(); // re-render when the time zone / units change
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {

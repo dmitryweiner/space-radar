@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { GIBS_NIGHT_LIGHTS_URL } from '../api/gibs';
+import { GIBS_FULL_WIDTH, GIBS_SAVER_WIDTH, gibsNightLightsUrl } from '../api/gibs';
+import { useGlobalSettings } from '../settings/useGlobalSettings';
 import type { LayerDefinition } from './types';
 
 // City lights on the night side (NASA GIBS VIIRS Black Marble). Follows the
@@ -9,7 +10,11 @@ export const nightLightsLayer: LayerDefinition = {
   title: 'Night lights',
   color: '#ffd27a',
   useLayer() {
-    const frame = useMemo(() => ({ nightLights: GIBS_NIGHT_LIGHTS_URL }), []);
+    const { dataSaver } = useGlobalSettings();
+    const frame = useMemo(
+      () => ({ nightLights: gibsNightLightsUrl(dataSaver ? GIBS_SAVER_WIDTH : GIBS_FULL_WIDTH) }),
+      [dataSaver],
+    );
     return {
       frame,
       loading: false,

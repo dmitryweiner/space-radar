@@ -13,6 +13,7 @@ import { SolarCycleCard } from '../cards/SolarCycleCard';
 import { SolarImageryCard } from '../cards/SolarImageryCard';
 import { NasaImagesCard } from '../cards/NasaImagesCard';
 import { useNoaaScales, usePeopleInSpace } from '../hooks/sharedResources';
+import { formatTime } from '../format/display';
 
 // Detail panels the inspector can open (from a status-bar chip or the widget
 // menu). Most are the self-contained components in src/cards/.
@@ -41,7 +42,7 @@ function ScalesPanel() {
         </div>
       ))}
       <p className="card-status">
-        NOAA scales run 0 (none) to 5 (extreme). Observed {data.observedAt} UTC.{' '}
+        NOAA scales run 0 (none) to 5 (extreme). Observed {formatTime(data.observedAt)}.{' '}
         <a className="detail-link" href="https://www.swpc.noaa.gov/noaa-scales-explanation" target="_blank" rel="noreferrer">
           About the scales ↗
         </a>
@@ -108,6 +109,11 @@ export const INSPECTOR_PANELS: InspectorPanel[] = [
   { id: 'sun-images', title: 'The Sun in other wavelengths', component: SolarImageryCard, settings: { layers: ['0171', '0304', 'HMIIF', 'HMIB'] } },
   { id: 'nasa-images', title: 'NASA image library', component: NasaImagesCard },
 ];
+
+// Panels about the Sun itself: shown on the Sun tab's stage rather than in
+// the inspector's "More" list. (Kp, the NOAA scales and the aurora forecast
+// are Earth's response, so they stay in the inspector.)
+export const SUN_PANELS: InspectorPanelId[] = ['flares', 'wind', 'solar-cycle', 'sun-images'];
 
 export function panelById(id: InspectorPanelId): InspectorPanel | undefined {
   return INSPECTOR_PANELS.find((panel) => panel.id === id);

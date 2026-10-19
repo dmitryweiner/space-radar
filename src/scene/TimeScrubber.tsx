@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LayerTime } from '../layers/types';
+import { formatTime } from '../format/display';
 
 const HOUR_MS = 60 * 60 * 1000;
 // ±7 days — the default asteroid-flyby window, so every pass in view can be
@@ -16,10 +17,6 @@ function speedLabel(speed: number): string {
   return '1 min/s';
 }
 
-export function formatUtc(ms: number): string {
-  return `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
-}
-
 interface TimeScrubberProps {
   time: LayerTime;
   onChange: (time: LayerTime) => void;
@@ -27,7 +24,7 @@ interface TimeScrubberProps {
 
 // The shared time cursor: "Live" (null) by default; dragging or playing sets a
 // fixed instant that every time-aware layer (satellites, terminator, flybys,
-// Moon) follows. Times are UTC throughout — the app's convention.
+// Moon) follows. Shown in UTC or local time per the general settings.
 export function TimeScrubber({ time, onChange }: TimeScrubberProps) {
   const [speed, setSpeed] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -102,7 +99,7 @@ export function TimeScrubber({ time, onChange }: TimeScrubberProps) {
         {speed === null ? '▶' : `▶ ${speedLabel(speed)}`}
       </button>
       <span className="time-label" data-testid="time-label">
-        {formatUtc(shown)}
+        {formatTime(shown)}
         {time !== null && (
           <span className="time-offset">
             {' '}

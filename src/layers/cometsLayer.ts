@@ -5,11 +5,11 @@ import type { Comet } from '../api/types';
 import { distanceAu, jdToMs, msToJd, orbitPath, orbitPosition, orbitalPeriodDays } from '../astro/kepler';
 import { earthPositionAt } from '../astro/planetPositions';
 import type { SolarMarker, SolarTrack } from '../render/solarSystemScene';
-import { formatUtcTimestamp } from '../cards/formatTimestamp';
 import { listSetting, numberSetting } from '../settings/values';
 import { useClock } from './issLayer';
 import { relativeTime } from './neoFlybyLayer';
 import { isRecord, type SolarFrame, type SolarLayerDefinition } from './types';
+import { formatTime } from '../format/display';
 
 const ACTIVE_COLOR = 0x6fe3ff;
 const FAMOUS_COLOR = 0xb9a6ff;
@@ -148,7 +148,7 @@ export const cometsLayer: SolarLayerDefinition = {
         return {
           title: comet.name,
           fields: [
-            { label: 'Perihelion', value: `${formatUtcTimestamp(new Date(perihelionMs).toISOString())} (${relativeTime(perihelionMs - nowMs)}) at ${comet.q.toFixed(2)} AU` },
+            { label: 'Perihelion', value: `${formatTime(perihelionMs)} (${relativeTime(perihelionMs - nowMs)}) at ${comet.q.toFixed(2)} AU` },
             { label: 'From the Sun', value: `${fromSun.toFixed(2)} AU` },
             { label: 'From Earth', value: `${fromEarth.toFixed(2)} AU` },
             { label: 'Eccentricity', value: comet.e.toFixed(4) },

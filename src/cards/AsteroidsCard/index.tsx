@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useApiResource } from '../../hooks/useApiResource';
 import { fetchAsteroids } from '../../api/neows';
 import type { Asteroid } from '../../api/types';
+import { formatDiameter, formatDistance, formatSpeedPerHour } from '../../format/display';
+import { useGlobalSettings } from '../../settings/useGlobalSettings';
 
 const CACHE_KEY = 'space-radar:asteroids';
 const TTL_MS = 60 * 60 * 1000;
@@ -58,6 +60,7 @@ function compareValues(a: Asteroid, b: Asteroid, key: SortKey): number {
 }
 
 export function AsteroidsCard() {
+  useGlobalSettings(); // re-render when the time zone / units change
   const { data, loading, error } = useApiResource<Asteroid[]>({
     key: CACHE_KEY,
     ttlMs: TTL_MS,
@@ -113,10 +116,10 @@ export function AsteroidsCard() {
               )}
             </td>
             <td>{asteroid.closeApproachDate}</td>
-            <td>{Math.round(asteroid.missDistanceKm).toLocaleString()} km</td>
-            <td>{Math.round(asteroid.relativeVelocityKmH).toLocaleString()} km/h</td>
+            <td>{formatDistance(asteroid.missDistanceKm)}</td>
+            <td>{formatSpeedPerHour(asteroid.relativeVelocityKmH)}</td>
             <td>
-              {asteroid.diameterMinKm.toFixed(2)}–{asteroid.diameterMaxKm.toFixed(2)} km
+              {formatDiameter(asteroid.diameterMinKm, asteroid.diameterMaxKm)}
             </td>
             <td>
               <span

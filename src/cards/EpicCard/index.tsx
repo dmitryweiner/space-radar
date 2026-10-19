@@ -4,7 +4,8 @@ import { fetchEpic } from '../../api/epic';
 import type { EpicFrame } from '../../api/types';
 import type { CardComponentProps } from '../../settings/types';
 import { numberSetting } from '../../settings/values';
-import { formatUtcTimestamp } from '../formatTimestamp';
+import { formatTime } from '../../format/display';
+import { useGlobalSettings } from '../../settings/useGlobalSettings';
 
 const CACHE_KEY = 'space-radar:epic';
 const TTL_MS = 60 * 60 * 1000;
@@ -34,13 +35,13 @@ function isEpicFrames(value: unknown): value is EpicFrame[] {
   );
 }
 
-// EPIC's `date` is a UTC "YYYY-MM-DD hh:mm:ss" string; reuse the shared UTC
-// formatter (it accepts a space separator) for the caption.
+// EPIC's `date` is a UTC "YYYY-MM-DD hh:mm:ss" string.
 function frameTime(date: string): string {
-  return formatUtcTimestamp(date);
+  return formatTime(date);
 }
 
 export function EpicCard({ settings = {} }: CardComponentProps) {
+  useGlobalSettings(); // re-render when the time zone / units change
   const frameSeconds = numberSetting(settings, 'frameSeconds', DEFAULT_FRAME_SECONDS);
   const { data, loading, error } = useApiResource<EpicFrame[]>({
     key: CACHE_KEY,

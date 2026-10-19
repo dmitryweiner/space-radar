@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { LayerInfo, MarkerDetails } from '../layers/types';
 import type { LayerSelection, LayerStatesRef, LayerStatusMap } from './layerHost';
-import { INSPECTOR_PANELS, panelById, type InspectorPanelId } from './panels';
+import { INSPECTOR_PANELS, SUN_PANELS, panelById, type InspectorPanelId } from './panels';
 import type { SceneId } from './sceneState';
 import { computeMoonInfo } from '../astro/moonInfo';
 
@@ -10,7 +10,7 @@ const SDO_193_THUMB = 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_512_01
 // Panels worth suggesting first for each scene.
 const SCENE_PANELS: Record<SceneId, InspectorPanelId[]> = {
   earth: ['aurora-forecast', 'epic', 'launches', 'asteroids', 'moon', 'apod'],
-  sun: ['flares', 'sun-images', 'solar-cycle', 'wind', 'kp', 'scales'],
+  sun: ['kp', 'scales', 'aurora-forecast'],
   'solar-system': ['asteroids', 'moon', 'apod', 'nasa-images', 'launches'],
 };
 
@@ -22,6 +22,7 @@ interface InspectorProps {
   statuses: LayerStatusMap;
   statesRef: LayerStatesRef;
   onOpenPanel: (panel: InspectorPanelId) => void;
+  onShowSun: () => void;
   onClose: () => void;
 }
 
@@ -51,7 +52,7 @@ function MoonWidget() {
   );
 }
 
-export function Inspector({ scene, selection, panel, layers, statuses, statesRef, onOpenPanel, onClose }: InspectorProps) {
+export function Inspector({ scene, selection, panel, layers, statuses, statesRef, onOpenPanel, onShowSun, onClose }: InspectorProps) {
   const details = useLiveDetails(selection, statesRef);
   const openPanel = panel ? panelById(panel) : undefined;
 
@@ -101,7 +102,7 @@ export function Inspector({ scene, selection, panel, layers, statuses, statesRef
   }
 
   const suggested = SCENE_PANELS[scene];
-  const others = INSPECTOR_PANELS.filter((p) => !suggested.includes(p.id));
+  const others = INSPECTOR_PANELS.filter((p) => !suggested.includes(p.id) && !SUN_PANELS.includes(p.id));
   return (
     <div className="inspector" data-testid="inspector">
       {scene !== 'sun' && (
@@ -131,9 +132,11 @@ export function Inspector({ scene, selection, panel, layers, statuses, statesRef
       <section className="inspector-section">
         <h2 className="panel-heading">Now</h2>
         <MoonWidget />
-        <button type="button" className="widget-sun" onClick={() => onOpenPanel('sun-images')} title="The Sun right now (SDO, 193 Å)">
-          <img src={SDO_193_THUMB} alt="The Sun right now, SDO 193 Å" loading="lazy" />
-        </button>
+        {scene !== 'sun' && (
+          <button type="button" className="widget-sun" onClick={onShowSun} title="The Sun right now (SDO, 193 Å) — open the Sun tab">
+            <img src={SDO_193_THUMB} alt="The Sun right now, SDO 193 Å" loading="lazy" />
+          </button>
+        )}
       </section>
       <section className="inspector-section">
         <h2 className="panel-heading">More</h2>

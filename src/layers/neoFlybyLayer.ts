@@ -13,9 +13,9 @@ import { geodeticToSceneVector, type SceneVector3 } from '../astro/coords';
 import { sublunarPoint } from '../astro/subsolar';
 import { EARTH_RADIUS_UNITS, type GlobeMarker, type GlobeTrack } from '../render/earthScene';
 import { numberSetting } from '../settings/values';
-import { formatUtcTimestamp } from '../cards/formatTimestamp';
 import { useClock } from './issLayer';
 import type { LayerDefinition, LayerFrame } from './types';
+import { formatDiameter, formatDistance, formatSpeed, formatTime } from '../format/display';
 
 const DEFAULT_WINDOW_DAYS = 7;
 const DEFAULT_MAX_OBJECTS = 15;
@@ -184,7 +184,7 @@ export const neoFlybyLayer: LayerDefinition = {
         if (hit.id === MOON_MARKER_ID) {
           return {
             title: 'Moon',
-            fields: [{ label: 'Distance', value: '≈384,400 km (1 lunar distance)' }],
+            fields: [{ label: 'Distance', value: `≈${formatDistance(384_400)} (1 lunar distance)` }],
           };
         }
         const flyby = flybys.find((f) => f.id === hit.id);
@@ -197,11 +197,11 @@ export const neoFlybyLayer: LayerDefinition = {
         return {
           title: asteroid.name,
           fields: [
-            { label: 'Closest approach', value: `${formatUtcTimestamp(new Date(flyby.closeApproachMs).toISOString())} (${relativeTime(flyby.closeApproachMs - nowMs)})` },
-            { label: 'Miss distance', value: `${Math.round(asteroid.missDistanceKm).toLocaleString()} km · ${lunarDistances(asteroid.missDistanceKm).toFixed(2)} LD` },
-            { label: 'Distance now', value: `${Math.round(distanceNow).toLocaleString()} km` },
-            { label: 'Speed', value: `${flyby.speedKmS.toFixed(1)} km/s` },
-            { label: 'Diameter', value: `${asteroid.diameterMinKm.toFixed(2)}–${asteroid.diameterMaxKm.toFixed(2)} km` },
+            { label: 'Closest approach', value: `${formatTime(flyby.closeApproachMs)} (${relativeTime(flyby.closeApproachMs - nowMs)})` },
+            { label: 'Miss distance', value: `${formatDistance(asteroid.missDistanceKm)} · ${lunarDistances(asteroid.missDistanceKm).toFixed(2)} LD` },
+            { label: 'Distance now', value: formatDistance(distanceNow) },
+            { label: 'Speed', value: formatSpeed(flyby.speedKmS) },
+            { label: 'Diameter', value: formatDiameter(asteroid.diameterMinKm, asteroid.diameterMaxKm) },
             { label: 'Hazardous', value: asteroid.hazardous ? 'Yes (PHA)' : 'No' },
             ...(asteroid.orbitClass ? [{ label: 'Orbit class', value: asteroid.orbitClass }] : []),
             ...(asteroid.orbitUncertainty !== undefined && asteroid.orbitUncertainty !== null

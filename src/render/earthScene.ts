@@ -8,6 +8,7 @@ import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
 import { makeTrail, type TrailLine } from './trailLine';
 import { attachKeyboardZoom } from './orbitControlsExtras';
+import { createFrameGate, pixelRatioFor } from './lowPower';
 
 export const EARTH_RADIUS_UNITS = 2;
 
@@ -125,8 +126,10 @@ export interface EarthSceneHandle {
   layer(id: string): EarthLayerHandle;
   removeLayer(id: string): void;
   /** Multiplies every label/marker's on-screen pixel size (see the global
-   * "Globe label size" setting). 1 = the base sizes below. */
+   * "Label size" setting). 1 = the base sizes below. */
   setLabelScale(scale: number): void;
+  /** Data saver: 30 fps cap and a 1× pixel ratio. */
+  setLowPower(lowPower: boolean): void;
   /** 'globe' (default): photo texture lit by a directional "sun" light, so
    * there's a day/night terminator. 'map': flat, evenly-lit political map —
    * no shadow hiding markers on the dark side. 'satellite': a recent NASA
@@ -166,8 +169,9 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   camera.position.set(0, 2, 7);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(pixelRatioFor(false));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  const frameGate = createFrameGate();
 
   // The FOV is vertical, so on a tall, narrow canvas (a phone in portrait) a
   // globe framed for a landscape canvas overflows the sides. Until the user
@@ -375,7 +379,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   const scratch = new THREE.Vector3();
   const FOV_TAN = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
 
-  // User-controlled multiplier (the global "Globe label size" setting) on top
+  // User-controlled multiplier (the global "Label size" setting) on top
   // of the base pixel sizes below — applied here so every label/marker picks
   // it up every frame without threading it through each call site.
   let labelScale = 1;
@@ -845,6 +849,9 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   function animate() {
     frameId = requestAnimationFrame(animate);
     const now = performance.now();
+    if (!frameGate.shouldRender(now)) {
+      return;
+    }
     const deltaSeconds = Math.min((now - lastFrameTime) / 1000, MAX_DELTA_SECONDS);
     lastFrameTime = now;
     controls.update(deltaSeconds);
@@ -877,6 +884,15 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       if (content) {
         content.dispose();
         layers.delete(id);
+      }
+    },
+    setLowPower(lowPower) {
+      frameGate.setLowPower(lowPower);
+      renderer.setPixelRatio(pixelRatioFor(lowPower));
+      applySize();
+      // Point sizes are in framebuffer px (× pixel ratio) — re-derive them.
+      for (const content of layers.values()) {
+        content.applyLabelScale();
       }
     },
     setLabelScale(scale) {

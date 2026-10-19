@@ -24,6 +24,7 @@ import ioTextureUrl from '../assets/planets/io.jpg';
 import europaTextureUrl from '../assets/planets/europa.jpg';
 import ganymedeTextureUrl from '../assets/planets/ganymede.jpg';
 import callistoTextureUrl from '../assets/planets/callisto.jpg';
+import { createFrameGate, pixelRatioFor } from './lowPower';
 
 const UNITS_PER_AU = 6;
 
@@ -211,6 +212,11 @@ export interface SolarSystemSceneHandle {
   /** Fires whenever the focus changes (a click, focusBody, or the focused
    * marker disappearing), and on every click on a body. */
   setOnFocusChange(handler: ((focus: SolarFocus | null) => void) | null): void;
+  /** Multiplier on every label's and layer marker's on-screen pixel size
+   * (the general "label size" setting). */
+  setLabelScale(scale: number): void;
+  /** Data saver: 30 fps cap and a 1× pixel ratio. */
+  setLowPower(lowPower: boolean): void;
   resize(): void;
   dispose(): void;
 }
@@ -314,7 +320,8 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   camera.position.copy(OVERVIEW_POSITION);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(pixelRatioFor(false));
+  const frameGate = createFrameGate();
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   function applySize() {
@@ -598,12 +605,13 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   // ---- per frame ------------------------------------------------------------
 
   const cameraUp = new THREE.Vector3();
+  let labelScale = 1;
   // Label just above its body on screen, whatever the zoom or view direction.
   function placeLabel(body: Body) {
     const distance = camera.position.distanceTo(body.mesh.position);
     const perPx = worldPerPixel(distance);
     if (body.markerPx) {
-      body.radius = body.markerPx * perPx;
+      body.radius = body.markerPx * labelScale * perPx;
       body.mesh.scale.setScalar(body.radius);
     }
     if (!body.label) {
@@ -613,14 +621,18 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
     if (!body.label.sprite.visible) {
       return;
     }
-    const lift = body.radius + (body.labelPx / 2 + LABEL_GAP_PX) * perPx;
+    const labelPx = body.labelPx * labelScale;
+    const lift = body.radius + (labelPx / 2 + LABEL_GAP_PX) * perPx;
     body.label.sprite.position.copy(body.mesh.position).addScaledVector(cameraUp, lift);
-    scaleLabelToScreen(body.label, camera, canvas.clientHeight, body.labelPx);
+    scaleLabelToScreen(body.label, camera, canvas.clientHeight, labelPx);
   }
 
   let frameId = 0;
   function animate(now: number) {
     frameId = requestAnimationFrame(animate);
+    if (!frameGate.shouldRender(now)) {
+      return;
+    }
     updateCamera(now);
     controls.update();
     updateNearPlane();
@@ -780,6 +792,14 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   }
 
   return {
+    setLabelScale(scale) {
+      labelScale = scale;
+    },
+    setLowPower(lowPower) {
+      frameGate.setLowPower(lowPower);
+      renderer.setPixelRatio(pixelRatioFor(lowPower));
+      applySize();
+    },
     layer(id) {
       return layerHandle(id);
     },

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useKpIndex, useLaunches, useNoaaScales, usePeopleInSpace, useSolarWind } from '../hooks/sharedResources';
 import type { InspectorPanelId } from './panels';
+import { formatSpeed } from '../format/display';
 
 // The "at a glance" strip: the handful of numbers worth seeing without opening
 // anything. Each chip opens its detail panel in the inspector.
@@ -86,7 +87,7 @@ export function StatusBar({ onOpen }: { onOpen: (panel: InspectorPanelId) => voi
       />
       <Chip
         label="Wind"
-        value={latestSpeed !== null ? `${Math.round(latestSpeed)} km/s` : wind.error ? UNAVAILABLE : dash}
+        value={latestSpeed !== null ? formatSpeed(latestSpeed, 0) : wind.error ? UNAVAILABLE : dash}
         title={wind.error ?? 'Solar wind speed at L1'}
         onClick={() => onOpen('wind')}
       />

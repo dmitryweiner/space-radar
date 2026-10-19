@@ -3,10 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { act } from '@testing-library/react';
 import { App } from '../src/App';
 import { createEarthScene } from '../src/render/earthScene';
+import { reloadGlobalSettings } from '../src/settings/useGlobalSettings';
 
 vi.mock('../src/render/earthScene', () => ({
   createEarthScene: vi.fn(() => ({
     setLabelScale: vi.fn(),
+    setLowPower: vi.fn(),
     setEarthStyle: vi.fn(),
     setAutoRotateSpeed: vi.fn(),
     setOnMarkerClick: vi.fn(),
@@ -39,6 +41,8 @@ vi.mock('../src/render/solarSystemScene', () => ({
     setOrientations: vi.fn(),
     focusBody: vi.fn(),
     setOnFocusChange: vi.fn(),
+    setLabelScale: vi.fn(),
+    setLowPower: vi.fn(),
     layer: vi.fn(() => ({ setMarkers: vi.fn(), setTracks: vi.fn(), setVisible: vi.fn() })),
     removeLayer: vi.fn(),
     resize: vi.fn(),
@@ -48,6 +52,7 @@ vi.mock('../src/render/solarSystemScene', () => ({
 
 beforeEach(() => {
   window.localStorage.clear();
+  reloadGlobalSettings();
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('no network in tests')));
 });
 
@@ -67,6 +72,23 @@ describe('App', () => {
     expect(screen.getByTestId('status-bar')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'ISS & satellites' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Active fires' })).not.toBeChecked();
+  });
+
+  it('opens on the tab chosen in "Open on", whatever tab was last used', () => {
+    window.localStorage.setItem('space-radar:scene:v1', JSON.stringify({ scene: 'earth' }));
+    window.localStorage.setItem('space-radar:global-settings:v1', JSON.stringify({ startScene: 'sun' }));
+    reloadGlobalSettings();
+    render(<App />);
+    expect(screen.getByRole('tab', { name: 'Sun' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('switches times to local and distances to miles from the general settings', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /^Global settings/ }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Local time' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Miles' }));
+    const stored = JSON.parse(window.localStorage.getItem('space-radar:global-settings:v1') ?? '{}');
+    expect(stored).toMatchObject({ timeZone: 'local', units: 'imperial' });
   });
 
   it('toggles a layer and persists the choice', async () => {
