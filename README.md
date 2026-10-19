@@ -79,7 +79,7 @@ npm run smoke     # headless-Chromium smoke of the Scene: layers, scrubber,
                    # tabs, zoom/rotate, settings, phone — no console errors
 npm run snap      # flexible single debug screenshot, e.g.
                    #   npm run snap -- --out /tmp/x.png --tab 'Solar System'
-npm run build     # production build → ./docs (GitHub Pages)
+npm run build     # production build → ./dist (CI deploys it to GitHub Pages)
 npm run worker:deploy   # deploy the caching proxy (worker/) to Cloudflare
 npm run worker:tail     # live proxy logs
 ```
@@ -164,7 +164,7 @@ selectable in the layer panel) uses a blank political world map from
 by FelixCountryBalls163 (CC BY 4.0), downscaled to 2048×1024.
 
 The favicon (`public/favicon.svg`) is a self-contained SVG radar scope in the
-app's palette. It lives in `public/` (copied verbatim to `docs/` on build) and
+app's palette. It lives in `public/` (copied verbatim to `dist/` on build) and
 is referenced from `index.html` with a relative `./favicon.svg` path so it
 resolves under the GitHub Pages sub-path.
 

@@ -11,7 +11,7 @@ export default defineConfig({
     format: 'es',
   },
   build: {
-    outDir: 'docs',
+    outDir: 'dist',
     emptyOutDir: true,
     // The vendor chunk below (three.js + satellite.js + astronomy-engine +
     // react/react-dom) is inherently >500kB for a

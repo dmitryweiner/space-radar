@@ -152,7 +152,7 @@ npx wrangler deploy
 # 5. Проверки и обычный деплой фронтенда:
 npm run check
 npm run smoke
-npm run build      # → docs/, коммит + push = деплой на GitHub Pages
+# деплой сайта: push в main → GitHub Actions (.github/workflows/deploy.yml)
 ```
 
 Проверка руками, что прокси жив:
