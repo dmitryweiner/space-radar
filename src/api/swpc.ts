@@ -5,8 +5,11 @@ import type {
   SolarCycleData,
   SolarCyclePoint,
   SolarCyclePrediction,
+  SolarFlare,
+  SolarRegion,
   SolarWindPoint,
   SpaceWeatherEvent,
+  XrayFluxPoint,
 } from './types';
 import { fetchViaProxy } from './proxy';
 
@@ -18,6 +21,9 @@ const OBSERVED_CYCLE_URL = 'https://services.swpc.noaa.gov/json/solar-cycle/obse
 const PREDICTED_CYCLE_URL = 'https://services.swpc.noaa.gov/json/solar-cycle/predicted-solar-cycle.json';
 const NOAA_SCALES_URL = 'https://services.swpc.noaa.gov/products/noaa-scales.json';
 const OVATION_AURORA_URL = 'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json';
+const SOLAR_REGIONS_URL = 'https://services.swpc.noaa.gov/json/solar_regions.json';
+const EDITED_EVENTS_URL = 'https://services.swpc.noaa.gov/json/edited_events.json';
+const XRAY_FLUX_URL = 'https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json';
 
 // The observed series runs back to 1749; keep only the recent tail so the cache
 // stays small — 480 months covers the widest (30-year) card horizon.
@@ -211,6 +217,128 @@ export function parseNoaaScales(raw: unknown): NoaaScales | null {
   return { r, s, g, observedAt: `${date} ${time}`.trim() };
 }
 
+function count(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function nullableNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function nullableText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
+// solar_regions.json: ~30 days of daily region reports (array of objects).
+// Keep the newest report day only. **Longitude is east-positive** here
+// (N06W28 → -28), so flip it to Stonyhurst west-positive.
+export function parseSolarRegions(raw: unknown): SolarRegion[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const records = raw.filter(isRecord);
+  const latest = records.reduce<string>((max, item) => (typeof item.observed_date === 'string' && item.observed_date > max ? item.observed_date : max), '');
+  const regions: SolarRegion[] = [];
+  for (const item of records) {
+    if (item.observed_date !== latest || typeof item.region !== 'number' || typeof item.latitude !== 'number' || typeof item.longitude !== 'number') {
+      continue;
+    }
+    const probability =
+      typeof item.c_flare_probability === 'number'
+        ? { c: count(item.c_flare_probability), m: count(item.m_flare_probability), x: count(item.x_flare_probability) }
+        : null;
+    regions.push({
+      region: item.region,
+      observedDate: latest,
+      latDeg: item.latitude,
+      lonDeg: -item.longitude,
+      area: nullableNumber(item.area),
+      spotClass: nullableText(item.spot_class),
+      magClass: nullableText(item.mag_class),
+      spots: nullableNumber(item.number_spots),
+      flares: { c: count(item.c_xray_events), m: count(item.m_xray_events), x: count(item.x_xray_events) },
+      probability,
+    });
+  }
+  return regions;
+}
+
+// SWPC times without a zone are UTC.
+function utc(value: unknown): string | null {
+  if (typeof value !== 'string' || value === '') return null;
+  return /Z$|[+-]\d\d:?\d\d$/.test(value) ? value : `${value}Z`;
+}
+
+const SAME_FLARE_MS = 5 * 60 * 1000;
+
+// edited_events.json: 30 days of every reported event. XRA rows are GOES X-ray
+// flares (class in particulars1, region attached) — reported once per GOES
+// satellite, so near-simultaneous rows of the same class letter are merged. FLA rows
+// are optical flares with a disk location; one that overlaps an XRA flare of
+// the same region gives it a location.
+export function parseFlareEvents(raw: unknown): SolarFlare[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const optical: { region: number; begin: number; end: number; location: string }[] = [];
+  const xray: SolarFlare[] = [];
+  for (const item of raw) {
+    if (!isRecord(item)) continue;
+    const begin = utc(item.begin_datetime);
+    if (!begin) continue;
+    const region = typeof item.region === 'number' && item.region > 0 ? item.region : null;
+    if (item.type === 'FLA' && region !== null && typeof item.location === 'string' && item.location.trim()) {
+      const end = utc(item.end_datetime) ?? begin;
+      optical.push({ region, begin: Date.parse(begin), end: Date.parse(end), location: item.location.trim() });
+    } else if (item.type === 'XRA' && typeof item.particulars1 === 'string' && /^[ABCMX]\d/.test(item.particulars1)) {
+      xray.push({
+        id: `xra-${begin}-${item.particulars1}`,
+        begin,
+        peak: utc(item.max_datetime),
+        end: utc(item.end_datetime),
+        classType: item.particulars1,
+        region,
+        location: null,
+      });
+    }
+  }
+  xray.sort((a, b) => a.begin.localeCompare(b.begin));
+  const merged: SolarFlare[] = [];
+  for (const flare of xray) {
+    const previous = merged[merged.length - 1];
+    if (previous && previous.classType[0] === flare.classType[0] && Date.parse(flare.begin) - Date.parse(previous.begin) <= SAME_FLARE_MS) {
+      previous.region ??= flare.region;
+      continue;
+    }
+    merged.push({ ...flare });
+  }
+  for (const flare of merged) {
+    if (flare.region === null) continue;
+    const start = Date.parse(flare.begin) - SAME_FLARE_MS;
+    const stop = Date.parse(flare.end ?? flare.begin) + SAME_FLARE_MS;
+    const match = optical.find((o) => o.region === flare.region && o.begin <= stop && o.end >= start);
+    flare.location = match?.location ?? null;
+  }
+  return merged.reverse();
+}
+
+// xrays-1-day.json: one row per minute *per band*; keep the long (1–8 Å)
+// channel the flare classes are defined on. Non-positive flux = no data.
+export function parseXrayFlux(raw: unknown): XrayFluxPoint[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const byTime = new Map<string, number>();
+  for (const item of raw) {
+    if (!isRecord(item) || item.energy !== '0.1-0.8nm' || typeof item.time_tag !== 'string') continue;
+    const flux = item.flux;
+    if (typeof flux === 'number' && Number.isFinite(flux) && flux > 0) {
+      byTime.set(item.time_tag, flux);
+    }
+  }
+  return [...byTime].map(([time, flux]) => ({ time, flux })).sort((a, b) => a.time.localeCompare(b.time));
+}
+
 interface FetchResponse {
   ok: boolean;
   status?: number;
@@ -287,4 +415,28 @@ export async function fetchNoaaScales(fetchFn: FetchFn = fetch): Promise<NoaaSca
     throw new Error('NOAA SWPC scales returned an unexpected response shape.');
   }
   return scales;
+}
+
+export async function fetchSolarRegions(fetchFn: FetchFn = fetch): Promise<SolarRegion[]> {
+  const response = await fetchViaProxy(fetchFn, SOLAR_REGIONS_URL);
+  if (!response.ok) {
+    throw new Error(`NOAA SWPC solar regions request failed with status ${response.status ?? 'unknown'}`);
+  }
+  return parseSolarRegions(await response.json());
+}
+
+export async function fetchFlareEvents(fetchFn: FetchFn = fetch): Promise<SolarFlare[]> {
+  const response = await fetchViaProxy(fetchFn, EDITED_EVENTS_URL);
+  if (!response.ok) {
+    throw new Error(`NOAA SWPC event list request failed with status ${response.status ?? 'unknown'}`);
+  }
+  return parseFlareEvents(await response.json());
+}
+
+export async function fetchXrayFlux(fetchFn: FetchFn = fetch): Promise<XrayFluxPoint[]> {
+  const response = await fetchViaProxy(fetchFn, XRAY_FLUX_URL);
+  if (!response.ok) {
+    throw new Error(`NOAA SWPC X-ray flux request failed with status ${response.status ?? 'unknown'}`);
+  }
+  return parseXrayFlux(await response.json());
 }

@@ -9,7 +9,10 @@ import { nightLightsLayer } from './nightLightsLayer';
 import { spacecraftLayer } from './spacecraftLayer';
 import { cometsLayer } from './cometsLayer';
 import { solarAsteroidsLayer } from './solarAsteroidsLayer';
-import type { LayerDefinition, SolarLayerDefinition } from './types';
+import { sunRegionsLayer } from './sunRegionsLayer';
+import { sunFlaresLayer } from './sunFlaresLayer';
+import { sunGridLayer } from './sunGridLayer';
+import type { LayerDefinition, SolarLayerDefinition, SunLayerDefinition } from './types';
 
 /** Every layer the Scene view's Earth globe can show, in panel order. */
 export const earthLayers: LayerDefinition[] = [
@@ -30,3 +33,8 @@ export const DEFAULT_ENABLED_LAYERS = ['iss', 'aurora', 'quakes', 'eonet', 'nigh
 export const solarLayers: SolarLayerDefinition[] = [spacecraftLayer, solarAsteroidsLayer, cometsLayer];
 
 export const DEFAULT_SOLAR_LAYERS = ['spacecraft', 'sol-asteroids', 'comets'];
+
+/** Overlays on the Sun tab's solar disk, in panel order. */
+export const sunLayers: SunLayerDefinition[] = [sunRegionsLayer, sunFlaresLayer, sunGridLayer];
+
+export const DEFAULT_SUN_LAYERS = ['sun-regions', 'sun-flares'];

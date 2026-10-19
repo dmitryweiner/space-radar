@@ -13,11 +13,16 @@ export interface SceneState {
   enabledLayers: string[];
   /** Enabled layers of the Solar System scene. */
   solarLayers: string[];
+  /** Enabled overlays of the Sun tab. */
+  sunLayers: string[];
   layerSettings: Record<string, CardSettingValues>;
   earthStyle: string;
+  /** The Sun tab's SDO channel (`SUN_WAVELENGTHS`). */
+  sunWavelength: string;
 }
 
 export const EARTH_STYLES = ['globe', 'map', 'satellite'];
+export const SUN_WAVELENGTHS = ['0193', '0171', '0304', '0131', 'HMIIF', 'HMIB'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -35,13 +40,15 @@ function isSceneId(value: unknown): value is SceneId {
   return value === 'earth' || value === 'sun' || value === 'solar-system';
 }
 
-export function defaultSceneState(defaultLayers: string[], defaultSolarLayers: string[] = []): SceneState {
+export function defaultSceneState(defaultLayers: string[], defaultSolarLayers: string[] = [], defaultSunLayers: string[] = []): SceneState {
   return {
     scene: 'earth',
     enabledLayers: [...defaultLayers],
     solarLayers: [...defaultSolarLayers],
+    sunLayers: [...defaultSunLayers],
     layerSettings: {},
     earthStyle: 'globe',
+    sunWavelength: '0193',
   };
 }
 
@@ -55,15 +62,18 @@ export function sanitizeSceneState(
   defaultLayers: string[],
   knownSolarLayers: string[] = [],
   defaultSolarLayers: string[] = [],
+  knownSunLayers: string[] = [],
+  defaultSunLayers: string[] = [],
 ): SceneState {
-  const fallback = defaultSceneState(defaultLayers, defaultSolarLayers);
+  const fallback = defaultSceneState(defaultLayers, defaultSolarLayers, defaultSunLayers);
   if (!isRecord(raw)) {
     return fallback;
   }
-  const known = new Set([...knownLayers, ...knownSolarLayers]);
+  const known = new Set([...knownLayers, ...knownSolarLayers, ...knownSunLayers]);
   const enabledLayers = knownIds(raw.enabledLayers, new Set(knownLayers), fallback.enabledLayers);
   // Absent in storage from before the Solar System had layers → defaults on.
   const solarLayers = knownIds(raw.solarLayers, new Set(knownSolarLayers), fallback.solarLayers);
+  const sunLayers = knownIds(raw.sunLayers, new Set(knownSunLayers), fallback.sunLayers);
   const layerSettings: Record<string, CardSettingValues> = {};
   if (isRecord(raw.layerSettings)) {
     for (const [id, values] of Object.entries(raw.layerSettings)) {
@@ -83,8 +93,11 @@ export function sanitizeSceneState(
     scene: isSceneId(raw.scene) ? raw.scene : fallback.scene,
     enabledLayers,
     solarLayers,
+    sunLayers,
     layerSettings,
     earthStyle: typeof raw.earthStyle === 'string' && EARTH_STYLES.includes(raw.earthStyle) ? raw.earthStyle : fallback.earthStyle,
+    sunWavelength:
+      typeof raw.sunWavelength === 'string' && SUN_WAVELENGTHS.includes(raw.sunWavelength) ? raw.sunWavelength : fallback.sunWavelength,
   };
 }
 
@@ -100,6 +113,11 @@ export function toggleSolarLayer(state: SceneState, id: string): SceneState {
     ? state.solarLayers.filter((layer) => layer !== id)
     : [...state.solarLayers, id];
   return { ...state, solarLayers };
+}
+
+export function toggleSunLayer(state: SceneState, id: string): SceneState {
+  const sunLayers = state.sunLayers.includes(id) ? state.sunLayers.filter((layer) => layer !== id) : [...state.sunLayers, id];
+  return { ...state, sunLayers };
 }
 
 export function changeLayerSetting(state: SceneState, id: string, key: string, value: CardSettingValue): SceneState {

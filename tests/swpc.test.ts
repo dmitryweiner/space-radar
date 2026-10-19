@@ -11,6 +11,9 @@ import {
   fetchSolarCycle,
   fetchAurora,
   auroraForecastImageUrl,
+  parseSolarRegions,
+  parseFlareEvents,
+  parseXrayFlux,
 } from '../src/api/swpc';
 
 const KP_SAMPLE = [
@@ -201,5 +204,88 @@ describe('fetchAurora', () => {
 describe('auroraForecastImageUrl', () => {
   it('returns a stable NOAA OVATION image URL', () => {
     expect(auroraForecastImageUrl()).toMatch(/^https:\/\/services\.swpc\.noaa\.gov\//);
+  });
+});
+
+describe('parseSolarRegions', () => {
+  const base = {
+    region: 4557,
+    latitude: 6,
+    longitude: -28,
+    location: 'N06W28',
+    area: 140,
+    spot_class: 'Eai',
+    number_spots: 22,
+    mag_class: 'B',
+    c_xray_events: 1,
+    m_xray_events: 0,
+    x_xray_events: 0,
+    c_flare_probability: 35,
+    m_flare_probability: 5,
+    x_flare_probability: 1,
+  };
+
+  it('keeps only the newest report day and flips longitude to west-positive', () => {
+    const regions = parseSolarRegions([
+      { ...base, observed_date: '2026-10-18', region: 4500 },
+      { ...base, observed_date: '2026-10-19' },
+      { ...base, observed_date: '2026-10-19', region: 4560, longitude: 12, area: null, spot_class: null, number_spots: null },
+    ]);
+    expect(regions).toEqual([
+      {
+        region: 4557,
+        observedDate: '2026-10-19',
+        latDeg: 6,
+        lonDeg: 28,
+        area: 140,
+        spotClass: 'Eai',
+        magClass: 'B',
+        spots: 22,
+        flares: { c: 1, m: 0, x: 0 },
+        probability: { c: 35, m: 5, x: 1 },
+      },
+      expect.objectContaining({ region: 4560, lonDeg: -12, area: null, spotClass: null }),
+    ]);
+    expect(parseSolarRegions('nope')).toEqual([]);
+  });
+});
+
+describe('parseFlareEvents', () => {
+  it('merges per-satellite duplicates and attaches optical locations', () => {
+    const flares = parseFlareEvents([
+      { type: 'XRA', begin_datetime: '2026-10-19T02:06:00', max_datetime: '2026-10-19T02:11:00', end_datetime: '2026-10-19T02:17:00', particulars1: 'C1.0', region: 4559 },
+      { type: 'XRA', begin_datetime: '2026-10-19T02:07:00', max_datetime: '2026-10-19T02:11:00', end_datetime: '2026-10-19T02:17:00', particulars1: 'C1.1', region: 4559 },
+      { type: 'FLA', begin_datetime: '2026-10-19T02:05:00', end_datetime: '2026-10-19T02:20:00', location: 'S20W35', region: 4559 },
+      { type: 'XRA', begin_datetime: '2026-10-19T05:00:00', particulars1: 'B9.2', region: null },
+      { type: 'RBR', begin_datetime: '2026-10-19T05:00:00', particulars1: '245' },
+    ]);
+    expect(flares).toEqual([
+      { id: 'xra-2026-10-19T05:00:00Z-B9.2', begin: '2026-10-19T05:00:00Z', peak: null, end: null, classType: 'B9.2', region: null, location: null },
+      {
+        id: 'xra-2026-10-19T02:06:00Z-C1.0',
+        begin: '2026-10-19T02:06:00Z',
+        peak: '2026-10-19T02:11:00Z',
+        end: '2026-10-19T02:17:00Z',
+        classType: 'C1.0',
+        region: 4559,
+        location: 'S20W35',
+      },
+    ]);
+  });
+});
+
+describe('parseXrayFlux', () => {
+  it('keeps the long channel with positive flux, sorted', () => {
+    expect(
+      parseXrayFlux([
+        { time_tag: '2026-10-19T07:17:00Z', energy: '0.1-0.8nm', flux: 2e-6 },
+        { time_tag: '2026-10-19T07:16:00Z', energy: '0.1-0.8nm', flux: 1e-6 },
+        { time_tag: '2026-10-19T07:16:00Z', energy: '0.05-0.4nm', flux: 1e-8 },
+        { time_tag: '2026-10-19T07:15:00Z', energy: '0.1-0.8nm', flux: -1 },
+      ]),
+    ).toEqual([
+      { time: '2026-10-19T07:16:00Z', flux: 1e-6 },
+      { time: '2026-10-19T07:17:00Z', flux: 2e-6 },
+    ]);
   });
 });

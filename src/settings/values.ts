@@ -12,3 +12,9 @@ export function listSetting(values: CardSettingValues, id: string, fallback: str
   return Array.isArray(value) ? value : fallback;
 }
 
+
+/** Read a select (single-choice) setting, falling back when absent or the wrong type. */
+export function selectSetting(values: CardSettingValues, id: string, fallback: string): string {
+  const value = values[id];
+  return typeof value === 'string' ? value : fallback;
+}

@@ -37,6 +37,30 @@ export interface SolarFrame {
   tracks?: SolarTrack[];
 }
 
+/** A point of interest on the solar disk (Sun tab). */
+export interface SunMarker {
+  id: string;
+  /** Stonyhurst position *now* (already rotated to the current time). */
+  latDeg: number;
+  lonDeg: number;
+  /** CSS colour. */
+  color: string;
+  shape: 'ring' | 'star';
+  /** On-screen size in CSS px (before the label-scale setting). */
+  sizePx: number;
+  label?: string;
+  /** Which side of the mark the label sits (default right) — flares go left
+   * so they don't cover their region's label. */
+  labelSide?: 'left' | 'right';
+}
+
+/** What a Sun-tab layer wants drawn over the solar disk. */
+export interface SunFrame {
+  markers?: SunMarker[];
+  /** Draw the heliographic latitude/longitude grid. */
+  grid?: boolean;
+}
+
 export interface LayerState<F = LayerFrame> {
   frame: F;
   loading: boolean;
@@ -67,6 +91,7 @@ export interface LayerDefinition<F = LayerFrame> {
 
 export type SolarLayerDefinition = LayerDefinition<SolarFrame>;
 export type SolarLayerState = LayerState<SolarFrame>;
+export type SunLayerDefinition = LayerDefinition<SunFrame>;
 
 /** The part of a layer the panels need (any scene). */
 export type LayerInfo = Pick<LayerDefinition, 'id' | 'title' | 'color' | 'settings'>;

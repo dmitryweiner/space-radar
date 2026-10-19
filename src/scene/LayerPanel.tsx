@@ -5,11 +5,14 @@ import { SelectField } from '../settings/SelectField';
 import type { LayerInfo } from '../layers/types';
 import type { LayerStatusMap } from './layerHost';
 
-const EARTH_STYLE_OPTIONS = [
-  { value: 'globe', label: 'Photo (day/night)' },
-  { value: 'satellite', label: 'Satellite (~2 days old)' },
-  { value: 'map', label: 'Flat map (no shadow)' },
-];
+/** A radio group under the layer list (Earth's surface, the Sun's wavelength). */
+export interface SurfacePicker {
+  idPrefix: string;
+  label: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+}
 
 interface LayerPanelProps {
   layers: LayerInfo[];
@@ -18,9 +21,7 @@ interface LayerPanelProps {
   statuses: LayerStatusMap;
   onToggle: (id: string) => void;
   onChangeSetting: (id: string, key: string, value: CardSettingValue) => void;
-  /** Earth scene only: the surface style picker under the list. */
-  earthStyle?: string;
-  onChangeEarthStyle?: (style: string) => void;
+  surface?: SurfacePicker;
 }
 
 function statusText(status: LayerStatusMap[string] | undefined): { text: string; error: boolean } | null {
@@ -35,10 +36,9 @@ export function LayerPanel({
   enabled,
   settings,
   statuses,
-  earthStyle,
+  surface,
   onToggle,
   onChangeSetting,
-  onChangeEarthStyle,
 }: LayerPanelProps) {
   const [openSettings, setOpenSettings] = useState<string | null>(null);
   return (
@@ -86,15 +86,9 @@ export function LayerPanel({
           );
         })}
       </ul>
-      {earthStyle !== undefined && onChangeEarthStyle && (
+      {surface && (
         <div className="layer-earth-style">
-          <SelectField
-            idPrefix="scene-earth-style"
-            label="Earth surface"
-            options={EARTH_STYLE_OPTIONS}
-            value={earthStyle}
-            onChange={onChangeEarthStyle}
-          />
+          <SelectField {...surface} />
         </div>
       )}
     </div>

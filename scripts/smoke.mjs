@@ -3,7 +3,8 @@
 // in vitest (jsdom has none of them), so we drive a real Chromium instance here
 // instead. Covers the Scene view: one shared globe with default layers, layer
 // toggles persisting, the globe rendering, a status chip opening its inspector
-// panel, the time scrubber, the Earth/Sun/Solar System tabs, hover-routed
+// panel, the time scrubber, the Earth/Sun/Solar System tabs (the Sun disk's
+// zoom, wavelength, grid, marker details), hover-routed
 // keyboard zoom, Solar System fly-to, auto-rotate stop-only-on-move, the
 // general settings popup, the Earth style select, and the phone layout
 // (one-finger rotate + bottom sheet, a panel's × returning to the list).
@@ -124,11 +125,62 @@ attach(page);
   await scenePage.getByRole('tab', { name: 'Sun' }).click();
   await scenePage.waitForTimeout(300);
   if ((await scenePage.locator('.sun-stage img').count()) < 1) errors.push('[scene] Sun scene shows no image');
+  await checkSunTab(scenePage, errors);
   await scenePage.getByRole('tab', { name: 'Earth' }).click();
   await scenePage.waitForTimeout(500);
   if ((await scenePage.getByTestId('scene-canvas').count()) !== 1) errors.push('[scene] Earth globe did not come back');
   else console.log('scene: Earth / Sun / Solar System tabs ok');
 
+}
+
+// The Sun tab: one zoomable SDO disk with overlay layers, a wavelength radio
+// group in the layer panel, and the X-ray strip. Region/flare markers come
+// from live SWPC feeds, so the marker-click check runs only if some arrived.
+async function checkSunTab(page, errors) {
+  const viewport = page.getByTestId('sun-viewport');
+  if ((await page.getByTestId('xray-timeline').count()) !== 1) errors.push('[sun] no X-ray timeline');
+  const box = await viewport.boundingBox();
+  if (!box) {
+    errors.push('[sun] no disk viewport');
+    return;
+  }
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, -400);
+  await page.waitForTimeout(200);
+  const fit = page.getByRole('button', { name: 'Fit disk' });
+  if ((await fit.count()) !== 1) errors.push('[sun] wheel did not zoom the disk');
+  await viewport.dblclick({ position: { x: 20, y: box.height - 20 } });
+  await page.waitForTimeout(200);
+  if ((await fit.count()) !== 0) errors.push('[sun] double-click did not fit the disk again');
+
+  await page.locator('#scene-sun-channel-HMIIF').check();
+  await page.waitForTimeout(200);
+  const src = await page.locator('.sun-disk-img').getAttribute('src');
+  if (!src?.includes('_HMIIF.jpg')) errors.push(`[sun] wavelength switch did not swap the image: ${src}`);
+  await page.locator('#scene-sun-channel-0193').check();
+
+  const grid = page.getByRole('checkbox', { name: 'Coordinate grid' });
+  await grid.check();
+  await page.waitForTimeout(200);
+  if ((await page.locator('.sun-grid path').count()) < 5) errors.push('[sun] coordinate grid did not draw');
+  await grid.uncheck();
+
+  const markers = page.getByTestId('sun-marker');
+  await markers.first().waitFor({ timeout: 10_000 }).catch(() => {});
+  const markerCount = await markers.count();
+  if (markerCount > 0) {
+    await markers.first().locator('.sun-marker-hit').click();
+    await page.waitForTimeout(1500);
+    const title = await page.locator('.scene-inspector .inspector-title').textContent().catch(() => null);
+    if (!title || title === '…') errors.push(`[sun] marker click opened no details: ${title}`);
+    await page.getByRole('button', { name: 'Close details' }).click().catch(() => {});
+  }
+  const regions = page.getByRole('checkbox', { name: 'Active regions' });
+  await regions.uncheck();
+  await page.waitForTimeout(200);
+  if ((await page.locator('.sun-marker-ring').count()) !== 0) errors.push('[sun] turning regions off left ring markers');
+  await regions.check();
+  console.log(`sun: zoom/fit, wavelength, grid, layer toggle ok; ${markerCount} live markers${markerCount > 0 ? ', click → details ok' : ''}`);
 }
 
 // keyboard +/- zoom must work on hover alone — no click needed — so it also

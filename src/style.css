@@ -639,44 +639,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.solar-imagery-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  height: 100%;
-}
-
-.solar-imagery-grid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 8px;
-  align-content: start;
-  overflow: auto;
-}
-
-.solar-imagery-item {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.solar-imagery-img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: contain;
-  border-radius: 6px;
-  background: #000;
-}
-
-.solar-imagery-caption {
-  font-size: 11px;
-  color: var(--text-dim);
-  text-align: center;
-}
-
 .solar-cycle-card {
   display: flex;
   flex-direction: column;
@@ -824,7 +786,6 @@ body {
   border-radius: 6px;
 }
 
-.solar-imagery-grid,
 .settings-checkbox-list {
   overscroll-behavior: contain;
 }
@@ -935,45 +896,305 @@ body {
   min-height: 0;
 }
 
+/* ---- Sun tab: one zoomable SDO disk + the X-ray strip ---- */
+
 .sun-stage {
-  padding: 12px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  grid-auto-rows: min-content;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  background: #000;
 }
 
-.sun-tile {
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 12px;
-  min-width: 0;
+.sun-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.sun-viewport:active {
+  cursor: grabbing;
+}
+
+.sun-disk {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform-origin: center;
+}
+
+.sun-disk-img,
+.sun-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sun-disk-img {
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.sun-overlay {
+  overflow: visible;
+  pointer-events: none;
+}
+
+.sun-grid {
+  fill: none;
+  stroke: rgba(230, 236, 255, 0.28);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+/* vector-effect isn't inherited — every shape needs it, or a 1-unit stroke
+   is a third of the image wide. */
+.sun-grid path,
+.sun-grid circle {
+  vector-effect: non-scaling-stroke;
+}
+
+.sun-marker {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.sun-marker-hit {
+  fill: transparent;
+}
+
+.sun-marker-ring circle:not(.sun-marker-hit):not(.sun-marker-halo) {
+  fill: none;
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+}
+
+.sun-marker-star polygon {
+  stroke: #000;
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.sun-marker-halo {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.5px;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.sun-marker text {
+  fill: var(--text);
+  stroke: rgba(0, 0, 0, 0.85);
+  paint-order: stroke;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.sun-marker:hover text,
+.sun-marker-selected text {
+  fill: #fff;
+}
+
+.sun-caption {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  max-width: min(360px, calc(100% - 16px));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(13, 18, 32, 0.85);
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.sun-caption-title {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.sun-caption-hint {
+  font-size: 11px;
   color: var(--text-dim);
 }
 
-/* Charts fill their parent's height, so chart tiles get a fixed one. */
-.sun-tile-body {
-  height: 260px;
+.sun-status {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  background: rgba(13, 18, 32, 0.85);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.sun-compass {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  width: 44px;
+  height: 30px;
+  font-size: 10px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.sun-compass span {
+  position: absolute;
+}
+
+.sun-compass-n {
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.sun-compass-e {
+  left: 0;
+  bottom: 0;
+}
+
+.sun-compass-w {
+  right: 0;
+  bottom: 0;
+}
+
+.sun-reset {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.xray-timeline {
+  flex: none;
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px 4px;
+  background: var(--panel);
+  border-top: 1px solid var(--panel-border);
 }
 
-.sun-tile-body > * {
-  flex: 1;
-  min-height: 0;
+.xray-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.sun-tile-flares .sun-tile-body,
-.sun-tile-sun-images .sun-tile-body {
-  height: auto;
+.xray-title {
+  margin: 0;
 }
 
-.sun-tile-flares .sun-tile-body {
-  max-height: 360px;
-  overflow-y: auto;
+.xray-now {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.xray-now strong {
+  color: var(--text);
+}
+
+.xray-open {
+  margin-left: auto;
+  padding: 2px 8px;
+}
+
+.xray-plot {
+  position: relative;
+  height: 110px;
+}
+
+.xray-svg {
+  display: block;
+}
+
+.xray-grid {
+  stroke: var(--panel-border);
+  stroke-width: 1;
+}
+
+.xray-axis {
+  fill: var(--text-dim);
+  font-size: 10px;
+}
+
+.xray-line {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.xray-flare {
+  cursor: pointer;
+}
+
+.xray-flare-hit {
+  fill: transparent;
+}
+
+.xray-flare-dot {
+  stroke: var(--panel);
+  stroke-width: 2;
+}
+
+.xray-flare-label {
+  fill: var(--text);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.xray-crosshair line {
+  stroke: var(--text-dim);
+  stroke-dasharray: 2 2;
+}
+
+.xray-crosshair circle {
+  fill: var(--series-1);
+  stroke: var(--panel);
+  stroke-width: 2;
+}
+
+.xray-tooltip {
+  position: absolute;
+  top: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #111830;
+  border: 1px solid var(--panel-border);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.xray-tooltip strong {
+  color: var(--text);
+}
+
+.xray-status {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scene-view-narrow .xray-plot {
+  height: 72px;
+}
+
+.scene-view-narrow .sun-caption-hint {
+  display: none;
 }
 
 .panel-heading {
@@ -1332,11 +1553,6 @@ body {
   flex: 1;
   height: auto;
   min-height: 0;
-}
-
-.scene-view-narrow .sun-stage {
-  grid-template-columns: minmax(0, 1fr);
-  padding: 8px;
 }
 
 @media (max-width: 700px) {

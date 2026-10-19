@@ -1,8 +1,8 @@
 import { useApiResource } from './useApiResource';
-import { fetchKpIndex, fetchNoaaScales, fetchSolarWind } from '../api/swpc';
+import { fetchFlareEvents, fetchKpIndex, fetchNoaaScales, fetchSolarRegions, fetchSolarWind } from '../api/swpc';
 import { fetchPeopleInSpace, fetchUpcomingLaunches } from '../api/launchLibrary';
 import { fetchFlybys } from '../api/neows';
-import type { Asteroid, KpIndexPoint, LaunchInfo, NoaaScales, PeopleInSpace, SolarWindPoint } from '../api/types';
+import type { Asteroid, KpIndexPoint, LaunchInfo, NoaaScales, PeopleInSpace, SolarFlare, SolarRegion, SolarWindPoint } from '../api/types';
 
 // Resources used by more than one component (the Scene view's status bar *and*
 // an inspector panel). Defined once so every consumer shares one
@@ -152,5 +152,70 @@ export function useFlybys(windowDays: number) {
     pollMs: HOUR,
     fetcher: () => fetchFlybys(windowDays),
     isValue: isAsteroids,
+  });
+}
+
+function isNumberTriple(value: unknown): value is { c: number; m: number; x: number } {
+  return isRecord(value) && typeof value.c === 'number' && typeof value.m === 'number' && typeof value.x === 'number';
+}
+
+function isSolarRegions(value: unknown): value is SolarRegion[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.region === 'number' &&
+        typeof item.observedDate === 'string' &&
+        typeof item.latDeg === 'number' &&
+        typeof item.lonDeg === 'number' &&
+        isNullableNumber(item.area) &&
+        isNullableString(item.spotClass) &&
+        isNullableString(item.magClass) &&
+        isNullableNumber(item.spots) &&
+        isNumberTriple(item.flares) &&
+        (item.probability === null || isNumberTriple(item.probability)),
+    )
+  );
+}
+
+function isSolarFlares(value: unknown): value is SolarFlare[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.id === 'string' &&
+        typeof item.begin === 'string' &&
+        isNullableString(item.peak) &&
+        isNullableString(item.end) &&
+        typeof item.classType === 'string' &&
+        isNullableNumber(item.region) &&
+        isNullableString(item.location),
+    )
+  );
+}
+
+/** Today's sunspot regions (SWPC updates the report daily) — the Sun tab's
+ * region layer, and where the flare layer places each region's flares. */
+export function useSolarRegions() {
+  return useApiResource<SolarRegion[]>({
+    key: 'space-radar:solar-regions',
+    ttlMs: HOUR,
+    pollMs: HOUR,
+    fetcher: () => fetchSolarRegions(),
+    isValue: isSolarRegions,
+  });
+}
+
+/** GOES X-ray flares of the last 30 days with their regions — the flare
+ * layer and the X-ray timeline's markers. */
+export function useSolarFlareEvents() {
+  return useApiResource<SolarFlare[]>({
+    key: 'space-radar:solar-flare-events',
+    ttlMs: 15 * MINUTE,
+    pollMs: 15 * MINUTE,
+    fetcher: () => fetchFlareEvents(),
+    isValue: isSolarFlares,
   });
 }

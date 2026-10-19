@@ -26,6 +26,47 @@ export interface SpaceWeatherEvent {
   sourceLocation: string | null;
 }
 
+/** One sunspot/active region from SWPC's daily region report (its latest day). */
+export interface SolarRegion {
+  /** NOAA region number, e.g. 4557. */
+  region: number;
+  /** Report date, "YYYY-MM-DD"; positions are for 00:00 UTC that day. */
+  observedDate: string;
+  latDeg: number;
+  /** Stonyhurst longitude, west of the central meridian positive. */
+  lonDeg: number;
+  /** Area in millionths of the visible hemisphere; null = plage only (no spots). */
+  area: number | null;
+  /** McIntosh class, e.g. "Eki". */
+  spotClass: string | null;
+  /** Mount Wilson magnetic class, e.g. "BG". */
+  magClass: string | null;
+  spots: number | null;
+  /** X-ray flares (C/M/X) from this region that day. */
+  flares: { c: number; m: number; x: number };
+  /** SWPC's 24 h flare probabilities, percent. */
+  probability: { c: number; m: number; x: number } | null;
+}
+
+/** A GOES X-ray flare from SWPC's edited event list, tied to its region. */
+export interface SolarFlare {
+  id: string;
+  begin: string;
+  peak: string | null;
+  end: string | null;
+  /** GOES class, e.g. "M1.4". */
+  classType: string;
+  region: number | null;
+  /** Optical flare location ("S20W35") when an observatory reported one. */
+  location: string | null;
+}
+
+/** One sample of GOES 1–8 Å X-ray flux (W/m²). */
+export interface XrayFluxPoint {
+  time: string;
+  flux: number;
+}
+
 export interface SolarCyclePoint {
   /** Month, "YYYY-MM". */
   time: string;

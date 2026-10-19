@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { earthLayers, solarLayers, DEFAULT_ENABLED_LAYERS, DEFAULT_SOLAR_LAYERS } from '../layers/registry';
+import { earthLayers, solarLayers, sunLayers, DEFAULT_ENABLED_LAYERS, DEFAULT_SOLAR_LAYERS, DEFAULT_SUN_LAYERS } from '../layers/registry';
 import type { LayerTime } from '../layers/types';
 import { markerFocusKey } from '../render/solarSystemScene';
 import { SolarStage } from './SolarStage';
@@ -8,6 +8,7 @@ import { EarthStage } from './EarthStage';
 import { SunStage } from './SunStage';
 import type { LayerSelection, LayerStatesRef, LayerStatusMap } from './layerHost';
 import { LayerPanel } from './LayerPanel';
+import { SUN_CHANNELS } from './sunImagery';
 import { Inspector } from './Inspector';
 import { StatusBar } from './StatusBar';
 import { TimeScrubber } from './TimeScrubber';
@@ -27,6 +28,15 @@ const SCENE_TABS: { id: SceneId; label: string }[] = [
 
 const KNOWN_LAYERS = earthLayers.map((layer) => layer.id);
 const KNOWN_SOLAR_LAYERS = solarLayers.map((layer) => layer.id);
+const KNOWN_SUN_LAYERS = sunLayers.map((layer) => layer.id);
+
+const EARTH_STYLE_OPTIONS = [
+  { value: 'globe', label: 'Photo (day/night)' },
+  { value: 'satellite', label: 'Satellite (~2 days old)' },
+  { value: 'map', label: 'Flat map (no shadow)' },
+];
+
+const SUN_CHANNEL_OPTIONS = SUN_CHANNELS.map(({ value, label }) => ({ value, label }));
 
 // Fly-to targets on the Solar System tab, grouped by parent.
 const SOLAR_BODIES: { name: string; moons: string[] }[] = [
@@ -73,11 +83,13 @@ interface SceneViewProps {
 // geographic source as a toggleable layer on a single globe, a shared time
 // cursor, a status strip, and an inspector for details.
 export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startScene = 'last' }: SceneViewProps) {
-  const { state, setScene, toggle, toggleSolar, setLayerSetting, setEarthStyle } = useSceneState(
+  const { state, setScene, toggle, toggleSolar, toggleSun, setLayerSetting, setEarthStyle, setSunWavelength } = useSceneState(
     KNOWN_LAYERS,
     DEFAULT_ENABLED_LAYERS,
     KNOWN_SOLAR_LAYERS,
     DEFAULT_SOLAR_LAYERS,
+    KNOWN_SUN_LAYERS,
+    DEFAULT_SUN_LAYERS,
     startScene === 'last' ? null : startScene,
   );
   const [time, setTime] = useState<LayerTime>(null);
@@ -97,6 +109,8 @@ export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startSce
     () => solarLayers.filter((layer) => state.solarLayers.includes(layer.id)),
     [state.solarLayers],
   );
+  const enabledSunLayers = useMemo(() => sunLayers.filter((layer) => state.sunLayers.includes(layer.id)), [state.sunLayers]);
+  const sceneLayers = state.scene === 'earth' ? enabledLayers : state.scene === 'sun' ? enabledSunLayers : enabledSolarLayers;
 
   const onStatus = useCallback((id: string, status: LayerStatusMap[string] | null) => {
     setStatuses((prev) => {
@@ -138,7 +152,7 @@ export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startSce
 
   // A selection belongs to a layer of the current scene — drop it if that
   // layer is switched off.
-  const sceneLayerIds = state.scene === 'solar-system' ? state.solarLayers : state.enabledLayers;
+  const sceneLayerIds = sceneLayers.map((layer) => layer.id);
   const liveSelection = selection && sceneLayerIds.includes(selection.layerId) ? selection : null;
 
   const stage =
@@ -156,7 +170,18 @@ export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startSce
         onSelect={select}
       />
     ) : state.scene === 'sun' ? (
-      <SunStage />
+      <SunStage
+        layers={enabledSunLayers}
+        layerSettings={state.layerSettings}
+        wavelength={state.sunWavelength}
+        labelScale={labelScale}
+        dataSaver={dataSaver}
+        selection={liveSelection}
+        statesRef={statesRef}
+        onStatus={onStatus}
+        onSelect={select}
+        onOpenPanel={openPanel}
+      />
     ) : (
       <SolarStage
         layers={enabledSolarLayers}
@@ -179,17 +204,41 @@ export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startSce
         enabled={state.enabledLayers}
         settings={state.layerSettings}
         statuses={statuses}
-        earthStyle={state.earthStyle}
+        surface={{
+          idPrefix: 'scene-earth-style',
+          label: 'Earth surface',
+          options: EARTH_STYLE_OPTIONS,
+          value: state.earthStyle,
+          onChange: setEarthStyle,
+        }}
         onToggle={toggle}
         onChangeSetting={setLayerSetting}
-        onChangeEarthStyle={setEarthStyle}
       />
     ) : state.scene === 'sun' ? (
       <div className="layer-panel">
         <h2 className="panel-heading">The Sun</h2>
         <p className="card-status">
-          The Sun right now in extreme ultraviolet (SDO, 193 Å), with its flares and CMEs, the solar wind, the solar
-          cycle and other wavelengths below the image. How Earth responds (Kp, NOAA scales, aurora) is under Details.
+          The latest SDO image (every ~15 min) with today's sunspot regions and recent flares on it. Drag to pan, scroll or
+          pinch to zoom. Click a marker for details; flares, solar wind and the solar cycle are under Details.
+        </p>
+        <LayerPanel
+          layers={sunLayers}
+          enabled={state.sunLayers}
+          settings={state.layerSettings}
+          statuses={statuses}
+          surface={{
+            idPrefix: 'scene-sun-channel',
+            label: 'Wavelength',
+            options: SUN_CHANNEL_OPTIONS,
+            value: state.sunWavelength,
+            onChange: setSunWavelength,
+          }}
+          onToggle={toggleSun}
+          onChangeSetting={setLayerSetting}
+        />
+        <p className="card-status body-credits">
+          Images: NASA SDO (AIA, HMI). Regions and flares: NOAA SWPC; positions are carried forward by solar rotation from
+          the daily report.
         </p>
       </div>
     ) : (
@@ -263,7 +312,7 @@ export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startSce
       scene={state.scene}
       selection={liveSelection}
       panel={panel}
-      layers={state.scene === 'solar-system' ? enabledSolarLayers : enabledLayers}
+      layers={sceneLayers}
       statuses={statuses}
       statesRef={statesRef}
       onOpenPanel={openPanel}
@@ -314,7 +363,7 @@ export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startSce
               className={sheet === 'layers' ? 'scene-tab scene-tab-active' : 'scene-tab'}
               onClick={() => setSheet((s) => (s === 'layers' ? 'closed' : 'layers'))}
             >
-              {state.scene === 'sun' ? 'About' : 'Layers'}
+              Layers
             </button>
             <button
               type="button"

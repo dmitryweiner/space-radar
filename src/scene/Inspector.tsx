@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { LayerInfo, MarkerDetails } from '../layers/types';
 import type { LayerSelection, LayerStatesRef, LayerStatusMap } from './layerHost';
-import { INSPECTOR_PANELS, SUN_PANELS, panelById, type InspectorPanelId } from './panels';
+import { INSPECTOR_PANELS, panelById, type InspectorPanelId } from './panels';
 import type { SceneId } from './sceneState';
 import { computeMoonInfo } from '../astro/moonInfo';
 
@@ -10,8 +10,14 @@ const SDO_193_THUMB = 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_512_01
 // Panels worth suggesting first for each scene.
 const SCENE_PANELS: Record<SceneId, InspectorPanelId[]> = {
   earth: ['aurora-forecast', 'epic', 'launches', 'asteroids', 'moon', 'apod'],
-  sun: ['kp', 'scales', 'aurora-forecast'],
+  sun: ['flares', 'wind', 'solar-cycle', 'scales', 'kp', 'aurora-forecast'],
   'solar-system': ['asteroids', 'moon', 'apod', 'nasa-images', 'launches'],
+};
+
+const SCENE_HEADINGS: Record<SceneId, string> = {
+  earth: 'On the globe',
+  sun: 'On the disk',
+  'solar-system': 'In view',
 };
 
 interface InspectorProps {
@@ -102,33 +108,31 @@ export function Inspector({ scene, selection, panel, layers, statuses, statesRef
   }
 
   const suggested = SCENE_PANELS[scene];
-  const others = INSPECTOR_PANELS.filter((p) => !suggested.includes(p.id) && !SUN_PANELS.includes(p.id));
+  const others = INSPECTOR_PANELS.filter((p) => !suggested.includes(p.id));
   return (
     <div className="inspector" data-testid="inspector">
-      {scene !== 'sun' && (
-        <section className="inspector-section">
-          <h2 className="panel-heading">{scene === 'earth' ? 'On the globe' : 'In view'}</h2>
-          {layers.length === 0 && <p className="card-status">No layers on — pick some on the left.</p>}
-          {layers.map((layer) => {
-            const status = statuses[layer.id];
-            return (
-              <div key={layer.id} className="legend-block">
-                <div className="legend-block-title">
-                  <span className="layer-swatch" style={{ backgroundColor: layer.color }} />
-                  {layer.title}
-                </div>
-                {status?.legend.map((item) => (
-                  <span key={item.label} className="legend-item">
-                    <span className="legend-swatch" style={{ backgroundColor: item.color }} />
-                    {item.label}
-                  </span>
-                ))}
+      <section className="inspector-section">
+        <h2 className="panel-heading">{SCENE_HEADINGS[scene]}</h2>
+        {layers.length === 0 && <p className="card-status">No layers on — pick some on the left.</p>}
+        {layers.map((layer) => {
+          const status = statuses[layer.id];
+          return (
+            <div key={layer.id} className="legend-block">
+              <div className="legend-block-title">
+                <span className="layer-swatch" style={{ backgroundColor: layer.color }} />
+                {layer.title}
               </div>
-            );
-          })}
-          <p className="card-status inspector-hint">Click a marker for details.</p>
-        </section>
-      )}
+              {status?.legend.map((item) => (
+                <span key={item.label} className="legend-item">
+                  <span className="legend-swatch" style={{ backgroundColor: item.color }} />
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          );
+        })}
+        <p className="card-status inspector-hint">Click a marker for details.</p>
+      </section>
       <section className="inspector-section">
         <h2 className="panel-heading">Now</h2>
         <MoonWidget />

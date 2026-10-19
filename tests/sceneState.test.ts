@@ -1,4 +1,4 @@
-import { changeLayerSetting, defaultSceneState, sanitizeSceneState, toggleLayer, toggleSolarLayer } from '../src/scene/sceneState';
+import { changeLayerSetting, defaultSceneState, sanitizeSceneState, toggleLayer, toggleSolarLayer, toggleSunLayer } from '../src/scene/sceneState';
 
 const KNOWN = ['iss', 'quakes', 'fires'];
 const DEFAULTS = ['iss', 'quakes'];
@@ -9,8 +9,10 @@ describe('sceneState', () => {
       scene: 'earth',
       enabledLayers: ['iss', 'quakes'],
       solarLayers: [],
+      sunLayers: [],
       layerSettings: {},
       earthStyle: 'globe',
+      sunWavelength: '0193',
     });
   });
 
@@ -29,8 +31,10 @@ describe('sceneState', () => {
       scene: 'solar-system',
       enabledLayers: ['fires'],
       solarLayers: [],
+      sunLayers: [],
       layerSettings: { fires: { dayRange: 2, list: ['a'] } },
       earthStyle: 'globe',
+      sunWavelength: '0193',
     });
     expect(sanitizeSceneState('garbage', KNOWN, DEFAULTS)).toEqual(defaultSceneState(DEFAULTS));
     expect(sanitizeSceneState({ scene: 'mars' }, KNOWN, DEFAULTS).enabledLayers).toEqual(DEFAULTS);
@@ -50,6 +54,29 @@ describe('sceneState', () => {
     expect(state.layerSettings.comets).toEqual({ maxActive: 5 });
     expect(toggleSolarLayer(state, 'spacecraft').solarLayers).toEqual(['comets', 'spacecraft']);
     expect(toggleSolarLayer(state, 'comets').solarLayers).toEqual([]);
+  });
+
+  it('keeps Sun layers and the wavelength, defaulting them for older storage', () => {
+    const SUN = ['sun-regions', 'sun-flares', 'sun-grid'];
+    const DEFAULT_SUN = ['sun-regions', 'sun-flares'];
+    const old = sanitizeSceneState({ enabledLayers: ['iss'] }, KNOWN, DEFAULTS, [], [], SUN, DEFAULT_SUN);
+    expect(old.sunLayers).toEqual(DEFAULT_SUN);
+    expect(old.sunWavelength).toBe('0193');
+    const state = sanitizeSceneState(
+      { sunLayers: ['sun-grid', 'iss'], sunWavelength: 'HMIB', layerSettings: { 'sun-flares': { hours: 48 } } },
+      KNOWN,
+      DEFAULTS,
+      [],
+      [],
+      SUN,
+      DEFAULT_SUN,
+    );
+    expect(state.sunLayers).toEqual(['sun-grid']);
+    expect(state.sunWavelength).toBe('HMIB');
+    expect(state.layerSettings['sun-flares']).toEqual({ hours: 48 });
+    expect(sanitizeSceneState({ sunWavelength: '9999' }, KNOWN, DEFAULTS).sunWavelength).toBe('0193');
+    expect(toggleSunLayer(state, 'sun-regions').sunLayers).toEqual(['sun-grid', 'sun-regions']);
+    expect(toggleSunLayer(state, 'sun-grid').sunLayers).toEqual([]);
   });
 
   it('toggles layers and merges per-layer settings', () => {

@@ -7,6 +7,7 @@ import {
   sanitizeSceneState,
   toggleLayer,
   toggleSolarLayer,
+  toggleSunLayer,
   type SceneId,
   type SceneState,
 } from './sceneState';
@@ -33,6 +34,8 @@ export function useSceneState(
   defaultLayers: string[],
   knownSolarLayers: string[] = [],
   defaultSolarLayers: string[] = [],
+  knownSunLayers: string[] = [],
+  defaultSunLayers: string[] = [],
   /** Overrides the stored scene tab on load (the "Open on" setting). */
   initialScene: SceneId | null = null,
 ) {
@@ -40,8 +43,8 @@ export function useSceneState(
     const raw = readJson(SCENE_STORAGE_KEY);
     const loaded =
       raw === null
-        ? defaultSceneState(defaultLayers, defaultSolarLayers)
-        : sanitizeSceneState(raw, knownLayers, defaultLayers, knownSolarLayers, defaultSolarLayers);
+        ? defaultSceneState(defaultLayers, defaultSolarLayers, defaultSunLayers)
+        : sanitizeSceneState(raw, knownLayers, defaultLayers, knownSolarLayers, defaultSolarLayers, knownSunLayers, defaultSunLayers);
     return initialScene ? { ...loaded, scene: initialScene } : loaded;
   });
   useEffect(() => writeJson(SCENE_STORAGE_KEY, state), [state]);
@@ -49,10 +52,12 @@ export function useSceneState(
   const setScene = useCallback((scene: SceneId) => setState((prev) => ({ ...prev, scene })), []);
   const toggle = useCallback((id: string) => setState((prev) => toggleLayer(prev, id)), []);
   const toggleSolar = useCallback((id: string) => setState((prev) => toggleSolarLayer(prev, id)), []);
+  const toggleSun = useCallback((id: string) => setState((prev) => toggleSunLayer(prev, id)), []);
   const setLayerSetting = useCallback(
     (id: string, key: string, value: CardSettingValue) => setState((prev) => changeLayerSetting(prev, id, key, value)),
     [],
   );
   const setEarthStyle = useCallback((earthStyle: string) => setState((prev) => ({ ...prev, earthStyle })), []);
-  return { state, setScene, toggle, toggleSolar, setLayerSetting, setEarthStyle };
+  const setSunWavelength = useCallback((sunWavelength: string) => setState((prev) => ({ ...prev, sunWavelength })), []);
+  return { state, setScene, toggle, toggleSolar, toggleSun, setLayerSetting, setEarthStyle, setSunWavelength };
 }

@@ -47,6 +47,14 @@ export function formatTime(input: number | string | Date, zone: TimeZoneSetting 
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())} ${localZoneLabel(d)}`;
 }
 
+/** Just the clock time, "06:52", in the configured zone (chart axes). */
+export function formatClock(input: number | string | Date, zone: TimeZoneSetting = getGlobalSettings().timeZone): string {
+  const ms = toMs(input);
+  if (!Number.isFinite(ms)) return String(input);
+  const d = new Date(ms);
+  return zone === 'utc' ? `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}` : `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** A distance given in km, e.g. "1,234 km" / "767 mi". */
 export function formatDistance(km: number, digits = 0, units: UnitSystem = getGlobalSettings().units): string {
   const value = units === 'imperial' ? km / KM_PER_MILE : km;

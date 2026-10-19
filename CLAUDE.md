@@ -11,7 +11,9 @@ Existing helpers:
 - `scripts/smoke.mjs` — headless Chromium over the Scene view (the whole UI):
   exactly one WebGL canvas, default layers on, a layer toggle persisting, the
   globe rendering, a status chip opening its inspector panel, the scrubber
-  leaving/returning to Live, the Earth/Sun/Solar System tabs, hover-routed
+  leaving/returning to Live, the Earth/Sun/Solar System tabs (Sun: wheel
+  zoom + double-click fit, wavelength swap, grid, region toggle, and a live
+  marker click → details when SWPC delivered any), hover-routed
   keyboard zoom (solar-system canvas), Solar System fly-to (a body chip →
   overlay + view change → "Whole system"), the Solar System data layers
   (on by default, toggling one removes its fly-to chips — UI only, their JPL
@@ -345,12 +347,33 @@ npm run build       # production build → ./dist (local check only — CI deplo
   An open inspector panel in the sheet gets `.scene-sheet-panel` (fixed sheet
   height, the panel body is the *only* scroller) — nested scrollers there
   trapped touch scrolling so the × was unreachable; × (`closeDetails`) goes
-  back to the inspector's list and never closes the sheet. **The Sun tab**
-  (`scene/SunStage.tsx`) lays out the SDO image plus `SUN_PANELS` (flares,
-  solar wind, solar cycle, other wavelengths — `panels.tsx`) as one scrolling
-  grid; those panels are left out of the inspector's "More" list (Kp, NOAA
-  scales, aurora are Earth's response and stay there). The sheet's first tab
-  reads "Layers" on Earth and Solar System, "About" only on Sun.
+  back to the inspector's list and never closes the sheet. The sheet's first tab
+  reads "Layers" on every tab.
+- **The Sun tab (`scene/SunStage.tsx`)** follows the same pattern as the
+  other scenes (the old scrolling card grid is gone): the stage is one
+  zoomable 2D SDO disk (plain `<img>` + an SVG overlay inside a CSS
+  transform; pan/zoom math in `scene/sunView.ts`; wheel/pinch/drag,
+  double-click fits, hover-routed `+`/`-`), the left panel has `sunLayers`
+  (`sun-regions`, `sun-flares`, `sun-grid`; `SceneState.sunLayers`) plus a
+  **Wavelength** radio group (`SceneState.sunWavelength`, `scene/sunImagery.ts`),
+  the inspector shows "On the disk" plus the Sun panels (flares, wind, cycle)
+  under "More", and the bottom strip is `XrayTimeline` (GOES 1–8 Å flux over
+  24 h on a log scale with C+ flares marked; a click opens the flare list).
+  Layers are `LayerDefinition<SunFrame>`; markers are in **Stonyhurst lat/lon,
+  west positive, already rotated to now**, and `astro/sunDisk.ts` projects
+  them using B0 and the apparent radius. Disk geometry: SDO's "latest" images
+  are north-up and centred, so the disk radius in image px = angular radius ÷
+  plate scale (AIA 2.4″/px, HMI 2.016″/px at 1024 px; HMI's measured limb at
+  478 px matches exactly). SWPC sources (all CORS `*`, under the proxy's
+  `json/` prefix): `solar_regions.json` (30 days of daily reports; **longitude
+  is east-positive**, and **the positions for `observed_date` D are valid at
+  D+1 00:00 UTC**, calibrated against 296 optical flare locations and the HMI
+  sunspots; assuming D 00:00 put every ring a day of rotation too far west),
+  `edited_events.json` (XRA = GOES flares with their region, listed once per
+  GOES satellite, so the duplicates are merged; FLA = optical flares with a
+  location), and `goes/primary/xrays-1-day.json`. SVG gotcha: `vector-effect:
+  non-scaling-stroke` is **not inherited**, so set it on every shape; without
+  it the limb circle got a stroke a third of the image wide.
 - **Time cursor**: `TimeScrubber` (±7 d, playback speeds) sets `time` (null =
   live). Layers get it via `useLayer(settings, time)` + `useClock`; the globe's
   sun position and `SolarSystemCard` (new optional `time` prop on
