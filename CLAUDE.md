@@ -75,10 +75,15 @@ npm run build       # production build → ./dist (local check only — CI deplo
   `satellite.js` (TLE → geodetic position) and `astronomy-engine` (planet
   heliocentric vectors + `moonPositions.ts`), plus `coords.ts` for lat/lon/AU →
   3D scene vectors. **astronomy-engine only has moon ephemerides for Earth's
-  Moon (`GeoMoon`) and Jupiter's four Galilean moons (`JupiterMoons`)** — there
-  is no data for Saturn/Uranus/Neptune moons, so the Solar System scene shows
-  only those five (drawn on exaggerated display orbits since real separations
-  are far smaller than a planet's rendered radius).
+  Moon (`GeoMoon`) and Jupiter's four Galilean moons (`JupiterMoons`).**
+  Phobos/Deimos and Saturn's seven largest moons come from
+  `astro/moonOrbits.ts`: a circle in a fixed plane with a linear angle per
+  moon, fitted to JPL Horizons by `scripts/fitMoonOrbits.mjs` (≤ ~3.5° off over
+  2020–2033, Mimas ~8°; re-run it to refresh). Uranus/Neptune moons are absent.
+  All moons ride exaggerated display orbits (real separations are far smaller
+  than a planet's rendered radius); a `MoonPosition.orbitPole` draws the orbit
+  in that plane (Saturn's: the ring plane, starting outside the rings),
+  otherwise it's flattened into the ecliptic.
 - **Caching proxy (`worker/`, Cloudflare Worker
   `https://space-radar-proxy.dmitry-weiner.workers.dev`, see `backend-plan.md`).**
   `worker/src/routes.ts` is the single allowlist table (service → upstream,

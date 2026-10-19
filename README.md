@@ -58,8 +58,9 @@ Your choices are saved locally.
   a heliographic **coordinate grid**. Below the disk, a 24-hour GOES **X-ray
   flux** timeline with C-class and stronger flares marked; the inspector adds
   flares & CMEs, solar wind and the solar cycle.
-- **Solar System** — the Sun, the eight planets, Earth's Moon and Jupiter's
-  four Galilean moons with **real surface maps**, sized by their real relative
+- **Solar System** — the Sun, the eight planets, Earth's Moon, Jupiter's
+  four Galilean moons, Mars's Phobos and Deimos and Saturn's seven largest
+  moons (Mimas … Titan, Iapetus) with **real surface maps**, sized by their real relative
   diameters and each turned on its **real spin axis** (Saturn's rings tilt,
   Uranus lies on its side), positions computed offline via `astronomy-engine`.
   Click a body (or its name, or a chip in the side panel) to fly to it; the
@@ -177,6 +178,19 @@ mosaics via Wikimedia Commons
 [Europa](https://commons.wikimedia.org/wiki/File:Europa_Voyager_GalileoSSI_global_mosaic.jpg),
 [Ganymede](https://commons.wikimedia.org/wiki/File:Ganymede_map_NASA_JPL_Voyager.jpg),
 [Callisto](https://commons.wikimedia.org/wiki/File:Callisto_map_NASA_JPL_Voyager.jpg)).
+Saturn's moons use the public-domain NASA/JPL/Space Science Institute Cassini
+colour mosaics ([Mimas](https://commons.wikimedia.org/wiki/File:Map_of_Mimas_colorized_2014-04_PIA18437.jpg),
+[Enceladus](https://commons.wikimedia.org/wiki/File:Enceladus_Color_Map.jpg),
+[Tethys](https://commons.wikimedia.org/wiki/File:Tethys_Color_Map.jpg),
+[Dione](https://commons.wikimedia.org/wiki/File:Dione_Color_Map.jpg),
+[Rhea](https://commons.wikimedia.org/wiki/File:Rhea_Color_Map.jpg),
+[Iapetus](https://commons.wikimedia.org/wiki/File:Iapetus_Color_Map.jpg));
+Titan is a flat haze colour. Phobos and Deimos maps are by Askaniy
+([Phobos](https://commons.wikimedia.org/wiki/File:Phobos_map_by_Askaniy.png),
+[Deimos](https://commons.wikimedia.org/wiki/File:Deimos_map_by_Askaniy.png),
+CC BY-SA 3.0). Those moons' positions come from circular mean orbits fitted to
+JPL Horizons (`scripts/fitMoonOrbits.mjs`), since `astronomy-engine` has no
+ephemerides for them.
 
 The flat "map" Earth style (an alternative to the default photographic globe,
 selectable in the layer panel) uses a blank political world map from

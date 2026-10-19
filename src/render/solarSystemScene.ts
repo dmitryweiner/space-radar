@@ -24,6 +24,14 @@ import ioTextureUrl from '../assets/planets/io.jpg';
 import europaTextureUrl from '../assets/planets/europa.jpg';
 import ganymedeTextureUrl from '../assets/planets/ganymede.jpg';
 import callistoTextureUrl from '../assets/planets/callisto.jpg';
+import phobosTextureUrl from '../assets/planets/phobos.jpg';
+import deimosTextureUrl from '../assets/planets/deimos.jpg';
+import mimasTextureUrl from '../assets/planets/mimas.jpg';
+import enceladusTextureUrl from '../assets/planets/enceladus.jpg';
+import tethysTextureUrl from '../assets/planets/tethys.jpg';
+import dioneTextureUrl from '../assets/planets/dione.jpg';
+import rheaTextureUrl from '../assets/planets/rhea.jpg';
+import iapetusTextureUrl from '../assets/planets/iapetus.jpg';
 import { createFrameGate, pixelRatioFor } from './lowPower';
 
 const UNITS_PER_AU = 6;
@@ -48,12 +56,24 @@ const BODY_RADII_KM: Record<string, number> = {
   Europa: 1560.8,
   Ganymede: 2634.1,
   Callisto: 2410.3,
+  Phobos: 11.08,
+  Deimos: 6.2,
+  Mimas: 198.2,
+  Enceladus: 252.1,
+  Tethys: 531.1,
+  Dione: 561.4,
+  Rhea: 763.8,
+  Titan: 2574.7,
+  Iapetus: 734.5,
 };
 
 // Equirectangular surface maps. Planets, the Sun and the Moon: Solar System
 // Scope (CC BY 4.0, from NASA mission data); Venus shows its cloud tops, the
 // gas giants their cloud bands. Galilean moons: NASA/JPL/USGS Voyager +
-// Galileo mosaics (public domain). All downscaled to 1024×512.
+// Galileo mosaics (public domain); Saturn's moons: NASA/JPL/Space Science
+// Institute Cassini colour mosaics (public domain); Phobos/Deimos: maps by
+// Askaniy on Wikimedia Commons (CC BY-SA 3.0). Titan has none — its haze hides
+// the surface in visible light, so it's a flat colour. All 1024×512.
 const BODY_TEXTURES: Record<string, string> = {
   Sun: sunTextureUrl,
   Mercury: mercuryTextureUrl,
@@ -69,6 +89,14 @@ const BODY_TEXTURES: Record<string, string> = {
   Europa: europaTextureUrl,
   Ganymede: ganymedeTextureUrl,
   Callisto: callistoTextureUrl,
+  Phobos: phobosTextureUrl,
+  Deimos: deimosTextureUrl,
+  Mimas: mimasTextureUrl,
+  Enceladus: enceladusTextureUrl,
+  Tethys: tethysTextureUrl,
+  Dione: dioneTextureUrl,
+  Rhea: rheaTextureUrl,
+  Iapetus: iapetusTextureUrl,
 };
 
 // One shared exaggeration factor keeps the planets in true proportion to each
@@ -99,9 +127,11 @@ function bodyRadiusUnits(name: string): number {
 }
 
 // Moons sit far too close to their planet to see at true scale, so they're
-// drawn on exaggerated display orbits (real longitude kept, inclination
-// flattened into the ecliptic plane) that start just outside the planet body.
+// drawn on exaggerated display orbits that start just outside the planet body
+// (Saturn's: outside its rings). Real direction kept, in the moon's orbit
+// plane when the ephemeris gives one, otherwise flattened into the ecliptic.
 const MOON_ORBIT_GAP = 0.35;
+const SATURN_MOON_ORBIT_GAP = 0.25;
 const MOON_RADIUS_STEP = 0.4;
 // Constant on-screen label sizes, in CSS pixels — unchanged by zoom or by
 // the canvas size (see scaleLabelToScreen). Labels sit just above their body
@@ -146,6 +176,7 @@ const PLANET_COLORS: Record<string, number> = {
   Saturn: 0xe0c48a,
   Uranus: 0x9de0e0,
   Neptune: 0x4166f5,
+  Titan: 0xd9a24e,
 };
 
 /** A point object from a layer: true heliocentric position (AU). */
@@ -220,6 +251,8 @@ export interface SolarSystemSceneHandle {
   resize(): void;
   dispose(): void;
 }
+
+const RING_NORMAL = new THREE.Vector3(0, 1, 0);
 
 function moonRingGeometry(radius: number): THREE.BufferGeometry {
   const segments = 48;
@@ -390,6 +423,7 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   let orientations: Record<string, BodyOrientation> = {};
 
   const scratch = new THREE.Vector3();
+  const scratchPole = new THREE.Vector3();
   const scratchNorth = new THREE.Vector3();
   const scratchMeridian = new THREE.Vector3();
   const scratchEast = new THREE.Vector3();
@@ -869,7 +903,9 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
         let moon = moons.get(position.name);
         if (!moon) {
           const radius = bodyRadiusUnits(position.name);
-          const orbitRadius = planet.radius + MOON_ORBIT_GAP + position.order * MOON_RADIUS_STEP;
+          const innerRadius =
+            position.planet === 'Saturn' ? planet.radius * SATURN_RING_OUTER + SATURN_MOON_ORBIT_GAP : planet.radius + MOON_ORBIT_GAP;
+          const orbitRadius = innerRadius + position.order * MOON_RADIUS_STEP;
           const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 16), bodyMaterial(position.name));
           const ring = new THREE.LineLoop(moonRingGeometry(orbitRadius), moonRingMaterial);
           const label = makeLabelSprite(position.name, '#cfd4e0');
@@ -888,15 +924,23 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
           moons.set(position.name, moon);
           orient(mesh, orientations[position.name] ?? orientations[position.planet]);
         }
-        // Real longitude from the ephemeris, flattened into the ecliptic plane.
-        const offset = heliocentricToSceneVector(position.offsetAu.xAu, position.offsetAu.yAu, position.offsetAu.zAu, 1);
-        scratch.set(offset.x, 0, offset.z);
+        // Real direction from the ephemeris, projected into the orbit plane
+        // (the ecliptic when there's no pole); the ring (built in XZ) is
+        // turned to match.
+        if (position.orbitPole) {
+          toScene(position.orbitPole, scratchPole).normalize();
+        } else {
+          scratchPole.set(0, 1, 0);
+        }
+        toScene(position.offsetAu, scratch);
+        scratch.addScaledVector(scratchPole, -scratch.dot(scratchPole));
         if (scratch.lengthSq() === 0) {
           scratch.set(1, 0, 0);
         }
         scratch.normalize();
         moon.mesh.position.copy(planet.mesh.position).addScaledVector(scratch, moon.orbitRadius);
         moon.ring.position.copy(planet.mesh.position);
+        moon.ring.quaternion.setFromUnitVectors(RING_NORMAL, scratchPole);
       }
     },
     setOrientations(next) {

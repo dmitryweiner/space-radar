@@ -43,9 +43,9 @@ const SOLAR_BODIES: { name: string; moons: string[] }[] = [
   { name: 'Mercury', moons: [] },
   { name: 'Venus', moons: [] },
   { name: 'Earth', moons: ['Moon'] },
-  { name: 'Mars', moons: [] },
+  { name: 'Mars', moons: ['Phobos', 'Deimos'] },
   { name: 'Jupiter', moons: ['Io', 'Europa', 'Ganymede', 'Callisto'] },
-  { name: 'Saturn', moons: [] },
+  { name: 'Saturn', moons: ['Mimas', 'Enceladus', 'Tethys', 'Dione', 'Rhea', 'Titan', 'Iapetus'] },
   { name: 'Uranus', moons: [] },
   { name: 'Neptune', moons: [] },
 ];
@@ -245,7 +245,7 @@ export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startSce
       <div className="layer-panel">
         <h2 className="panel-heading">Solar System</h2>
         <p className="card-status">
-          Planets and the Moon/Galilean moons at the time on the scrubber, each turned on its real axis. Sizes are to
+          Planets and the largest moons (Earth, Mars, Jupiter, Saturn) at the time on the scrubber, each turned on its real axis. Sizes are to
           scale with each other (the Sun shrunk); moons ride exaggerated display orbits.
         </p>
         <LayerPanel
@@ -302,7 +302,8 @@ export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startSce
         </div>
         <p className="card-status body-credits">
           Surface maps: <a className="detail-link" href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noreferrer">Solar System Scope</a>{' '}
-          (CC BY 4.0); Galilean moons: NASA/JPL/USGS.
+          (CC BY 4.0); Galilean moons: NASA/JPL/USGS; Saturn's moons: NASA/JPL/SSI (Cassini); Phobos &amp; Deimos:{' '}
+          <a className="detail-link" href="https://commons.wikimedia.org/wiki/File:Phobos_map_by_Askaniy.png" target="_blank" rel="noreferrer">Askaniy</a> (CC BY-SA 3.0).
         </p>
       </div>
     );
