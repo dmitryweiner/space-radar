@@ -70,7 +70,8 @@ const browser = await chromium.launch();
 
 // ---------------------------------------------------------------- Scene view
 ctxLabel = 'scene';
-const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+// A fixed non-UTC zone, so the "local time" check means the same on any machine.
+const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, timezoneId: 'Asia/Tokyo' });
 attach(page);
 {
   const scenePage = page;

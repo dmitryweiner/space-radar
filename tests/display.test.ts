@@ -14,9 +14,9 @@ describe('formatTime', () => {
     const ms = Date.UTC(2026, 9, 19, 6, 23);
     const d = new Date(ms);
     const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    const text = formatTime(ms, 'local');
-    expect(text).toContain(hhmm);
-    expect(text).not.toMatch(/UTC$/);
+    // The zone label depends on the machine's zone (CI runs in UTC), so only
+    // the local clock time is checked.
+    expect(formatTime(ms, 'local')).toContain(hhmm);
   });
 
   it('passes unparseable strings through', () => {
