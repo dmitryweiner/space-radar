@@ -1,39 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="28 0 32 32" role="img" aria-label="Space Radar">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Space Radar">
   <defs>
-    <!-- Anchored in the original scope's coordinates (userSpaceOnUse) so the
-         cropped top-right quarter stays dark toward the corner and lighter
-         toward the scope centre at the bottom-left. -->
-    <radialGradient id="scope" gradientUnits="userSpaceOnUse" cx="32" cy="29" r="46">
-      <stop offset="0%" stop-color="#13233f"/>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#16305a"/>
       <stop offset="100%" stop-color="#05070d"/>
     </radialGradient>
-    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0.7">
-      <stop offset="0%" stop-color="#5eb1ff" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="#5eb1ff" stop-opacity="0"/>
+    <!-- The sweep fades from its bright leading edge (up-right) back to its
+         trailing edge (up-left); userSpaceOnUse so it follows the wedge. -->
+    <linearGradient id="sweep" gradientUnits="userSpaceOnUse" x1="20" y1="14" x2="46" y2="22">
+      <stop offset="0%" stop-color="#5eb1ff" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#8fd0ff" stop-opacity="0.95"/>
     </linearGradient>
+    <radialGradient id="earth" cx="38%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#8fe0ff"/>
+      <stop offset="55%" stop-color="#2d7fd6"/>
+      <stop offset="100%" stop-color="#0d2f66"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd166" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#fab219" stop-opacity="0"/>
+    </radialGradient>
   </defs>
 
-  <!-- full-bleed background of the cropped top-right quarter -->
-  <rect x="28" y="0" width="32" height="32" fill="url(#scope)"/>
+  <!-- tile -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
 
-  <!-- radar range rings (centred on the original scope centre) -->
-  <g fill="none" stroke="#5eb1ff" stroke-opacity="0.32" stroke-width="1.6">
-    <circle cx="32" cy="32" r="22"/>
-    <circle cx="32" cy="32" r="14.5"/>
-    <circle cx="32" cy="32" r="7"/>
+  <!-- range rings + crosshair -->
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#5eb1ff" stroke-opacity="0.85" stroke-width="3"/>
+  <circle cx="32" cy="32" r="16" fill="none" stroke="#5eb1ff" stroke-opacity="0.35" stroke-width="2"/>
+  <g stroke="#5eb1ff" stroke-opacity="0.22" stroke-width="1.5">
+    <line x1="32" y1="6" x2="32" y2="58"/>
+    <line x1="6" y1="32" x2="58" y2="32"/>
   </g>
 
-  <!-- crosshair (left + bottom edges of the quarter) -->
-  <g stroke="#5eb1ff" stroke-opacity="0.2" stroke-width="1.4">
-    <line x1="32" y1="9" x2="32" y2="55"/>
-    <line x1="9" y1="32" x2="55" y2="32"/>
-  </g>
+  <!-- sweep wedge (−30° … +45° from north) + bright leading edge -->
+  <path d="M32 32 L19 9.48 A26 26 0 0 1 50.38 13.62 Z" fill="url(#sweep)"/>
+  <line x1="32" y1="32" x2="50.38" y2="13.62" stroke="#c8e8ff" stroke-width="3" stroke-linecap="round"/>
 
-  <!-- sweep wedge + bright leading edge -->
-  <path d="M32 32 L32 10 A22 22 0 0 1 52.5 22.5 Z" fill="url(#sweep)"/>
-  <line x1="32" y1="32" x2="32" y2="10" stroke="#9fd0ff" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Earth at the centre of the scope -->
+  <circle cx="32" cy="32" r="8" fill="url(#earth)" stroke="#05070d" stroke-width="1.5"/>
 
-  <!-- target blip -->
-  <circle cx="44.5" cy="24" r="6.5" fill="none" stroke="#fab219" stroke-opacity="0.45" stroke-width="1.6"/>
-  <circle cx="44.5" cy="24" r="3.6" fill="#fab219"/>
+  <!-- a faint satellite contact on the far side -->
+  <circle cx="18.5" cy="45" r="2.4" fill="#7cc4ff" fill-opacity="0.8"/>
+
+  <!-- the fresh contact, just behind the sweep line -->
+  <circle cx="40" cy="17" r="11" fill="url(#glow)"/>
+  <circle cx="40" cy="17" r="5.2" fill="#fab219" stroke="#fff3c4" stroke-width="1"/>
 </svg>

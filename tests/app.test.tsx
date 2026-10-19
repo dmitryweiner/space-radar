@@ -51,6 +51,7 @@ vi.mock('../src/render/solarSystemScene', () => ({
 }));
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/');
   window.localStorage.clear();
   reloadGlobalSettings();
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('no network in tests')));
@@ -80,6 +81,26 @@ describe('App', () => {
     reloadGlobalSettings();
     render(<App />);
     expect(screen.getByRole('tab', { name: 'Sun' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('opens the tab named in the URL hash, over "Open on" and the last tab', () => {
+    window.localStorage.setItem('space-radar:global-settings:v1', JSON.stringify({ startScene: 'sun' }));
+    reloadGlobalSettings();
+    window.history.replaceState(null, '', '/#solar-system');
+    render(<App />);
+    expect(screen.getByRole('tab', { name: 'Solar System' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('keeps the URL hash on the current tab and follows hash changes', async () => {
+    render(<App />);
+    expect(window.location.hash).toBe('#earth');
+    await userEvent.click(screen.getByRole('tab', { name: 'Sun' }));
+    expect(window.location.hash).toBe('#sun');
+    act(() => {
+      window.history.replaceState(null, '', '/#solar-system');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    expect(screen.getByRole('tab', { name: 'Solar System' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('switches times to local and distances to miles from the general settings', async () => {

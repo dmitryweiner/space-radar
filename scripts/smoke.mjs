@@ -3,7 +3,7 @@
 // in vitest (jsdom has none of them), so we drive a real Chromium instance here
 // instead. Covers the Scene view: one shared globe with default layers, layer
 // toggles persisting, the globe rendering, a status chip opening its inspector
-// panel, the time scrubber, the Earth/Sun/Solar System tabs (the Sun disk's
+// panel, the time scrubber, the Earth/Sun/Solar System tabs and their #hash links (the Sun disk's
 // zoom, wavelength, grid, marker details), hover-routed
 // keyboard zoom, Solar System fly-to, auto-rotate stop-only-on-move, the
 // general settings popup, the Earth style select, and the phone layout
@@ -131,6 +131,23 @@ attach(page);
   if ((await scenePage.getByTestId('scene-canvas').count()) !== 1) errors.push('[scene] Earth globe did not come back');
   else console.log('scene: Earth / Sun / Solar System tabs ok');
 
+  // hash links: each tab writes its #hash, Back returns to the previous tab,
+  // and opening a #hash URL lands on that tab
+  const selectedTab = () => scenePage.locator('.scene-tabs [aria-selected="true"]').textContent();
+  const hashErrors = errors.length;
+  if (!scenePage.url().endsWith('#earth')) errors.push(`[scene] Earth tab URL has no #earth: ${scenePage.url()}`);
+  await scenePage.getByRole('tab', { name: 'Sun' }).click();
+  if (!scenePage.url().endsWith('#sun')) errors.push(`[scene] Sun tab URL has no #sun: ${scenePage.url()}`);
+  await scenePage.goBack();
+  await scenePage.waitForTimeout(300);
+  if ((await selectedTab()) !== 'Earth') errors.push(`[scene] Back from #sun did not return to Earth (${await selectedTab()})`);
+  await scenePage.goto(`${BASE}#solar-system`);
+  await scenePage.waitForTimeout(500);
+  if ((await selectedTab()) !== 'Solar System') errors.push(`[scene] #solar-system opened ${await selectedTab()}`);
+  await scenePage.goto(`${BASE}#earth`);
+  await scenePage.waitForTimeout(500);
+  if ((await selectedTab()) !== 'Earth') errors.push(`[scene] #earth opened ${await selectedTab()}`);
+  if (errors.length === hashErrors) console.log('scene: #earth / #sun / #solar-system hash links ok');
 }
 
 // The Sun tab: one zoomable SDO disk with overlay layers, a wavelength radio

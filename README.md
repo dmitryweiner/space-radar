@@ -28,6 +28,10 @@ Your choices are saved locally.
   - **Active fires** — VIIRS/MODIS detections from NASA FIRMS, strongest fires
     labelled (needs a free FIRMS MAP_KEY — see below).
   - **Aurora oval** — NOAA OVATION probability grid as a glowing point cloud.
+  - **Fireballs** — bolides reported by US government sensors (JPL), with
+    location and impact energy.
+  - **Night lights** — NASA Black Marble city lights, shown on the night side
+    only.
 - **Time scrubber** (±7 days, with playback at 1 min/s … 1 day/s): satellites,
   the terminator, night lights, the Moon, asteroid flybys and the Solar System
   all follow it. "Live" returns to now.
@@ -39,11 +43,21 @@ Your choices are saved locally.
   Moon, the Sun right now, and detail panels — Kp-index and solar-wind charts,
   solar flares & CMEs, the aurora forecast image, upcoming launches, today's
   near-Earth asteroids, the Moon & eclipses, the solar cycle, EPIC full-disk
-  Earth photos from L1, APOD, the Sun in other wavelengths (SDO), and the NASA
-  image library.
+  Earth photos from L1, APOD, and the NASA image library.
 - **Status bar**: NOAA R/S/G space-weather scales, Kp, solar-wind speed, people
   in space, next launch — click a chip for details.
-- Scenes: **Earth**, **Sun** (SDO) and **Solar System**.
+- Scenes: **Earth**, **Sun** and **Solar System** — each tab has its own link
+  ([`#earth`](https://dmitryweiner.github.io/space-radar/#earth),
+  [`#sun`](https://dmitryweiner.github.io/space-radar/#sun),
+  [`#solar-system`](https://dmitryweiner.github.io/space-radar/#solar-system)),
+  and Back returns to the previous tab.
+- **Sun** — the latest full-disk SDO image, zoomable and pannable (wheel,
+  pinch, drag, `+`/`-`; double-click fits), in six wavelengths from the corona
+  to visible light and the magnetogram. Overlays: NOAA **active regions** and
+  **recent flares** at their real positions on the disk (rotated to now), and
+  a heliographic **coordinate grid**. Below the disk, a 24-hour GOES **X-ray
+  flux** timeline with C-class and stronger flares marked; the inspector adds
+  flares & CMEs, solar wind and the solar cycle.
 - **Solar System** — the Sun, the eight planets, Earth's Moon and Jupiter's
   four Galilean moons with **real surface maps**, sized by their real relative
   diameters and each turned on its **real spin axis** (Saturn's rings tilt,
@@ -63,8 +77,10 @@ Your choices are saved locally.
   Beyond 35 AU the distance scale is compressed so the Voyagers fit on screen.
 - The 3D views **rotate by dragging** and **zoom** with the mouse wheel,
   trackpad pinch, or `+`/`-`. The globe idle-spins until you drag it — zooming
-  never stops the spin. **Settings** in the header: label/marker size and
-  auto-rotate speed (0 turns it off).
+  never stops the spin.
+- **Settings** in the header: label/marker size, auto-rotate speed (0 turns it
+  off), UTC or local time, metric or imperial units, which tab to open on, a
+  data saver (slower refresh, smaller images, 30 fps), and "reset everything".
 - On phones the globe is full screen (one finger rotates it — the page doesn't
   scroll), layers and details live in a bottom sheet, and the status chips
   scroll sideways.
@@ -88,8 +104,9 @@ npm run worker:tail     # live proxy logs
 
 ```
 src/api/       fetch + parse for each data source (CelesTrak, NOAA SWPC + GOES,
-               NASA DONKI/NeoWs/EONET/APOD/FIRMS/EPIC/Images, USGS quakes,
-               Launch Library 2) — pure functions, no React/Three
+               NASA DONKI/NeoWs/EONET/APOD/FIRMS/EPIC/GIBS/Images, JPL
+               Horizons/SBDB/fireballs, USGS quakes, Launch Library 2) — pure
+               functions, no React/Three
 src/astro/     pure orbital/astronomical math: TLE -> geodetic position
                (satellite.js), planet + moon vectors, Moon phase / apsides /
                eclipses (astronomy-engine), lat/lon/AU -> 3D scene coordinates.
@@ -98,13 +115,15 @@ src/render/    thin Three.js layer: Earth globe + solar-system scenes, plus
                starfield / label-sprite / orbit-trail helpers
 src/hooks/     useApiResource — generic polling + localStorage TTL cache
                (requests deduped across components); sharedResources
-src/layers/    one LayerDefinition per geographic source: settings + a
-               useLayer(settings, time) hook returning what to draw
-src/scene/     the Scene view: globe stage, layer panel, inspector, status
-               bar, time scrubber, persisted scene state
+src/layers/    one LayerDefinition per data layer (Earth, Sun, Solar System):
+               settings + a useLayer(settings, time) hook returning what to draw
+src/scene/     the Scene view: Earth / Sun / Solar System stages, layer panel,
+               inspector, status bar, time scrubber, X-ray timeline, persisted
+               scene state (+ the #hash tab links)
 src/settings/  setting types/readers, form fields, general settings popup
+src/format/    every user-visible time / distance / speed (time zone, units)
 src/cards/     self-contained panels shown in the inspector (charts, lists,
-               images) plus the Solar System scene component
+               images)
 worker/        Cloudflare Worker: caching proxy over an allowlist of the
                upstream APIs (see backend-plan.md)
 ```
@@ -112,8 +131,8 @@ worker/        Cloudflare Worker: caching proxy over an allowlist of the
 All API traffic goes through the **caching proxy** first (one shared cache
 for every visitor: stale-while-revalidate, last good copy on upstream errors,
 API keys kept as worker secrets) and falls back to calling the upstream
-directly if the proxy is unavailable. JPL data (fireballs) has no CORS, so it
-works only through the proxy.
+directly if the proxy is unavailable. JPL data (fireballs, comets, spacecraft
+via Horizons) has no CORS, so it works only through the proxy.
 
 `src/astro/` never imports Three.js and `src/api/` never imports React — the
 same core/UI separation used in the sibling `mathsculpt` project. Three.js
@@ -127,7 +146,8 @@ mount it are exercised by `scripts/smoke.mjs` in a real browser rather than by
 |---|---|---|
 | [CelesTrak](https://celestrak.org/) | satellite TLEs | none |
 | [NOAA SWPC](https://www.swpc.noaa.gov/) | Kp-index, solar wind, aurora | none |
-| [NOAA SWPC GOES](https://www.swpc.noaa.gov/) | solar flares (X-ray events) | none |
+| [NOAA SWPC GOES](https://www.swpc.noaa.gov/) | solar flares (X-ray events), 24 h X-ray flux | none |
+| [NOAA SWPC regions & events](https://www.swpc.noaa.gov/products/solar-region-summary) | active regions and flare locations on the Sun disk | none |
 | [NASA DONKI](https://ccmc.gsfc.nasa.gov/tools/DONKI/) | CMEs (best-effort) | personal key |
 | [NASA NeoWs](https://api.nasa.gov/) | near-Earth asteroids and their orbital elements | personal key |
 | [NASA EONET](https://eonet.gsfc.nasa.gov/) | natural events (wildfires, volcanoes, …) | none |
@@ -136,7 +156,7 @@ mount it are exercised by `scripts/smoke.mjs` in a real browser rather than by
 | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/) | active fire detections (VIIRS/MODIS) | MAP_KEY |
 | [NASA EPIC](https://epic.gsfc.nasa.gov/) | full-disk Earth images from DSCOVR/L1 | none |
 | [USGS Earthquakes](https://earthquake.usgs.gov/earthquakes/feed/v1.0/) | realtime earthquake feeds | none |
-| [NASA SDO](https://sdo.gsfc.nasa.gov/) / [NOAA GOES](https://www.star.nesdis.noaa.gov/GOES/) | live Sun / Earth images | none |
+| [NASA SDO](https://sdo.gsfc.nasa.gov/) / [NOAA GOES](https://www.star.nesdis.noaa.gov/GOES/) | live Sun (six wavelengths) / Earth images | none |
 | [NOAA SWPC solar cycle](https://www.swpc.noaa.gov/products/solar-cycle-progression) | observed + predicted sunspot number / F10.7 | none |
 | [NOAA SWPC OVATION](https://www.swpc.noaa.gov/products/aurora-30-minute-forecast) | aurora probability grid | none |
 | `astronomy-engine` (offline) | Moon phase, apsides, eclipses | none |
@@ -164,7 +184,7 @@ selectable in the layer panel) uses a blank political world map from
 by FelixCountryBalls163 (CC BY 4.0), downscaled to 2048×1024.
 
 The favicon (`public/favicon.svg`) is a self-contained SVG radar scope in the
-app's palette. It lives in `public/` (copied verbatim to `dist/` on build) and
+app's palette: Earth at the centre, a sweep and a fresh amber contact. It lives in `public/` (copied verbatim to `dist/` on build) and
 is referenced from `index.html` with a relative `./favicon.svg` path so it
 resolves under the GitHub Pages sub-path.
 

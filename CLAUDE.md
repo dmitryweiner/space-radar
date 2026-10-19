@@ -111,10 +111,10 @@ npm run build       # production build → ./dist (local check only — CI deplo
   takes an injectable fetch function (default: global `fetch`) so tests can
   mock it without touching the network.
 - Static assets live in `public/` (copied verbatim to `dist/` on build) —
-  currently `favicon.svg`, a self-contained SVG radar scope (cropped to its
-  top-right quarter via `viewBox="28 0 32 32"`, full-bleed; the `#scope`
-  gradient uses `gradientUnits="userSpaceOnUse"` so the crop stays dark toward
-  the corner) referenced from `index.html`. Reference it with a **relative**
+  currently `favicon.svg`, a self-contained SVG radar scope (64×64 rounded
+  tile: rings, a sweep wedge whose gradient is `userSpaceOnUse` so it fades
+  from the leading edge, Earth at the centre, an amber contact with a glow —
+  shapes kept bold enough to read at 16 px) referenced from `index.html`. Reference it with a **relative**
   `./favicon.svg` (not `/…`) so it resolves under the GitHub Pages sub-path
   (`vite.config.ts` sets `base: './'`).
 - **This Vite version (8.x) bundles with Rolldown, not Rollup** — its
@@ -331,7 +331,13 @@ npm run build       # production build → ./dist (local check only — CI deplo
   "Dashboard" was removed; its leftover `space-radar:layout:v1` /
   `space-radar:ui-mode:v1` localStorage keys are simply ignored). Scene state
   (`space-radar:scene:v1`: scene tab, enabled layers, per-layer settings,
-  Earth style) is sanitized field by field (`sceneState.ts`). `EarthStage`
+  Earth style) is sanitized field by field (`sceneState.ts`). **Tabs have hash
+  links** (`#earth`, `#sun`, `#solar-system`; `sceneFromHash` also takes
+  `#solar`): on load the hash beats "Open on" and the stored tab;
+  `useSceneState` keeps the hash in sync (first sync `replaceState`, later tab
+  switches `pushState` so Back returns to the previous tab) and follows
+  `hashchange`/`popstate`. `tests/app.test.tsx` resets the URL in
+  `beforeEach` — jsdom's location survives between tests. `EarthStage`
   owns one `createEarthScene` and mounts one render-less `LayerHost` per
   enabled layer (from `layers/registry.ts`), which runs the layer hook,
   `applyFrame`s into `scene.layer(id)` and on unmount `removeLayer`s. Hosts

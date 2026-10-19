@@ -40,6 +40,20 @@ function isSceneId(value: unknown): value is SceneId {
   return value === 'earth' || value === 'sun' || value === 'solar-system';
 }
 
+// Each tab has a shareable hash link: `#earth`, `#sun`, `#solar-system`
+// (case-insensitive; `#solar` / `#solarsystem` are accepted too).
+const HASH_ALIASES: Record<string, SceneId> = { solar: 'solar-system', solarsystem: 'solar-system' };
+
+export function sceneFromHash(hash: string): SceneId | null {
+  const key = decodeURIComponent(hash.replace(/^#\/?/, '')).trim().toLowerCase().replace(/[\s_]+/g, '-');
+  if (isSceneId(key)) return key;
+  return HASH_ALIASES[key.replace(/-/g, '')] ?? null;
+}
+
+export function sceneHash(scene: SceneId): string {
+  return `#${scene}`;
+}
+
 export function defaultSceneState(defaultLayers: string[], defaultSolarLayers: string[] = [], defaultSunLayers: string[] = []): SceneState {
   return {
     scene: 'earth',

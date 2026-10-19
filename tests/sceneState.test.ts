@@ -1,9 +1,30 @@
-import { changeLayerSetting, defaultSceneState, sanitizeSceneState, toggleLayer, toggleSolarLayer, toggleSunLayer } from '../src/scene/sceneState';
+import {
+  changeLayerSetting,
+  defaultSceneState,
+  sanitizeSceneState,
+  sceneFromHash,
+  sceneHash,
+  toggleLayer,
+  toggleSolarLayer,
+  toggleSunLayer,
+} from '../src/scene/sceneState';
 
 const KNOWN = ['iss', 'quakes', 'fires'];
 const DEFAULTS = ['iss', 'quakes'];
 
 describe('sceneState', () => {
+  it('maps URL hashes to scene tabs and back', () => {
+    expect(sceneFromHash('#earth')).toBe('earth');
+    expect(sceneFromHash('#Sun')).toBe('sun');
+    expect(sceneFromHash('#solar-system')).toBe('solar-system');
+    expect(sceneFromHash('#/solar')).toBe('solar-system');
+    expect(sceneFromHash('#solarsystem')).toBe('solar-system');
+    expect(sceneFromHash('#Solar%20System')).toBe('solar-system');
+    expect(sceneFromHash('')).toBeNull();
+    expect(sceneFromHash('#mars')).toBeNull();
+    expect(sceneFromHash(sceneHash('solar-system'))).toBe('solar-system');
+  });
+
   it('defaults to the Earth scene with the default layers', () => {
     expect(defaultSceneState(DEFAULTS)).toEqual({
       scene: 'earth',
