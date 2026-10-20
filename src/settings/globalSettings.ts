@@ -33,8 +33,8 @@ export interface GlobalSettings {
    * (localStorage), so desktop and mobile naturally keep independent values
    * with no viewport-based branching needed. */
   labelScale: number;
-  /** Multiplies the Earth globe's idle auto-rotate speed
-   * (earthScene.ts's AUTO_ROTATE_SPEED). 0 stops the spin entirely — no
+  /** Multiplies the idle auto-rotate speed of the Earth globe and the Solar
+   * System scene (orbitControlsExtras.ts's AUTO_ROTATE_SPEED). 0 stops the spin entirely — no
    * separate on/off toggle needed, since OrbitControls' per-frame rotation
    * delta is directly proportional to this and a zero delta is a no-op. */
   rotateSpeed: number;

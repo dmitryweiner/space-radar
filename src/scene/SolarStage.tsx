@@ -56,6 +56,8 @@ interface SolarStageProps {
   /** What the camera follows: a planet/moon name or a marker key; null = whole system. */
   focus: string | null;
   labelScale: number;
+  /** Auto-rotate speed multiplier (general settings); 0 = off. */
+  rotateSpeed: number;
   dataSaver?: boolean;
   onFocusChange: (key: string | null) => void;
   statesRef: LayerStatesRef;
@@ -64,7 +66,7 @@ interface SolarStageProps {
   onSelect: (selection: LayerSelection) => void;
 }
 
-export function SolarStage({ layers, layerSettings, time, focus, labelScale, dataSaver = false, onFocusChange, statesRef, onStatus, onSelect }: SolarStageProps) {
+export function SolarStage({ layers, layerSettings, time, focus, labelScale, rotateSpeed, dataSaver = false, onFocusChange, statesRef, onStatus, onSelect }: SolarStageProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [scene, setScene] = useState<SolarSystemSceneHandle | null>(null);
   const [sceneError, setSceneError] = useState<string | null>(null);
@@ -127,6 +129,10 @@ export function SolarStage({ layers, layerSettings, time, focus, labelScale, dat
   useEffect(() => {
     scene?.setLabelScale(labelScale);
   }, [scene, labelScale]);
+
+  useEffect(() => {
+    scene?.setAutoRotateSpeed(rotateSpeed);
+  }, [scene, rotateSpeed]);
 
   useEffect(() => {
     scene?.setLowPower(dataSaver);

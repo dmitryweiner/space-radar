@@ -43,6 +43,7 @@ vi.mock('../src/render/solarSystemScene', () => ({
     setOnFocusChange: vi.fn(),
     setLabelScale: vi.fn(),
     setLowPower: vi.fn(),
+    setAutoRotateSpeed: vi.fn(),
     layer: vi.fn(() => ({ setMarkers: vi.fn(), setTracks: vi.fn(), setVisible: vi.fn() })),
     removeLayer: vi.fn(),
     resize: vi.fn(),

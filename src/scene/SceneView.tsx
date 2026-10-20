@@ -189,6 +189,7 @@ export function SceneView({ labelScale, rotateSpeed, dataSaver = false, startSce
         time={time}
         focus={solarFocus}
         labelScale={labelScale}
+        rotateSpeed={rotateSpeed}
         dataSaver={dataSaver}
         onFocusChange={setSolarFocus}
         statesRef={statesRef}

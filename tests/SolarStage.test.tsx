@@ -15,6 +15,7 @@ const sceneHandle = {
   setOnFocusChange: vi.fn(),
   setLabelScale: vi.fn(),
   setLowPower: vi.fn(),
+  setAutoRotateSpeed: vi.fn(),
   layer: vi.fn(() => layerHandle),
   removeLayer: vi.fn(),
   resize: vi.fn(),
@@ -51,6 +52,7 @@ function renderStage(overrides: Partial<React.ComponentProps<typeof SolarStage>>
     time: null,
     focus: null,
     labelScale: 1,
+    rotateSpeed: 1,
     onFocusChange: vi.fn(),
     statesRef: { current: {} },
     onStatus: vi.fn(),
@@ -90,6 +92,13 @@ describe('SolarStage', () => {
     unmount();
     expect(sceneHandle.removeLayer).toHaveBeenCalledWith('test-layer');
     expect(sceneHandle.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('passes the auto-rotate speed setting to the scene', async () => {
+    const { rerender, props } = renderStage({ rotateSpeed: 2 });
+    await vi.waitFor(() => expect(sceneHandle.setAutoRotateSpeed).toHaveBeenCalledWith(2));
+    rerender(<SolarStage {...props} rotateSpeed={0} />);
+    expect(sceneHandle.setAutoRotateSpeed).toHaveBeenLastCalledWith(0);
   });
 
   it('follows the focus prop and shows the focused name', async () => {

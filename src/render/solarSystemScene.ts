@@ -6,7 +6,7 @@ import type { BodyOrientation } from '../astro/bodyOrientation';
 import { heliocentricToSceneVector } from '../astro/coords';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
-import { attachKeyboardZoom } from './orbitControlsExtras';
+import { attachAutoRotate, attachKeyboardZoom } from './orbitControlsExtras';
 import { makeTrail, type TrailLine } from './trailLine';
 import { compressForDisplay } from '../astro/kepler';
 import earthTextureUrl from '../assets/earth-diffuse.jpg';
@@ -248,6 +248,9 @@ export interface SolarSystemSceneHandle {
   setLabelScale(scale: number): void;
   /** Data saver: 30 fps cap and a 1× pixel ratio. */
   setLowPower(lowPower: boolean): void;
+  /** Multiplies the idle auto-rotate speed (the global "Auto-rotate speed"
+   * setting); 0 stops the spin. */
+  setAutoRotateSpeed(multiplier: number): void;
   resize(): void;
   dispose(): void;
 }
@@ -373,6 +376,9 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   controls.minDistance = OVERVIEW_MIN_DISTANCE;
   controls.maxDistance = MAX_DISTANCE;
   const detachKeyboardZoom = attachKeyboardZoom(controls, camera, canvas);
+  // Idle spin around whatever the camera looks at (the Sun, or a focused
+  // body) until the user rotates/pans — same rules as the Earth globe.
+  const autoRotate = attachAutoRotate(controls);
   // One finger rotates (the page never scrolls); two fingers rotate + pinch-zoom.
   controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
 
@@ -662,13 +668,20 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
   }
 
   let frameId = 0;
+  // Real elapsed seconds for controls.update(), so the auto-rotate speed is
+  // per second, not per frame (see earthScene.ts); capped so a stall (a
+  // backgrounded tab) doesn't jump the view forward.
+  const MAX_DELTA_SECONDS = 0.1;
+  let lastFrameTime = performance.now();
   function animate(now: number) {
     frameId = requestAnimationFrame(animate);
     if (!frameGate.shouldRender(now)) {
       return;
     }
+    const deltaSeconds = Math.min(Math.max(0, now - lastFrameTime) / 1000, MAX_DELTA_SECONDS);
+    lastFrameTime = now;
     updateCamera(now);
-    controls.update();
+    controls.update(deltaSeconds);
     updateNearPlane();
     cameraUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
     for (const planet of planets.values()) {
@@ -834,6 +847,9 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
       renderer.setPixelRatio(pixelRatioFor(lowPower));
       applySize();
     },
+    setAutoRotateSpeed(multiplier) {
+      autoRotate.setSpeed(multiplier);
+    },
     layer(id) {
       return layerHandle(id);
     },
@@ -969,6 +985,7 @@ export function createSolarSystemScene(canvas: HTMLCanvasElement): SolarSystemSc
       canvas.removeEventListener('pointerdown', handlePointerDown);
       canvas.removeEventListener('click', handleClick);
       detachKeyboardZoom();
+      autoRotate.dispose();
       controls.dispose();
       scene.traverse((object) => {
         if (object instanceof THREE.Mesh || object instanceof THREE.Line) {

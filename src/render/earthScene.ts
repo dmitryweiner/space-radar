@@ -7,7 +7,7 @@ import earthMapTextureUrl from '../assets/earth-map.jpg';
 import { createStarfield } from './starfield';
 import { makeLabelSprite, scaleLabelToScreen, type LabelSprite } from './labelSprite';
 import { makeTrail, type TrailLine } from './trailLine';
-import { attachKeyboardZoom } from './orbitControlsExtras';
+import { attachAutoRotate, attachKeyboardZoom } from './orbitControlsExtras';
 import { createFrameGate, pixelRatioFor } from './lowPower';
 
 export const EARTH_RADIUS_UNITS = 2;
@@ -15,21 +15,6 @@ export const EARTH_RADIUS_UNITS = 2;
 // How close the camera can dolly in — just above the surface so users can
 // make out fine detail; far enough that geometry never clips the near plane.
 const MIN_CAMERA_DISTANCE = EARTH_RADIUS_UNITS + 0.3;
-
-// Slow idle spin, in OrbitControls units (2.0 ≈ one turn per 30 s at 60 fps),
-// so a fresh globe drifts gently until the user grabs or zooms it.
-const AUTO_ROTATE_SPEED = 0.4;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-// OrbitControls tracks its current gesture in a plain `state` property
-// (`this.state = _STATE.ROTATE` etc. at runtime) that isn't part of its
-// public type declarations — read it structurally instead of an `as` cast.
-function currentControlsState(controls: OrbitControls): unknown {
-  return isRecord(controls) ? controls.state : undefined;
-}
 
 // Labels and markers keep a constant on-screen *pixel* size — unchanged by zoom
 // and by the canvas size (see scaleLabelToScreen). Marker sizes
@@ -143,7 +128,7 @@ export interface EarthSceneHandle {
    * is where it actually is right now (or at the scrubbed time). */
   setSunPosition(sun: SunPosition): void;
   /** Multiplies the idle auto-rotate speed (see the global "Auto-rotate
-   * speed" setting). 1 = AUTO_ROTATE_SPEED below; 0 stops the spin. */
+   * speed" setting). 0 stops the spin. */
   setAutoRotateSpeed(multiplier: number): void;
   /** Dolly the camera to `distance` from the centre (clamped to the zoom
    * limits) — e.g. to take in the asteroid-flyby scale. Ends aspect fitting. */
@@ -211,31 +196,8 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
   // scale (out to ~14 units) — see src/astro/flyby.ts.
   controls.maxDistance = 32;
 
-  // Gently auto-rotate until the user actually moves the globe (drag-rotate
-  // or drag-pan); zooming (wheel, trackpad pinch, keyboard +/-, or a
-  // middle-drag dolly) leaves it spinning. OrbitControls fires 'start' on any
-  // pointer interaction, but only *sets* its internal `state` for gestures
-  // that need to track motion across multiple events — a mouse-wheel/pinch
-  // zoom is a one-shot action handled inline in the wheel handler, which
-  // never touches `state`, so it fires 'start' with `state` left at NONE
-  // (-1); a middle-mouse-button-drag dolly *is* a multi-event drag, so it
-  // does get its own state, DOLLY (1). Both are zoom-only and must be
-  // excluded, or trackpad pinch-zoom (delivered as wheel events) stops the
-  // spin exactly like a real drag would. Two-finger touch gestures always mix
-  // a pinch with pan/rotate, so those still count as a move. `state`'s enum
-  // isn't exported by the OrbitControls module, so the values are hardcoded
-  // here with this comment as the source of truth.
-  const ORBIT_CONTROLS_NONE_STATE = -1;
-  const ORBIT_CONTROLS_DOLLY_STATE = 1;
-  controls.autoRotate = true;
-  controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
-  const stopAutoRotateOnMove = () => {
-    const state = currentControlsState(controls);
-    if (state !== ORBIT_CONTROLS_NONE_STATE && state !== ORBIT_CONTROLS_DOLLY_STATE) {
-      controls.autoRotate = false;
-    }
-  };
-  controls.addEventListener('start', stopAutoRotateOnMove);
+  // Idle spin until the user rotates/pans (zoom keeps it spinning).
+  const autoRotate = attachAutoRotate(controls);
   const detachKeyboardZoom = attachKeyboardZoom(controls, camera, canvas);
   // One finger rotates (the page never scrolls); two fingers rotate + pinch-zoom.
   controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
@@ -939,7 +901,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       placeSun(sun);
     },
     setAutoRotateSpeed(multiplier) {
-      controls.autoRotateSpeed = AUTO_ROTATE_SPEED * multiplier;
+      autoRotate.setSpeed(multiplier);
     },
     setViewDistance(distance) {
       fittedDistance = null;
@@ -956,7 +918,7 @@ export function createEarthScene(canvas: HTMLCanvasElement): EarthSceneHandle {
       cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
       canvas.removeEventListener('click', handleCanvasClick);
-      controls.removeEventListener('start', stopAutoRotateOnMove);
+      autoRotate.dispose();
       detachKeyboardZoom();
       controls.dispose();
       for (const content of layers.values()) {

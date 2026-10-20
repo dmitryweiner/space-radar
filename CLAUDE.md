@@ -15,7 +15,8 @@ Existing helpers:
   zoom + double-click fit, wavelength swap, grid, region toggle, and a live
   marker click → details when SWPC delivered any), hover-routed
   keyboard zoom (solar-system canvas), Solar System fly-to (a body chip →
-  overlay + view change → "Whole system"), the Solar System data layers
+  overlay + view change → "Whole system"), Solar System auto-rotate (spins
+  at rest, a press on empty space stops it), the Solar System data layers
   (on by default, toggling one removes its fly-to chips — UI only, their JPL
   data needs the deployed proxy), auto-rotate stop-only-on-move (see
   the OrbitControls `state` note below), the general settings popup (label
@@ -167,8 +168,9 @@ npm run build       # production build → ./dist (local check only — CI deplo
     size in once at creation) **and in the Solar System scene**
     (`solarSystemScene.ts`'s `setLabelScale`: planet/moon/marker labels and
     layer marker sizes, in `placeLabel`).
-  - `rotateSpeed`: a 0–3× multiplier on the globe's idle auto-rotate speed
-    (`setAutoRotateSpeed`, multiplies `AUTO_ROTATE_SPEED`). **0 doubles as
+  - `rotateSpeed`: a 0–3× multiplier on the idle auto-rotate speed of both
+    the globe and the Solar System scene (each scene's `setAutoRotateSpeed`,
+    multiplies `AUTO_ROTATE_SPEED`). **0 doubles as
     "off"** — no separate boolean toggle.
   - `timeZone` (`utc`|`local`) and `units` (`metric`|`imperial`): **all**
     user-visible times/distances/speeds go through `src/format/display.ts`
@@ -208,8 +210,12 @@ npm run build       # production build → ./dist (local check only — CI deplo
   auto-rotation, so the keys would never fire *while the globe is still spinning*.
   A click-focused canvas is a fallback target only when the pointer is over no
   scene, so two canvases never zoom at once. (Zoom is keyboard + mouse-wheel only; an
-  on-screen-button version was tried and removed.) The Earth globe
-  additionally auto-rotates (`controls.autoRotate`, `AUTO_ROTATE_SPEED`).
+  on-screen-button version was tried and removed.) **Both scenes also
+  auto-rotate via the shared `orbitControlsExtras.attachAutoRotate`**
+  (`controls.autoRotate`, `AUTO_ROTATE_SPEED`; the solar-system one spins
+  around whatever it's looking at — the Sun or a focused body). Each host
+  passes real elapsed seconds to `controls.update(delta)` so the speed is per
+  second, not per frame.
   **Only a rotate/pan move stops the spin — zooming (wheel, trackpad pinch,
   keyboard `+`/`-`, or a middle-drag dolly) leaves it spinning.** OrbitControls
   fires `start` on any pointer interaction, but only *sets* its internal
@@ -218,7 +224,7 @@ npm run build       # production build → ./dist (local check only — CI deplo
   wheel handler, which never touches `state`, so `start` fires with `state`
   left at `NONE` (`-1`); a middle-mouse-drag dolly *is* a multi-event drag, so
   it gets its own state, `DOLLY` (`1`). **Both must be excluded** —
-  `earthScene.ts`'s `stopAutoRotateOnMove` only clears `autoRotate` when
+  `attachAutoRotate`'s `stopAutoRotateOnMove` only clears `autoRotate` when
   `state` is neither. (An earlier version excluded only `DOLLY`, on the wrong
   assumption that wheel zoom also sets `state=DOLLY`; that let trackpad
   pinch-zoom, which browsers deliver as wheel events, incorrectly stop the
@@ -228,8 +234,7 @@ npm run build       # production build → ./dist (local check only — CI deplo
   part of OrbitControls' public type declarations, so `state` is read via an
   `isRecord` structural check rather than an `as` cast, and both values are
   hardcoded with a comment as the source of truth. Two-finger touch gestures
-  always mix a pinch with pan/rotate, so those still stop it. The solar-system
-  scene gets keyboard zoom but no auto-rotate. `scripts/smoke.mjs` guards the
+  always mix a pinch with pan/rotate, so those still stop it. `scripts/smoke.mjs` guards the
   zoom-hover-while-spinning case (hovers, does not click, the solar-system
   canvas) and separately guards the stop/no-stop distinction on the Scene globe
   via `scripts/pngDiff.mjs`'s `countDiffPixels` — **exact-byte

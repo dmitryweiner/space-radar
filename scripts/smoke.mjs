@@ -5,7 +5,7 @@
 // toggles persisting, the globe rendering, a status chip opening its inspector
 // panel, the time scrubber, the Earth/Sun/Solar System tabs and their #hash links (the Sun disk's
 // zoom, wavelength, grid, marker details), hover-routed
-// keyboard zoom, Solar System fly-to, auto-rotate stop-only-on-move, the
+// keyboard zoom, Solar System fly-to + auto-rotate, auto-rotate stop-only-on-move, the
 // general settings popup, the Earth style select, and the phone layout
 // (one-finger rotate + bottom sheet, a panel's × returning to the list).
 //
@@ -201,9 +201,9 @@ async function checkSunTab(page, errors) {
 }
 
 // keyboard +/- zoom must work on hover alone — no click needed — so it also
-// works while a globe is still auto-rotating (clicking would stop the spin).
-// The Solar System scene has no auto-rotate, so any change between the
-// before/after capture is the zoom itself.
+// works while a scene is still auto-rotating (clicking would stop the spin).
+// The Solar System scene spins too, so this only proves the view changed; the
+// auto-rotate stop/no-stop rules themselves are checked on the globe below.
 ctxLabel = 'keyboard-zoom';
 {
   await page.getByRole('tab', { name: 'Solar System' }).click();
@@ -229,6 +229,24 @@ ctxLabel = 'keyboard-zoom';
   await page.getByRole('button', { name: '← Whole system' }).click();
   await page.waitForTimeout(300);
   if ((await page.locator('.solar-focus-name').count()) !== 0) errors.push('[fly-to] "Whole system" did not leave the focus');
+
+  // Solar System auto-rotate (same rules as the globe's, shared helper): it
+  // spins at rest, and a zero-movement rotate press on empty space stops it.
+  await page.waitForTimeout(1200);
+  const solarBefore = await zoomCanvas.screenshot();
+  await page.waitForTimeout(600);
+  const solarSpinDiff = countDiffPixels(solarBefore, await zoomCanvas.screenshot());
+  if (solarSpinDiff < 1000) errors.push(`[solar-auto-rotate] not auto-rotating at rest (diff=${solarSpinDiff})`);
+  else console.log('solar-auto-rotate: spinning at rest ok, diff=', solarSpinDiff);
+  const solarBox = await zoomCanvas.boundingBox();
+  if (solarBox) {
+    await page.mouse.move(solarBox.x + 20, solarBox.y + solarBox.height - 20);
+    await page.mouse.down();
+    await page.mouse.up();
+    const solarStoppedDiff = await settledDiff(zoomCanvas, 300);
+    if (solarStoppedDiff >= 300) errors.push(`[solar-auto-rotate] a rotate press did not stop it (diff=${solarStoppedDiff})`);
+    else console.log('solar-auto-rotate: press stops it ok, diff=', solarStoppedDiff);
+  }
 
   // Solar System data layers: on by default; switching one off removes its
   // fly-to chips. (Their data needs the deployed proxy — JPL sends no CORS —

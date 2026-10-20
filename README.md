@@ -77,7 +77,7 @@ Your choices are saved locally.
     including hyperbolic one-time visitors.
   Beyond 35 AU the distance scale is compressed so the Voyagers fit on screen.
 - The 3D views **rotate by dragging** and **zoom** with the mouse wheel,
-  trackpad pinch, or `+`/`-`. The globe idle-spins until you drag it — zooming
+  trackpad pinch, or `+`/`-`. The globe and the Solar System view idle-spin until you drag them — zooming
   never stops the spin.
 - **Settings** in the header: label/marker size, auto-rotate speed (0 turns it
   off), UTC or local time, metric or imperial units, which tab to open on, a
